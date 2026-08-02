@@ -1,0 +1,60 @@
+import { createEnv } from "@t3-oss/env-nextjs";
+import { z } from "zod";
+
+const trueEnvValues = ["1", "true", "yes", "on"] as const;
+const falseEnvValues = ["0", "false", "no", "off"] as const;
+const booleanFlagEnvValues = [...trueEnvValues, ...falseEnvValues] as const;
+const trueEnvValueSet = new Set<string>(trueEnvValues);
+
+function _booleanFlagSchema(defaultValue: boolean) {
+  return z
+    .preprocess((value) => {
+      if (typeof value === "string") {
+        const normalizedValue = value.trim().toLowerCase();
+
+        return normalizedValue === "" ? undefined : normalizedValue;
+      }
+
+      return value;
+    }, z.union([z.boolean(), z.enum(booleanFlagEnvValues)]).optional())
+    .transform((value) => {
+      if (value == null) {
+        return defaultValue;
+      }
+
+      if (typeof value === "boolean") {
+        return value;
+      }
+
+      return trueEnvValueSet.has(value);
+    });
+}
+
+export const env = createEnv({
+  server: {
+    NODE_ENV: z.enum(["development", "production", "test"]),
+    DATABASE_URL: z.string().min(1),
+    BETTER_AUTH_SECRET: z.string().min(32),
+    BETTER_AUTH_URL: z.url(),
+  },
+  client: {
+    NEXT_PUBLIC_BASE_URL: z.string().min(1),
+  },
+  runtimeEnv: {
+    NODE_ENV: process.env.NODE_ENV,
+    NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
+    DATABASE_URL: process.env.DATABASE_URL,
+    BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
+    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
+  },
+});
+
+export const getEnvVariable = (key: string) => {
+  const value = process.env[key];
+
+  if (!value) {
+    throw new Error(`Missing environment variable: ${key}`);
+  }
+
+  return value;
+};
