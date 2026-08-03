@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { env } from "@/lib/env";
 import db from "@/server/db";
 import { user, verification } from "@/server/db/schema";
+import type { AuthSession } from "@/server/routes/auth";
 import type { ChangeEmailValues } from "@/zod";
 
 const EMAIL_CHANGE_PREFIX = "account-email-change";
@@ -17,20 +18,17 @@ type PendingEmailChange = {
   userId: string;
 };
 
-type AccountEmailState =
-  | { kind: "unauthorized" }
-  | {
-      kind: "success";
-      value: {
-        email: string;
-        emailVerified: boolean;
-        pendingEmail: string | null;
-        pendingEmailExpiresAt: string | null;
-      };
-    };
+type AccountEmailState = {
+  kind: "success";
+  value: {
+    email: string;
+    emailVerified: boolean;
+    pendingEmail: string | null;
+    pendingEmailExpiresAt: string | null;
+  };
+};
 
 type AccountEmailMutationResult =
-  | { kind: "unauthorized" }
   | { kind: "error"; message: string; statusCode: number }
   | {
       kind: "success";
@@ -184,28 +182,17 @@ function createAccountRedirectURL(status: "success" | "invalid" | "expired") {
 }
 
 export async function getAccountEmailState({
-  headers,
+  authSession,
 }: {
-  headers: Headers;
+  authSession: AuthSession;
 }): Promise<AccountEmailState> {
-  const session = await auth.api.getSession({
-    headers,
-    query: {
-      disableCookieCache: true,
-    },
-  });
-
-  if (!session) {
-    return { kind: "unauthorized" };
-  }
-
-  const pendingChange = await getPendingEmailChange(session.user.id);
+  const pendingChange = await getPendingEmailChange(authSession.user.id);
 
   return {
     kind: "success",
     value: {
-      email: session.user.email,
-      emailVerified: session.user.emailVerified,
+      email: authSession.user.email,
+      emailVerified: authSession.user.emailVerified,
       pendingEmail: pendingChange?.newEmail ?? null,
       pendingEmailExpiresAt: pendingChange?.expiresAt.toISOString() ?? null,
     },
@@ -213,24 +200,13 @@ export async function getAccountEmailState({
 }
 
 export async function changeAccountEmail({
+  authSession,
   body,
-  headers,
 }: {
+  authSession: AuthSession;
   body: ChangeEmailValues;
-  headers: Headers;
 }): Promise<AccountEmailMutationResult> {
-  const session = await auth.api.getSession({
-    headers,
-    query: {
-      disableCookieCache: true,
-    },
-  });
-
-  if (!session) {
-    return { kind: "unauthorized" };
-  }
-
-  if (body.newEmail === session.user.email) {
+  if (body.newEmail === authSession.user.email) {
     return {
       kind: "error",
       message: "New email must be different from your current email.",
@@ -253,16 +229,16 @@ export async function changeAccountEmail({
   }
 
   const pendingChange = await createPendingEmailChange({
-    currentEmail: session.user.email,
+    currentEmail: authSession.user.email,
     newEmail: body.newEmail,
-    userId: session.user.id,
+    userId: authSession.user.id,
   });
 
   return {
     kind: "success",
     value: {
-      email: session.user.email,
-      emailVerified: session.user.emailVerified,
+      email: authSession.user.email,
+      emailVerified: authSession.user.emailVerified,
       pendingEmail: pendingChange.newEmail,
       pendingEmailExpiresAt: pendingChange.expiresAt.toISOString(),
     },
@@ -270,28 +246,17 @@ export async function changeAccountEmail({
 }
 
 export async function cancelPendingEmailChange({
-  headers,
+  authSession,
 }: {
-  headers: Headers;
+  authSession: AuthSession;
 }): Promise<AccountEmailMutationResult> {
-  const session = await auth.api.getSession({
-    headers,
-    query: {
-      disableCookieCache: true,
-    },
-  });
-
-  if (!session) {
-    return { kind: "unauthorized" };
-  }
-
-  await clearPendingEmailChanges(session.user.id);
+  await clearPendingEmailChanges(authSession.user.id);
 
   return {
     kind: "success",
     value: {
-      email: session.user.email,
-      emailVerified: session.user.emailVerified,
+      email: authSession.user.email,
+      emailVerified: authSession.user.emailVerified,
       pendingEmail: null,
       pendingEmailExpiresAt: null,
     },
@@ -299,22 +264,13 @@ export async function cancelPendingEmailChange({
 }
 
 export async function resendAccountVerification({
+  authSession,
   headers,
 }: {
+  authSession: AuthSession;
   headers: Headers;
 }): Promise<AccountEmailMutationResult> {
-  const session = await auth.api.getSession({
-    headers,
-    query: {
-      disableCookieCache: true,
-    },
-  });
-
-  if (!session) {
-    return { kind: "unauthorized" };
-  }
-
-  if (session.user.emailVerified) {
+  if (authSession.user.emailVerified) {
     return {
       kind: "error",
       message: "Email is already verified.",
@@ -325,7 +281,7 @@ export async function resendAccountVerification({
   await auth.api.sendVerificationEmail({
     body: {
       callbackURL: "/email-verification?status=success",
-      email: session.user.email,
+      email: authSession.user.email,
     },
     headers,
   });
@@ -333,8 +289,8 @@ export async function resendAccountVerification({
   return {
     kind: "success",
     value: {
-      email: session.user.email,
-      emailVerified: session.user.emailVerified,
+      email: authSession.user.email,
+      emailVerified: authSession.user.emailVerified,
       pendingEmail: null,
       pendingEmailExpiresAt: null,
     },

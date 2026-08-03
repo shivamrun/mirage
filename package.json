@@ -16,6 +16,7 @@
     "shadcn:add": "pnpm dlx shadcn@latest add"
   },
   "dependencies": {
+    "@elysia/eden": "^1.4.10",
     "@elysia/node": "^1.4.6",
     "@hookform/resolvers": "^5.6.0",
     "@remixicon/react": "^4.9.0",

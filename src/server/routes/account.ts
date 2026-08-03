@@ -10,9 +10,7 @@ import {
 } from "@/server/account/email-change";
 import { changeEmailSchema } from "@/zod";
 
-function unauthorizedResponse() {
-  return Response.json({ message: "Unauthorized" }, { status: 401 });
-}
+import { elysiaAuth } from "./auth";
 
 function validationErrorResponse(message: string) {
   return Response.json({ message }, { status: 400 });
@@ -48,17 +46,20 @@ function validateMutationRequest(request: Request) {
 }
 
 export const accountRoutes = new Elysia({ prefix: "/account" })
-  .get("/", async ({ request }) => {
-    const result = await getAccountEmailState({
-      headers: request.headers,
-    });
+  .use(elysiaAuth)
+  .get(
+    "/",
+    async ({ authSession }) => {
+      const result = await getAccountEmailState({
+        authSession,
+      });
 
-    if (result.kind === "unauthorized") {
-      return unauthorizedResponse();
-    }
-
-    return result.value;
-  })
+      return result.value;
+    },
+    {
+      auth: true,
+    },
+  )
   .get("/confirm-email-change", async ({ query }) => {
     const token = typeof query.token === "string" ? query.token : "";
 
@@ -74,101 +75,108 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
 
     return Response.redirect(result.redirectURL);
   })
-  .post("/change-email", async ({ body, request }) => {
-    const invalidMutationResponse = validateMutationRequest(request);
+  .post(
+    "/change-email",
+    async ({ authSession, body, request }) => {
+      const invalidMutationResponse = validateMutationRequest(request);
 
-    if (invalidMutationResponse) {
-      return invalidMutationResponse;
-    }
+      if (invalidMutationResponse) {
+        return invalidMutationResponse;
+      }
 
-    const parsed = changeEmailSchema.safeParse({
-      ...(body && typeof body === "object" ? body : {}),
-      callbackURL: "/email-verification?status=success",
-    });
+      const parsed = changeEmailSchema.safeParse({
+        ...(body && typeof body === "object" ? body : {}),
+        callbackURL: "/email-verification?status=success",
+      });
 
-    if (!parsed.success) {
-      const message =
-        parsed.error.flatten().formErrors[0] ||
-        Object.values(parsed.error.flatten().fieldErrors)
-          .flat()
-          .find(Boolean) ||
-        "Invalid email change request.";
+      if (!parsed.success) {
+        const message =
+          parsed.error.flatten().formErrors[0] ||
+          Object.values(parsed.error.flatten().fieldErrors)
+            .flat()
+            .find(Boolean) ||
+          "Invalid email change request.";
 
-      return validationErrorResponse(message);
-    }
+        return validationErrorResponse(message);
+      }
 
-    const result = await changeAccountEmail({
-      body: parsed.data,
-      headers: request.headers,
-    });
+      const result = await changeAccountEmail({
+        authSession,
+        body: parsed.data,
+      });
 
-    if (result.kind === "unauthorized") {
-      return unauthorizedResponse();
-    }
+      if (result.kind === "error") {
+        return Response.json(
+          { message: result.message },
+          { status: result.statusCode },
+        );
+      }
 
-    if (result.kind === "error") {
-      return Response.json(
-        { message: result.message },
-        { status: result.statusCode },
-      );
-    }
+      return {
+        status: true,
+        ...result.value,
+      };
+    },
+    {
+      auth: true,
+    },
+  )
+  .post(
+    "/cancel-email-change",
+    async ({ authSession, request }) => {
+      const invalidMutationResponse = validateMutationRequest(request);
 
-    return {
-      status: true,
-      ...result.value,
-    };
-  })
-  .post("/cancel-email-change", async ({ request }) => {
-    const invalidMutationResponse = validateMutationRequest(request);
+      if (invalidMutationResponse) {
+        return invalidMutationResponse;
+      }
 
-    if (invalidMutationResponse) {
-      return invalidMutationResponse;
-    }
+      const result = await cancelPendingEmailChange({
+        authSession,
+      });
 
-    const result = await cancelPendingEmailChange({
-      headers: request.headers,
-    });
+      if (result.kind === "error") {
+        return Response.json(
+          { message: result.message },
+          { status: result.statusCode },
+        );
+      }
 
-    if (result.kind === "unauthorized") {
-      return unauthorizedResponse();
-    }
+      return {
+        status: true,
+        ...result.value,
+      };
+    },
+    {
+      auth: true,
+    },
+  )
+  .post(
+    "/resend-verification",
+    async ({ authSession, request }) => {
+      const invalidMutationResponse = validateMutationRequest(request);
 
-    if (result.kind === "error") {
-      return Response.json(
-        { message: result.message },
-        { status: result.statusCode },
-      );
-    }
+      if (invalidMutationResponse) {
+        return invalidMutationResponse;
+      }
 
-    return {
-      status: true,
-      ...result.value,
-    };
-  })
-  .post("/resend-verification", async ({ request }) => {
-    const invalidMutationResponse = validateMutationRequest(request);
+      const result = await resendAccountVerification({
+        authSession,
+        headers: request.headers,
+      });
 
-    if (invalidMutationResponse) {
-      return invalidMutationResponse;
-    }
+      if (result.kind === "error") {
+        return Response.json(
+          { message: result.message },
+          { status: result.statusCode },
+        );
+      }
 
-    const result = await resendAccountVerification({
-      headers: request.headers,
-    });
-
-    if (result.kind === "unauthorized") {
-      return unauthorizedResponse();
-    }
-
-    if (result.kind === "error") {
-      return Response.json(
-        { message: result.message },
-        { status: result.statusCode },
-      );
-    }
-
-    return {
-      status: true,
-      ...result.value,
-    };
-  });
+      return {
+        status: true,
+        ...result.value,
+      };
+    },
+    {
+      auth: true,
+    },
+  );

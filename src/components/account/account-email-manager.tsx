@@ -9,6 +9,7 @@ import { AuthInputField, AuthStatusMessage } from "@/components/auth";
 import { getUnexpectedAuthErrorMessage } from "@/components/auth/auth-errors";
 import { Button } from "@/components/ui/button";
 import { FieldDescription, FieldGroup, FieldSet } from "@/components/ui/field";
+import { api } from "@/lib/api/client";
 import {
   type ChangeEmailInput,
   type ChangeEmailValues,
@@ -32,8 +33,8 @@ type AccountEmailResponse = {
   pendingEmailExpiresAt: string | null;
 };
 
-async function readAccountError(response: Response) {
-  const body = (await response.json().catch(() => null)) as {
+function readAccountError(error: { value?: unknown } | null) {
+  const body = error?.value as {
     message?: string;
   } | null;
 
@@ -63,7 +64,7 @@ function AccountEmailManager({
   const form = useForm<ChangeEmailInput, undefined, ChangeEmailValues>({
     resolver: zodResolver(changeEmailSchema),
     defaultValues: {
-      newEmail: "",
+      newEmail: user.email,
     },
   });
 
@@ -99,22 +100,23 @@ function AccountEmailManager({
       email: user.email,
       emailVerified: user.emailVerified,
     }));
-  }, [user.email, user.emailVerified]);
+    form.reset({
+      newEmail: user.email,
+    });
+  }, [form, user.email, user.emailVerified]);
 
   React.useEffect(() => {
     let isMounted = true;
 
     async function loadEmailState() {
-      const response = await fetch("/api/account");
+      const { data, error } = await api.api.account.get();
 
-      if (!response.ok) {
+      if (error) {
         return;
       }
 
-      const nextEmailState = (await response.json()) as AccountEmailResponse;
-
       if (isMounted) {
-        setEmailState(nextEmailState);
+        setEmailState(data as AccountEmailResponse);
       }
     }
 
@@ -134,20 +136,18 @@ function AccountEmailManager({
     setIsSendingVerification(true);
 
     try {
-      const response = await fetch("/api/account/resend-verification", {
-        method: "POST",
-      });
+      const { data, error } =
+        await api.api.account["resend-verification"].post();
 
-      if (!response.ok) {
+      if (error) {
         setStatus({
-          text: await readAccountError(response),
+          text: readAccountError(error),
           tone: "error",
         });
         return;
       }
 
-      const nextEmailState = (await response.json()) as AccountEmailResponse;
-      setEmailState(nextEmailState);
+      setEmailState(data as AccountEmailResponse);
       setStatus({
         text: "Verification link sent.",
         tone: "success",
@@ -173,26 +173,23 @@ function AccountEmailManager({
     }
 
     try {
-      const response = await fetch("/api/account/change-email", {
-        body: JSON.stringify({ newEmail: values.newEmail }),
-        headers: {
-          "content-type": "application/json",
-        },
-        method: "POST",
+      const { data, error } = await api.api.account["change-email"].post({
+        newEmail: values.newEmail,
       });
 
-      if (!response.ok) {
+      if (error) {
         setStatus({
-          text: await readAccountError(response),
+          text: readAccountError(error),
           tone: "error",
         });
         return;
       }
 
-      const nextEmailState = (await response.json()) as AccountEmailResponse;
-      setEmailState(nextEmailState);
+      setEmailState(data as AccountEmailResponse);
       await onSessionRefresh();
-      form.reset();
+      form.reset({
+        newEmail: (data as AccountEmailResponse).email,
+      });
       setStatus({
         text: "Check the new email address to confirm this change.",
         tone: "success",
@@ -210,20 +207,21 @@ function AccountEmailManager({
     setIsCancellingEmailChange(true);
 
     try {
-      const response = await fetch("/api/account/cancel-email-change", {
-        method: "POST",
-      });
+      const { data, error } =
+        await api.api.account["cancel-email-change"].post();
 
-      if (!response.ok) {
+      if (error) {
         setStatus({
-          text: await readAccountError(response),
+          text: readAccountError(error),
           tone: "error",
         });
         return;
       }
 
-      const nextEmailState = (await response.json()) as AccountEmailResponse;
-      setEmailState(nextEmailState);
+      setEmailState(data as AccountEmailResponse);
+      form.reset({
+        newEmail: (data as AccountEmailResponse).email,
+      });
       setStatus({
         text: "Pending email change canceled.",
         tone: "success",
@@ -244,30 +242,27 @@ function AccountEmailManager({
 
   return (
     <FieldSet>
-      <div className="flex items-center justify-between gap-3 rounded-lg border bg-background px-3 py-2.5">
-        <div className="min-w-0">
-          <p className="truncate font-medium text-sm">{emailState.email}</p>
-          <FieldDescription>
+      <div className="flex flex-col gap-2 rounded-lg border bg-background px-3 py-2.5">
+        <div className="flex items-start justify-between gap-4">
+          <p className="font-medium text-sm">Email</p>
+          <span
+            className={
+              emailState.emailVerified
+                ? "font-medium text-emerald-700 text-sm dark:text-emerald-300"
+                : "text-muted-foreground text-sm"
+            }
+          >
             {emailState.emailVerified ? "Verified" : "Not verified"}
-          </FieldDescription>
-          {emailState.pendingEmail ? (
-            <FieldDescription>
-              Pending change to {emailState.pendingEmail}
-              {pendingEmailExpiresAt
-                ? `, expires ${pendingEmailExpiresAt.toLocaleString()}`
-                : ""}
-            </FieldDescription>
-          ) : null}
+          </span>
         </div>
-        <span
-          className={
-            emailState.emailVerified
-              ? "rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700 text-xs dark:bg-emerald-950/40 dark:text-emerald-300"
-              : "rounded-lg bg-muted px-2 py-1 text-muted-foreground text-xs"
-          }
-        >
-          {emailState.emailVerified ? "Verified" : "Optional"}
-        </span>
+        {emailState.pendingEmail ? (
+          <FieldDescription>
+            Pending change to {emailState.pendingEmail}
+            {pendingEmailExpiresAt
+              ? `, expires ${pendingEmailExpiresAt.toLocaleString()}`
+              : ""}
+          </FieldDescription>
+        ) : null}
       </div>
 
       {status ? (
@@ -302,16 +297,9 @@ function AccountEmailManager({
       >
         <FieldGroup>
           <AuthInputField
-            id="currentEmail"
-            label="Current email"
-            readOnly
-            value={emailState.email}
-          />
-          <AuthInputField
             id="newEmail"
-            label="New email"
+            label="Current email"
             error={form.formState.errors.newEmail?.message}
-            placeholder="new@company.com"
             required
             type="email"
             {...form.register("newEmail")}

@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { RiSave3Line } from "@remixicon/react";
+import Image from "next/image";
 import * as React from "react";
 import { useForm } from "react-hook-form";
 
@@ -29,6 +30,27 @@ type StatusMessage = {
   tone: "success" | "error" | "info";
 };
 
+function getInitials(name: string) {
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+
+  return initials || "G";
+}
+
+function isValidImageURL(value: string) {
+  try {
+    const url = new URL(value);
+
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function AccountProfileForm({
   onSessionRefresh,
   user,
@@ -44,6 +66,14 @@ function AccountProfileForm({
       name: "",
     },
   });
+  const imageValue = form.watch("image");
+  const nameValue = form.watch("name");
+  const previewImage = typeof imageValue === "string" ? imageValue.trim() : "";
+  const previewName =
+    typeof nameValue === "string" && nameValue.trim() ? nameValue : user.name;
+  const [failedImage, setFailedImage] = React.useState<string>();
+  const shouldShowImage =
+    isValidImageURL(previewImage) && failedImage !== previewImage;
 
   React.useEffect(() => {
     form.reset({
@@ -90,6 +120,27 @@ function AccountProfileForm({
             {status.text}
           </AuthStatusMessage>
         ) : null}
+        <div className="flex items-center gap-4">
+          <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 font-semibold text-primary text-xl">
+            {shouldShowImage ? (
+              <Image
+                alt={`${previewName} profile`}
+                className="size-full object-cover"
+                height={64}
+                onError={() => setFailedImage(previewImage)}
+                src={previewImage}
+                unoptimized
+                width={64}
+              />
+            ) : (
+              <span>{getInitials(previewName)}</span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate font-medium text-sm">{previewName}</p>
+            <p className="text-muted-foreground text-sm">Profile picture</p>
+          </div>
+        </div>
         <AuthInputField
           id="name"
           label="Name"
