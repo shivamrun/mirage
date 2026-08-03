@@ -12,10 +12,12 @@
     "db:migrate": "drizzle-kit migrate --config drizzle.config.ts",
     "db:studio": "drizzle-kit studio --config drizzle.config.ts",
     "db:up": "docker compose up -d",
-    "db:down": "docker compose down --volumes --remove-orphans"
+    "db:down": "docker compose down --volumes --remove-orphans",
+    "shadcn:add": "pnpm dlx shadcn@latest add"
   },
   "dependencies": {
     "@elysia/node": "^1.4.6",
+    "@hookform/resolvers": "^5.6.0",
     "@remixicon/react": "^4.9.0",
     "@sinclair/typebox": "^0.34.52",
     "@t3-oss/env-nextjs": "^0.13.11",
@@ -30,6 +32,7 @@
     "radix-ui": "^1.6.7",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-hook-form": "^7.84.0",
     "shadcn": "^4.16.1",
     "tailwind-merge": "^3.6.0",
     "tw-animate-css": "^1.4.0",

@@ -17,6 +17,22 @@ export function idColumn() {
 }
 
 /**
+ * Creates a standard required email column.
+ *
+ * @param options.unique Whether the database column should be unique.
+ *
+ * @example
+ * ...emailColumn({ unique: true })
+ */
+export function emailColumn(options: { unique?: boolean } = {}) {
+  const column = text("email").notNull();
+
+  return {
+    email: options.unique ? column.unique() : column,
+  };
+}
+
+/**
  * Creates standard record lifecycle timestamps.
  *
  * Includes:

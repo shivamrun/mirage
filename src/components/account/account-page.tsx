@@ -1,0 +1,114 @@
+"use client";
+
+import {
+  RiLockPasswordLine,
+  RiLogoutBoxLine,
+  RiMailCheckLine,
+  RiUserLine,
+} from "@remixicon/react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+
+import { AccountEmailManager } from "@/components/account/account-email-manager";
+import { AccountPasswordForm } from "@/components/account/account-password-form";
+import { AccountProfileForm } from "@/components/account/account-profile-form";
+import { AccountSection } from "@/components/account/account-section";
+import { Button } from "@/components/ui/button";
+import { authClient } from "@/lib/auth/client";
+
+function AccountPage({ emailChangeStatus }: { emailChangeStatus?: string }) {
+  const router = useRouter();
+  const session = authClient.useSession();
+  const user = session.data?.user;
+  const [isSigningOut, setIsSigningOut] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!session.isPending && !user) {
+      router.replace("/login");
+    }
+  }, [router, session.isPending, user]);
+
+  async function signOut() {
+    setIsSigningOut(true);
+
+    try {
+      await authClient.signOut();
+    } finally {
+      router.push("/login");
+      router.refresh();
+    }
+  }
+
+  if (session.isPending || !user) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center px-6">
+        <p className="text-muted-foreground text-sm">Loading account...</p>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-dvh bg-muted/30 px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <Link href="/" className="font-semibold text-lg tracking-tight">
+              Grove
+            </Link>
+            <h1 className="font-semibold text-3xl tracking-tight">Account</h1>
+            <p className="text-muted-foreground text-sm">{user.email}</p>
+          </div>
+          <Button
+            disabled={isSigningOut}
+            onClick={signOut}
+            type="button"
+            variant="outline"
+          >
+            <RiLogoutBoxLine data-icon="inline-start" />
+            {isSigningOut ? "Signing out..." : "Sign out"}
+          </Button>
+        </header>
+
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="flex flex-col gap-6">
+            <AccountSection
+              description="Update the public details tied to your Grove account."
+              icon={<RiUserLine />}
+              title="Profile"
+            >
+              <AccountProfileForm
+                onSessionRefresh={session.refetch}
+                user={user}
+              />
+            </AccountSection>
+
+            <AccountSection
+              description="Change your password and keep this session active."
+              icon={<RiLockPasswordLine />}
+              title="Security"
+            >
+              <AccountPasswordForm />
+            </AccountSection>
+          </div>
+
+          <aside className="flex flex-col gap-6">
+            <AccountSection
+              description="View your current address, send a verification link, or change it."
+              icon={<RiMailCheckLine />}
+              title="Email"
+            >
+              <AccountEmailManager
+                emailChangeStatus={emailChangeStatus}
+                onSessionRefresh={session.refetch}
+                user={user}
+              />
+            </AccountSection>
+          </aside>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+export { AccountPage };

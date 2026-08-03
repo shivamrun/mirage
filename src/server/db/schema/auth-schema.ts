@@ -3,6 +3,7 @@ import { boolean, index, pgTable, text } from "drizzle-orm/pg-core";
 
 import {
   auditTimestamps,
+  emailColumn,
   eventTimestamp,
   requiredTimestamp,
 } from "./../helpers/base-column";
@@ -13,7 +14,7 @@ export const user = pgTable("user", {
   id: text("id").primaryKey(),
 
   name: text("name").notNull(),
-  email: text("email").notNull().unique(),
+  ...emailColumn({ unique: true }),
 
   emailVerified: boolean("email_verified").default(false).notNull(),
 
