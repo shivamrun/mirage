@@ -6,6 +6,7 @@ import {
   changeAccountEmail,
   getAccountEmailState,
   resendAccountVerification,
+  resolveEmailChangeApprovalRedirectURL,
   resolveEmailChangeConfirmationRedirectURL,
 } from "@/server/account/email-change";
 import { changeEmailSchema } from "@/zod";
@@ -72,6 +73,19 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
     const result = await resolveEmailChangeConfirmationRedirectURL({
       token,
     });
+
+    return Response.redirect(result.redirectURL);
+  })
+  .get("/approve-email-change", async ({ query }) => {
+    const token = typeof query.token === "string" ? query.token : "";
+
+    if (!token) {
+      return Response.redirect(
+        new URL("/account?emailChange=invalid", env.NEXT_PUBLIC_BASE_URL),
+      );
+    }
+
+    const result = await resolveEmailChangeApprovalRedirectURL({ token });
 
     return Response.redirect(result.redirectURL);
   })

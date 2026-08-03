@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { and, eq, gt, like, lte } from "drizzle-orm";
+import { and, eq, gt, like, lte, or } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { env } from "@/lib/env";
@@ -10,7 +10,9 @@ import type { AuthSession } from "@/server/routes/auth";
 import type { ChangeEmailValues } from "@/zod";
 
 const EMAIL_CHANGE_PREFIX = "account-email-change";
+const EMAIL_CHANGE_APPROVAL_PREFIX = "account-email-change-approval";
 const EMAIL_CHANGE_EXPIRES_IN_MS = 1000 * 60 * 60;
+const EMAIL_CHANGE_TOKEN_PATTERN = /^[a-f0-9]{64}$/;
 
 type PendingEmailChange = {
   currentEmail: string;
@@ -51,12 +53,24 @@ function createToken() {
   return randomBytes(32).toString("hex");
 }
 
+function isValidEmailChangeToken(token: string) {
+  return EMAIL_CHANGE_TOKEN_PATTERN.test(token);
+}
+
 function getPendingIdentifierPrefix(userId: string) {
   return `${EMAIL_CHANGE_PREFIX}:${userId}:`;
 }
 
 function getPendingIdentifier(userId: string, token: string) {
   return `${getPendingIdentifierPrefix(userId)}${token}`;
+}
+
+function getApprovalIdentifierPrefix(userId: string) {
+  return `${EMAIL_CHANGE_APPROVAL_PREFIX}:${userId}:`;
+}
+
+function getApprovalIdentifier(userId: string, token: string) {
+  return `${getApprovalIdentifierPrefix(userId)}${token}`;
 }
 
 function parsePendingEmailChange(value: string | null) {
@@ -93,7 +107,16 @@ async function getPendingEmailChange(userId: string) {
     .from(verification)
     .where(
       and(
-        like(verification.identifier, `${getPendingIdentifierPrefix(userId)}%`),
+        or(
+          like(
+            verification.identifier,
+            `${getPendingIdentifierPrefix(userId)}%`,
+          ),
+          like(
+            verification.identifier,
+            `${getApprovalIdentifierPrefix(userId)}%`,
+          ),
+        ),
         gt(verification.expiresAt, new Date()),
       ),
     )
@@ -115,11 +138,23 @@ async function cleanupStaleEmailChanges(userId?: string) {
   const conditions = [lte(verification.expiresAt, new Date())];
 
   if (userId) {
-    conditions.push(
+    const identifierCondition = or(
       like(verification.identifier, `${getPendingIdentifierPrefix(userId)}%`),
+      like(verification.identifier, `${getApprovalIdentifierPrefix(userId)}%`),
     );
+
+    if (identifierCondition) {
+      conditions.push(identifierCondition);
+    }
   } else {
-    conditions.push(like(verification.identifier, `${EMAIL_CHANGE_PREFIX}:%`));
+    const identifierCondition = or(
+      like(verification.identifier, `${EMAIL_CHANGE_PREFIX}:%`),
+      like(verification.identifier, `${EMAIL_CHANGE_APPROVAL_PREFIX}:%`),
+    );
+
+    if (identifierCondition) {
+      conditions.push(identifierCondition);
+    }
   }
 
   await db.delete(verification).where(and(...conditions));
@@ -129,7 +164,13 @@ async function clearPendingEmailChanges(userId: string) {
   await db
     .delete(verification)
     .where(
-      like(verification.identifier, `${getPendingIdentifierPrefix(userId)}%`),
+      or(
+        like(verification.identifier, `${getPendingIdentifierPrefix(userId)}%`),
+        like(
+          verification.identifier,
+          `${getApprovalIdentifierPrefix(userId)}%`,
+        ),
+      ),
     );
 }
 
@@ -179,7 +220,55 @@ async function createPendingEmailChange({
   };
 }
 
-function createAccountRedirectURL(status: "success" | "invalid" | "expired") {
+async function createPendingEmailChangeApproval({
+  currentEmail,
+  newEmail,
+  userId,
+}: {
+  currentEmail: string;
+  newEmail: string;
+  userId: string;
+}) {
+  const token = createToken();
+  const expiresAt = new Date(Date.now() + EMAIL_CHANGE_EXPIRES_IN_MS);
+  const pendingChange: PendingEmailChange = {
+    currentEmail,
+    newEmail,
+    token,
+    userId,
+  };
+
+  await clearPendingEmailChanges(userId);
+  await db.insert(verification).values({
+    id: randomUUID(),
+    identifier: getApprovalIdentifier(userId, token),
+    value: JSON.stringify(pendingChange),
+    expiresAt,
+  });
+
+  const approvalURL = new URL(
+    "/api/account/approve-email-change",
+    env.NEXT_PUBLIC_BASE_URL,
+  );
+  approvalURL.searchParams.set("token", token);
+
+  await sendVerificationEmail({
+    actionLabel: "Approve email change",
+    email: currentEmail,
+    heading: "Approve your email change",
+    intro: `Approve changing your Grove account email to ${newEmail}.`,
+    verificationUrl: approvalURL.toString(),
+  });
+
+  return {
+    ...pendingChange,
+    expiresAt,
+  };
+}
+
+function createAccountRedirectURL(
+  status: "success" | "invalid" | "expired" | "pending",
+) {
   const redirectURL = new URL("/account", env.NEXT_PUBLIC_BASE_URL);
   redirectURL.searchParams.set("emailChange", status);
 
@@ -233,7 +322,10 @@ export async function changeAccountEmail({
     };
   }
 
-  const pendingChange = await createPendingEmailChange({
+  const createPendingChange = authSession.user.emailVerified
+    ? createPendingEmailChangeApproval
+    : createPendingEmailChange;
+  const pendingChange = await createPendingChange({
     currentEmail: authSession.user.email,
     newEmail: body.newEmail,
     userId: authSession.user.id,
@@ -247,6 +339,83 @@ export async function changeAccountEmail({
       pendingEmail: pendingChange.newEmail,
       pendingEmailExpiresAt: pendingChange.expiresAt.toISOString(),
     },
+  };
+}
+
+export async function resolveEmailChangeApprovalRedirectURL({
+  token,
+}: {
+  token: string;
+}): Promise<EmailChangeConfirmationResult> {
+  if (!isValidEmailChangeToken(token)) {
+    return {
+      notificationEmail: null,
+      notificationUserId: null,
+      redirectURL: createAccountRedirectURL("invalid"),
+    };
+  }
+
+  await cleanupStaleEmailChanges();
+
+  const [approvalRecord] = await db
+    .select()
+    .from(verification)
+    .where(
+      like(
+        verification.identifier,
+        `${EMAIL_CHANGE_APPROVAL_PREFIX}:%:${token}`,
+      ),
+    )
+    .limit(1);
+
+  const pendingChange = parsePendingEmailChange(approvalRecord?.value ?? null);
+
+  if (!approvalRecord || !pendingChange) {
+    return {
+      notificationEmail: null,
+      notificationUserId: null,
+      redirectURL: createAccountRedirectURL("invalid"),
+    };
+  }
+
+  if (approvalRecord.expiresAt < new Date()) {
+    await db.delete(verification).where(eq(verification.id, approvalRecord.id));
+
+    return {
+      notificationEmail: null,
+      notificationUserId: null,
+      redirectURL: createAccountRedirectURL("expired"),
+    };
+  }
+
+  const [existingUser] = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(eq(user.email, pendingChange.newEmail))
+    .limit(1);
+
+  if (existingUser) {
+    await db.delete(verification).where(eq(verification.id, approvalRecord.id));
+
+    return {
+      notificationEmail: null,
+      notificationUserId: null,
+      redirectURL: createAccountRedirectURL("invalid"),
+    };
+  }
+
+  await db.delete(verification).where(eq(verification.id, approvalRecord.id));
+
+  const newEmailChange = await createPendingEmailChange({
+    currentEmail: pendingChange.currentEmail,
+    newEmail: pendingChange.newEmail,
+    userId: pendingChange.userId,
+  });
+
+  return {
+    notificationEmail: newEmailChange.newEmail,
+    notificationUserId: newEmailChange.userId,
+    redirectURL: createAccountRedirectURL("pending"),
   };
 }
 
@@ -307,6 +476,14 @@ export async function resolveEmailChangeConfirmationRedirectURL({
 }: {
   token: string;
 }): Promise<EmailChangeConfirmationResult> {
+  if (!isValidEmailChangeToken(token)) {
+    return {
+      notificationEmail: null,
+      notificationUserId: null,
+      redirectURL: createAccountRedirectURL("invalid"),
+    };
+  }
+
   await cleanupStaleEmailChanges();
 
   const [pendingChangeRecord] = await db

@@ -78,6 +78,14 @@ function AccountEmailManager({
       return;
     }
 
+    if (emailChangeStatus === "pending") {
+      setStatus({
+        text: "Current email approved. Check the new email to finish the change.",
+        tone: "success",
+      });
+      return;
+    }
+
     if (emailChangeStatus === "expired") {
       setStatus({
         text: "That email change link expired. Start a new change below.",
@@ -191,7 +199,9 @@ function AccountEmailManager({
         newEmail: (data as AccountEmailResponse).email,
       });
       setStatus({
-        text: "Check the new email address to confirm this change.",
+        text: emailState.emailVerified
+          ? "Check your current email to approve this change."
+          : "Check the new email address to confirm this change.",
         tone: "success",
       });
     } catch (reason) {

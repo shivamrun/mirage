@@ -33,10 +33,9 @@ function getResetLinkErrorMessage(error?: string) {
     return;
   }
 
-  return (
-    resetLinkErrorMessages[error] ||
-    "This reset link could not be used. Request a new link."
-  );
+  return Object.hasOwn(resetLinkErrorMessages, error)
+    ? resetLinkErrorMessages[error]
+    : "This reset link could not be used. Request a new link.";
 }
 
 function ResetPasswordForm({

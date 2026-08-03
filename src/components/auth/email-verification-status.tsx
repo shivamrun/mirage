@@ -18,7 +18,9 @@ function getVerificationErrorMessage(error?: string) {
     return "We could not verify your email from this link.";
   }
 
-  return verificationErrorMessages[error] ?? "Email verification failed.";
+  return Object.hasOwn(verificationErrorMessages, error)
+    ? verificationErrorMessages[error]
+    : "Email verification failed.";
 }
 
 function EmailVerificationStatus({
