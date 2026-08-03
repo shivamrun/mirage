@@ -50,6 +50,10 @@ export const changeEmailSchema = z.object({
   callbackURL: z.string().min(1).optional(),
 });
 
+export const emailChangeTokenSchema = z.object({
+  token: z.string().min(1, "Email change token is required."),
+});
+
 export const accountProfileSchema = z.object({
   name: z
     .string()

@@ -19,7 +19,13 @@ import { FieldGroup } from "@/components/ui/field";
 import { authClient } from "@/lib/auth/client";
 import { type LoginInput, type LoginValues, loginSchema } from "@/zod";
 
-function LoginForm({ resetSuccess = false }: { resetSuccess?: boolean }) {
+function LoginForm({
+  redirectTo = "/",
+  resetSuccess = false,
+}: {
+  redirectTo?: string;
+  resetSuccess?: boolean;
+}) {
   const router = useRouter();
   const [error, setError] = React.useState<string>();
   const form = useForm<LoginInput, undefined, LoginValues>({
@@ -36,7 +42,7 @@ function LoginForm({ resetSuccess = false }: { resetSuccess?: boolean }) {
     try {
       const result = await authClient.signIn.email({
         ...values,
-        callbackURL: "/",
+        callbackURL: redirectTo,
       });
 
       if (result.error) {
@@ -44,7 +50,7 @@ function LoginForm({ resetSuccess = false }: { resetSuccess?: boolean }) {
         return;
       }
 
-      router.push(result.data?.url ?? "/");
+      router.push(result.data?.url ?? redirectTo);
       router.refresh();
     } catch (reason) {
       setError(getUnexpectedAuthErrorMessage(reason));
@@ -58,7 +64,14 @@ function LoginForm({ resetSuccess = false }: { resetSuccess?: boolean }) {
       footer={
         <>
           New here?{" "}
-          <Link className="font-medium text-primary" href="/register">
+          <Link
+            className="font-medium text-primary"
+            href={
+              redirectTo === "/"
+                ? "/register"
+                : `/register?callbackURL=${encodeURIComponent(redirectTo)}`
+            }
+          >
             Create an account
           </Link>
         </>

@@ -17,8 +17,8 @@ export function WelcomeEmailTemplate({
     <EmailLayout previewText="Welcome to Grove." title="Welcome to Grove">
       <EmailText>Hi {name || "there"},</EmailText>
       <EmailText>
-        Your email is verified and your Grove account is ready. You can head
-        back to your workspace whenever you are ready.
+        Welcome to Grove. Please verify your email address to keep your account
+        secure.
       </EmailText>
       <EmailButton href={appUrl}>Open Grove</EmailButton>
     </EmailLayout>

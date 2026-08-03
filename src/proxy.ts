@@ -6,7 +6,16 @@ import { auth } from "@/lib/auth";
 const authRoutes = new Set(["/login", "/register"]);
 
 function redirectTo(pathname: string, request: NextRequest) {
-  return NextResponse.redirect(new URL(pathname, request.url));
+  const redirectURL = new URL(pathname, request.url);
+
+  if (pathname === "/login") {
+    redirectURL.searchParams.set(
+      "callbackURL",
+      `${request.nextUrl.pathname}${request.nextUrl.search}`,
+    );
+  }
+
+  return NextResponse.redirect(redirectURL);
 }
 
 export async function proxy(request: NextRequest) {

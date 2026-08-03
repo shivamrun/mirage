@@ -25,7 +25,7 @@ export function sendWelcomeEmail({
     ],
     text: [
       `Hi ${name || "there"},`,
-      "Your email is verified and your Grove account is ready.",
+      "Welcome to Grove. Please verify your email address to keep your account secure.",
       `Open Grove: ${appUrl}`,
     ].join("\n\n"),
     to: email,

@@ -23,7 +23,7 @@ import { FieldGroup } from "@/components/ui/field";
 import { authClient } from "@/lib/auth/client";
 import { type RegisterInput, type RegisterValues, registerSchema } from "@/zod";
 
-function RegisterForm() {
+function RegisterForm({ redirectTo = "/" }: { redirectTo?: string }) {
   const router = useRouter();
   const [error, setError] = React.useState<string>();
   const form = useForm<RegisterInput, undefined, RegisterValues>({
@@ -49,7 +49,7 @@ function RegisterForm() {
         return;
       }
 
-      router.push("/");
+      router.push(redirectTo);
       router.refresh();
     } catch (reason) {
       setError(getUnexpectedAuthErrorMessage(reason));
@@ -63,7 +63,14 @@ function RegisterForm() {
       footer={
         <>
           Already have an account?{" "}
-          <Link className="font-medium text-primary" href="/login">
+          <Link
+            className="font-medium text-primary"
+            href={
+              redirectTo === "/"
+                ? "/login"
+                : `/login?callbackURL=${encodeURIComponent(redirectTo)}`
+            }
+          >
             Sign in
           </Link>
         </>

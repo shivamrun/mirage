@@ -9,7 +9,7 @@ import {
   resolveEmailChangeApprovalRedirectURL,
   resolveEmailChangeConfirmationRedirectURL,
 } from "@/server/account/email-change";
-import { changeEmailSchema } from "@/zod";
+import { changeEmailSchema, emailChangeTokenSchema } from "@/zod";
 
 import { elysiaAuth } from "./auth";
 
@@ -46,6 +46,45 @@ function validateMutationRequest(request: Request) {
   return isTrustedOriginRequest(request) ? null : forbiddenResponse();
 }
 
+// TODO(rate-limit): Throttle email delivery and email-change mutations when
+// application rate limiting is introduced.
+
+function emailChangePageURL({
+  action,
+  token,
+}: {
+  action: "approve" | "confirm";
+  token: string;
+}) {
+  const url = new URL("/email-change", env.NEXT_PUBLIC_BASE_URL);
+  url.searchParams.set("action", action);
+  url.searchParams.set("token", token);
+  return url;
+}
+
+function invalidEmailChangePageURL() {
+  const url = new URL("/email-change", env.NEXT_PUBLIC_BASE_URL);
+  url.searchParams.set("status", "invalid");
+  return url;
+}
+
+function parseEmailChangeToken(body: unknown) {
+  const parsed = emailChangeTokenSchema.safeParse(
+    body && typeof body === "object" ? body : {},
+  );
+
+  if (!parsed.success) {
+    return {
+      error: validationErrorResponse(
+        parsed.error.flatten().fieldErrors.token?.[0] ||
+          "Email change token is required.",
+      ),
+    };
+  }
+
+  return { token: parsed.data.token };
+}
+
 export const accountRoutes = new Elysia({ prefix: "/account" })
   .use(elysiaAuth)
   .get(
@@ -65,29 +104,63 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
     const token = typeof query.token === "string" ? query.token : "";
 
     if (!token) {
-      return Response.redirect(
-        new URL("/account?emailChange=invalid", env.NEXT_PUBLIC_BASE_URL),
-      );
+      return Response.redirect(invalidEmailChangePageURL());
+    }
+
+    return Response.redirect(emailChangePageURL({ action: "confirm", token }));
+  })
+  .post("/confirm-email-change", async ({ body, request }) => {
+    const invalidMutationResponse = validateMutationRequest(request);
+
+    if (invalidMutationResponse) {
+      return invalidMutationResponse;
+    }
+
+    const parsed = parseEmailChangeToken(body);
+
+    if (parsed.error) {
+      return parsed.error;
     }
 
     const result = await resolveEmailChangeConfirmationRedirectURL({
-      token,
+      token: parsed.token,
     });
 
-    return Response.redirect(result.redirectURL);
+    return {
+      status: true,
+      redirectURL: result.redirectURL,
+    };
   })
   .get("/approve-email-change", async ({ query }) => {
     const token = typeof query.token === "string" ? query.token : "";
 
     if (!token) {
-      return Response.redirect(
-        new URL("/account?emailChange=invalid", env.NEXT_PUBLIC_BASE_URL),
-      );
+      return Response.redirect(invalidEmailChangePageURL());
     }
 
-    const result = await resolveEmailChangeApprovalRedirectURL({ token });
+    return Response.redirect(emailChangePageURL({ action: "approve", token }));
+  })
+  .post("/approve-email-change", async ({ body, request }) => {
+    const invalidMutationResponse = validateMutationRequest(request);
 
-    return Response.redirect(result.redirectURL);
+    if (invalidMutationResponse) {
+      return invalidMutationResponse;
+    }
+
+    const parsed = parseEmailChangeToken(body);
+
+    if (parsed.error) {
+      return parsed.error;
+    }
+
+    const result = await resolveEmailChangeApprovalRedirectURL({
+      token: parsed.token,
+    });
+
+    return {
+      status: true,
+      redirectURL: result.redirectURL,
+    };
   })
   .post(
     "/change-email",
