@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { env } from "@/lib/env";
 import db from "@/server/db";
 import { user, verification } from "@/server/db/schema";
+import { sendVerificationEmail } from "@/server/email";
 import type { AuthSession } from "@/server/routes/auth";
 import type { ChangeEmailValues } from "@/zod";
 
@@ -164,9 +165,13 @@ async function createPendingEmailChange({
   );
   confirmationURL.searchParams.set("token", token);
 
-  console.info(
-    `Email change confirmation link for ${newEmail}: ${confirmationURL}`,
-  );
+  await sendVerificationEmail({
+    actionLabel: "Confirm email change",
+    email: newEmail,
+    heading: "Confirm your new email",
+    intro: "Use this link to confirm the email address for your Grove account.",
+    verificationUrl: confirmationURL.toString(),
+  });
 
   return {
     ...pendingChange,

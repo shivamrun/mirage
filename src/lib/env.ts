@@ -6,6 +6,14 @@ const falseEnvValues = ["0", "false", "no", "off"] as const;
 const booleanFlagEnvValues = [...trueEnvValues, ...falseEnvValues] as const;
 const trueEnvValueSet = new Set<string>(trueEnvValues);
 
+const optionalEnvString = z.preprocess((value) => {
+  if (typeof value === "string" && value.trim() === "") {
+    return undefined;
+  }
+
+  return value;
+}, z.string().min(1).optional());
+
 function _booleanFlagSchema(defaultValue: boolean) {
   return z
     .preprocess((value) => {
@@ -36,6 +44,9 @@ export const env = createEnv({
     DATABASE_URL: z.string().min(1),
     BETTER_AUTH_SECRET: z.string().min(32),
     BETTER_AUTH_URL: z.url(),
+    EMAIL_FROM: optionalEnvString,
+    EMAIL_REPLY_TO: optionalEnvString,
+    RESEND_API_KEY: optionalEnvString,
   },
   client: {
     NEXT_PUBLIC_BASE_URL: z.string().min(1),
@@ -46,6 +57,9 @@ export const env = createEnv({
     DATABASE_URL: process.env.DATABASE_URL,
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
+    EMAIL_FROM: process.env.EMAIL_FROM,
+    EMAIL_REPLY_TO: process.env.EMAIL_REPLY_TO,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
   },
 });
 
