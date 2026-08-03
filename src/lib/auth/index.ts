@@ -1,10 +1,9 @@
 import { betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 
 import { authHooks } from "@/lib/auth/hooks";
 import { env } from "@/lib/env";
-import db from "@/server/db";
+import { createAuthDatabaseAdapter } from "@/server/db/dal/auth";
 import {
   sendVerificationEmail as sendAuthVerificationEmail,
   sendPasswordResetEmail,
@@ -50,8 +49,6 @@ export const auth = betterAuth({
     },
   },
   hooks: authHooks,
-  database: drizzleAdapter(db, {
-    provider: "pg",
-  }),
+  database: createAuthDatabaseAdapter(),
   plugins: [nextCookies()],
 });

@@ -1,10 +1,17 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { and, eq, gt, like, lte, or } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { env } from "@/lib/env";
-import db from "@/server/db";
-import { user, verification } from "@/server/db/schema";
+import {
+  createVerification,
+  deleteExpiredVerifications,
+  deleteVerification,
+  deleteVerificationsByIdentifierPatterns,
+  findActiveVerification,
+  findUserByEmail,
+  findVerificationByIdentifierPattern,
+  updateUserEmail,
+} from "@/server/db/dal/email-change";
 import { sendVerificationEmail } from "@/server/email";
 import type { AuthSession } from "@/server/routes/auth";
 import type { ChangeEmailValues } from "@/zod";
@@ -99,28 +106,13 @@ function parsePendingEmailChange(value: string | null) {
 async function getPendingEmailChange(userId: string) {
   await cleanupStaleEmailChanges(userId);
 
-  const [pendingChange] = await db
-    .select({
-      expiresAt: verification.expiresAt,
-      value: verification.value,
-    })
-    .from(verification)
-    .where(
-      and(
-        or(
-          like(
-            verification.identifier,
-            `${getPendingIdentifierPrefix(userId)}%`,
-          ),
-          like(
-            verification.identifier,
-            `${getApprovalIdentifierPrefix(userId)}%`,
-          ),
-        ),
-        gt(verification.expiresAt, new Date()),
-      ),
-    )
-    .limit(1);
+  const pendingChange = await findActiveVerification({
+    identifierPatterns: [
+      `${getPendingIdentifierPrefix(userId)}%`,
+      `${getApprovalIdentifierPrefix(userId)}%`,
+    ],
+    expiresAfter: new Date(),
+  });
 
   const parsed = parsePendingEmailChange(pendingChange?.value ?? null);
 
@@ -135,43 +127,21 @@ async function getPendingEmailChange(userId: string) {
 }
 
 async function cleanupStaleEmailChanges(userId?: string) {
-  const conditions = [lte(verification.expiresAt, new Date())];
-
-  if (userId) {
-    const identifierCondition = or(
-      like(verification.identifier, `${getPendingIdentifierPrefix(userId)}%`),
-      like(verification.identifier, `${getApprovalIdentifierPrefix(userId)}%`),
-    );
-
-    if (identifierCondition) {
-      conditions.push(identifierCondition);
-    }
-  } else {
-    const identifierCondition = or(
-      like(verification.identifier, `${EMAIL_CHANGE_PREFIX}:%`),
-      like(verification.identifier, `${EMAIL_CHANGE_APPROVAL_PREFIX}:%`),
-    );
-
-    if (identifierCondition) {
-      conditions.push(identifierCondition);
-    }
-  }
-
-  await db.delete(verification).where(and(...conditions));
+  await deleteExpiredVerifications(
+    userId
+      ? [
+          `${getPendingIdentifierPrefix(userId)}%`,
+          `${getApprovalIdentifierPrefix(userId)}%`,
+        ]
+      : [`${EMAIL_CHANGE_PREFIX}:%`, `${EMAIL_CHANGE_APPROVAL_PREFIX}:%`],
+  );
 }
 
 async function clearPendingEmailChanges(userId: string) {
-  await db
-    .delete(verification)
-    .where(
-      or(
-        like(verification.identifier, `${getPendingIdentifierPrefix(userId)}%`),
-        like(
-          verification.identifier,
-          `${getApprovalIdentifierPrefix(userId)}%`,
-        ),
-      ),
-    );
+  await deleteVerificationsByIdentifierPatterns([
+    `${getPendingIdentifierPrefix(userId)}%`,
+    `${getApprovalIdentifierPrefix(userId)}%`,
+  ]);
 }
 
 async function createPendingEmailChange({
@@ -193,7 +163,7 @@ async function createPendingEmailChange({
   };
 
   await clearPendingEmailChanges(userId);
-  await db.insert(verification).values({
+  await createVerification({
     id: randomUUID(),
     identifier: getPendingIdentifier(userId, token),
     value: JSON.stringify(pendingChange),
@@ -239,7 +209,7 @@ async function createPendingEmailChangeApproval({
   };
 
   await clearPendingEmailChanges(userId);
-  await db.insert(verification).values({
+  await createVerification({
     id: randomUUID(),
     identifier: getApprovalIdentifier(userId, token),
     value: JSON.stringify(pendingChange),
@@ -308,11 +278,7 @@ export async function changeAccountEmail({
     };
   }
 
-  const [existingUser] = await db
-    .select({ id: user.id })
-    .from(user)
-    .where(eq(user.email, body.newEmail))
-    .limit(1);
+  const existingUser = await findUserByEmail(body.newEmail);
 
   if (existingUser) {
     return {
@@ -357,16 +323,9 @@ export async function resolveEmailChangeApprovalRedirectURL({
 
   await cleanupStaleEmailChanges();
 
-  const [approvalRecord] = await db
-    .select()
-    .from(verification)
-    .where(
-      like(
-        verification.identifier,
-        `${EMAIL_CHANGE_APPROVAL_PREFIX}:%:${token}`,
-      ),
-    )
-    .limit(1);
+  const approvalRecord = await findVerificationByIdentifierPattern(
+    `${EMAIL_CHANGE_APPROVAL_PREFIX}:%:${token}`,
+  );
 
   const pendingChange = parsePendingEmailChange(approvalRecord?.value ?? null);
 
@@ -379,7 +338,7 @@ export async function resolveEmailChangeApprovalRedirectURL({
   }
 
   if (approvalRecord.expiresAt < new Date()) {
-    await db.delete(verification).where(eq(verification.id, approvalRecord.id));
+    await deleteVerification(approvalRecord.id);
 
     return {
       notificationEmail: null,
@@ -388,14 +347,10 @@ export async function resolveEmailChangeApprovalRedirectURL({
     };
   }
 
-  const [existingUser] = await db
-    .select({ id: user.id })
-    .from(user)
-    .where(eq(user.email, pendingChange.newEmail))
-    .limit(1);
+  const existingUser = await findUserByEmail(pendingChange.newEmail);
 
   if (existingUser) {
-    await db.delete(verification).where(eq(verification.id, approvalRecord.id));
+    await deleteVerification(approvalRecord.id);
 
     return {
       notificationEmail: null,
@@ -404,7 +359,7 @@ export async function resolveEmailChangeApprovalRedirectURL({
     };
   }
 
-  await db.delete(verification).where(eq(verification.id, approvalRecord.id));
+  await deleteVerification(approvalRecord.id);
 
   const newEmailChange = await createPendingEmailChange({
     currentEmail: pendingChange.currentEmail,
@@ -486,11 +441,9 @@ export async function resolveEmailChangeConfirmationRedirectURL({
 
   await cleanupStaleEmailChanges();
 
-  const [pendingChangeRecord] = await db
-    .select()
-    .from(verification)
-    .where(like(verification.identifier, `${EMAIL_CHANGE_PREFIX}:%:${token}`))
-    .limit(1);
+  const pendingChangeRecord = await findVerificationByIdentifierPattern(
+    `${EMAIL_CHANGE_PREFIX}:%:${token}`,
+  );
 
   const pendingChange = parsePendingEmailChange(
     pendingChangeRecord?.value ?? null,
@@ -505,9 +458,7 @@ export async function resolveEmailChangeConfirmationRedirectURL({
   }
 
   if (pendingChangeRecord.expiresAt < new Date()) {
-    await db
-      .delete(verification)
-      .where(eq(verification.id, pendingChangeRecord.id));
+    await deleteVerification(pendingChangeRecord.id);
 
     return {
       notificationEmail: null,
@@ -516,16 +467,10 @@ export async function resolveEmailChangeConfirmationRedirectURL({
     };
   }
 
-  const [existingUser] = await db
-    .select({ id: user.id })
-    .from(user)
-    .where(eq(user.email, pendingChange.newEmail))
-    .limit(1);
+  const existingUser = await findUserByEmail(pendingChange.newEmail);
 
   if (existingUser) {
-    await db
-      .delete(verification)
-      .where(eq(verification.id, pendingChangeRecord.id));
+    await deleteVerification(pendingChangeRecord.id);
 
     return {
       notificationEmail: null,
@@ -534,14 +479,10 @@ export async function resolveEmailChangeConfirmationRedirectURL({
     };
   }
 
-  await db
-    .update(user)
-    .set({
-      email: pendingChange.newEmail,
-      emailVerified: true,
-      updatedAt: new Date(),
-    })
-    .where(eq(user.id, pendingChange.userId));
+  await updateUserEmail({
+    email: pendingChange.newEmail,
+    userId: pendingChange.userId,
+  });
   await clearPendingEmailChanges(pendingChange.userId);
 
   return {
