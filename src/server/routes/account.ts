@@ -9,6 +9,7 @@ import {
   resolveEmailChangeApprovalRedirectURL,
   resolveEmailChangeConfirmationRedirectURL,
 } from "@/server/account/email-change";
+import { getConnectedGoogleAccount } from "@/server/account/google-account";
 import { changeEmailSchema, emailChangeTokenSchema } from "@/zod";
 
 import { elysiaAuth } from "./auth";
@@ -95,6 +96,21 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       });
 
       return result.value;
+    },
+    {
+      auth: true,
+    },
+  )
+  .get(
+    "/google-account",
+    async ({ authSession }) => {
+      const connectedAccount = await getConnectedGoogleAccount({
+        authSession,
+      });
+
+      return {
+        account: connectedAccount,
+      };
     },
     {
       auth: true,

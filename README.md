@@ -31,6 +31,22 @@ pnpm dev
 
 The app runs at [http://localhost:3000](http://localhost:3000).
 
+## Google Sign-In
+
+Create an OAuth client in Google Cloud Console and add this redirect URI for
+local development:
+
+```text
+http://localhost:3000/api/auth/callback/google
+```
+
+Then add the credentials to `.env`:
+
+```bash
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+```
+
 ## Checks
 
 ```bash

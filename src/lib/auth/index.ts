@@ -10,10 +10,30 @@ import {
   sendWelcomeEmail,
 } from "@/server/email";
 
+export const isGoogleAuthConfigured = Boolean(
+  env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET,
+);
+
 export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
   trustedOrigins: [env.NEXT_PUBLIC_BASE_URL],
+  account: {
+    accountLinking: {
+      enabled: true,
+      requireLocalEmailVerified: false,
+      trustedProviders: ["google"],
+    },
+  },
+  socialProviders: isGoogleAuthConfigured
+    ? {
+        google: {
+          clientId: env.GOOGLE_CLIENT_ID as string,
+          clientSecret: env.GOOGLE_CLIENT_SECRET as string,
+          prompt: "select_account",
+        },
+      }
+    : undefined,
   databaseHooks: {
     user: {
       create: {

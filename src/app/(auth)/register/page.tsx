@@ -2,6 +2,7 @@ import { BadgeCheck, BookOpen, PenTool } from "lucide-react";
 import type { Metadata } from "next";
 
 import { RegisterForm } from "@/components/auth";
+import { isGoogleAuthConfigured } from "@/lib/auth";
 import { getSafeAuthRedirect } from "@/lib/auth/redirect";
 
 export const metadata: Metadata = {
@@ -61,7 +62,10 @@ export default async function RegisterPage({
       </div>
 
       <section className="flex min-h-screen items-center justify-center px-6 py-24 lg:px-12">
-        <RegisterForm redirectTo={getSafeAuthRedirect(callbackURL)} />
+        <RegisterForm
+          redirectTo={getSafeAuthRedirect(callbackURL)}
+          googleAuthEnabled={isGoogleAuthConfigured}
+        />
       </section>
 
       <section className="hidden min-h-screen p-6 lg:block">

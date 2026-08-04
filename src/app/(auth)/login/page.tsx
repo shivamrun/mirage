@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { LoginForm } from "@/components/auth";
 import AuthContainer from "@/components/auth/auth-container";
+import { isGoogleAuthConfigured } from "@/lib/auth";
 import { getSafeAuthRedirect } from "@/lib/auth/redirect";
 
 export const metadata: Metadata = {
@@ -24,6 +25,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <LoginForm
           redirectTo={getSafeAuthRedirect(callbackURL)}
           resetSuccess={reset === "success"}
+          googleAuthEnabled={isGoogleAuthConfigured}
         />
       }
     />

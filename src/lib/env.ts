@@ -46,6 +46,8 @@ export const env = createEnv({
     BETTER_AUTH_URL: z.url(),
     EMAIL_FROM: optionalEnvString,
     EMAIL_REPLY_TO: optionalEnvString,
+    GOOGLE_CLIENT_ID: optionalEnvString,
+    GOOGLE_CLIENT_SECRET: optionalEnvString,
     RESEND_API_KEY: optionalEnvString,
   },
   client: {
@@ -59,6 +61,8 @@ export const env = createEnv({
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     EMAIL_FROM: process.env.EMAIL_FROM,
     EMAIL_REPLY_TO: process.env.EMAIL_REPLY_TO,
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
   },
 });

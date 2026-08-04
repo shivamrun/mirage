@@ -14,6 +14,10 @@ import {
   AuthFormShell,
   AuthStatusMessage,
 } from "@/components/auth/auth-form-shell";
+import {
+  AuthDivider,
+  GoogleAuthButton,
+} from "@/components/auth/google-auth-button";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FieldError, FieldGroup } from "@/components/ui/field";
@@ -24,9 +28,16 @@ import {
   registerFormSchema,
 } from "@/zod";
 
-function RegisterForm({ redirectTo = "/" }: { redirectTo?: string }) {
+function RegisterForm({
+  redirectTo = "/",
+  googleAuthEnabled = false,
+}: {
+  redirectTo?: string;
+  googleAuthEnabled?: boolean;
+}) {
   const router = useRouter();
   const [error, setError] = React.useState<string>();
+  const [isRedirecting, setIsRedirecting] = React.useState(false);
   const form = useForm<RegisterFormInput, undefined, RegisterFormValues>({
     resolver: zodResolver(registerFormSchema),
     defaultValues: {
@@ -51,11 +62,16 @@ function RegisterForm({ redirectTo = "/" }: { redirectTo?: string }) {
         return;
       }
 
+      setIsRedirecting(true);
       router.push(redirectTo);
       router.refresh();
     } catch (reason) {
       setError(getUnexpectedAuthErrorMessage(reason));
     }
+  }
+
+  async function validateSocialAuthConsent() {
+    return form.trigger("agreeToTerms", { shouldFocus: true });
   }
 
   return (
@@ -152,13 +168,24 @@ function RegisterForm({ redirectTo = "/" }: { redirectTo?: string }) {
         </FieldGroup>
         <Button
           className="w-full"
-          disabled={form.formState.isSubmitting}
+          disabled={form.formState.isSubmitting || isRedirecting}
           type="submit"
         >
-          {form.formState.isSubmitting
-            ? "Creating account..."
-            : "Create account"}
+          {isRedirecting
+            ? "Redirecting..."
+            : form.formState.isSubmitting
+              ? "Creating account..."
+              : "Create account"}
         </Button>
+        {googleAuthEnabled ? (
+          <>
+            <AuthDivider label="OR" />
+            <GoogleAuthButton
+              redirectTo={redirectTo}
+              onBeforeSignIn={validateSocialAuthConsent}
+            />
+          </>
+        ) : null}
       </form>
     </AuthFormShell>
   );

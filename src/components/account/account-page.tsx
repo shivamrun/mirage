@@ -1,10 +1,11 @@
 "use client";
 
-import { LockKeyhole, LogOut, MailCheck, User } from "lucide-react";
+import { LockKeyhole, LogOut, MailCheck, Plug, User } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
+import { AccountConnectedAccounts } from "@/components/account/account-connected-accounts";
 import { AccountEmailManager } from "@/components/account/account-email-manager";
 import { AccountPasswordForm } from "@/components/account/account-password-form";
 import { AccountProfileForm } from "@/components/account/account-profile-form";
@@ -12,7 +13,15 @@ import { AccountSection } from "@/components/account/account-section";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth/client";
 
-function AccountPage({ emailChangeStatus }: { emailChangeStatus?: string }) {
+function AccountPage({
+  emailChangeStatus,
+  googleAuthEnabled,
+  googleAccountStatus,
+}: {
+  emailChangeStatus?: string;
+  googleAuthEnabled?: boolean;
+  googleAccountStatus?: string;
+}) {
   const router = useRouter();
   const session = authClient.useSession();
   const user = session.data?.user;
@@ -100,6 +109,17 @@ function AccountPage({ emailChangeStatus }: { emailChangeStatus?: string }) {
                 emailChangeStatus={emailChangeStatus}
                 onSessionRefresh={session.refetch}
                 user={user}
+              />
+            </AccountSection>
+
+            <AccountSection
+              description="Connect a Google account for sign-in, or disconnect it when needed."
+              icon={<Plug />}
+              title="Connected accounts"
+            >
+              <AccountConnectedAccounts
+                googleAuthEnabled={googleAuthEnabled}
+                googleAccountStatus={googleAccountStatus}
               />
             </AccountSection>
           </aside>
