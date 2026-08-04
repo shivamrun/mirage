@@ -9,6 +9,7 @@ import {
   sendVerificationEmailSchema,
   verifyEmailSchema,
 } from "@/zod";
+import { emailSchema } from "@/zod/helpers";
 
 const authInputSchemas = {
   "/sign-in/email": loginSchema,
@@ -74,6 +75,28 @@ export const authHooks = {
       }
 
       return;
+    }
+
+    if (ctx.path === "/sign-up/email") {
+      const parsedEmail = emailSchema.safeParse(ctx.body?.email);
+      const name = parsedEmail.success
+        ? parsedEmail.data.slice(0, parsedEmail.data.indexOf("@"))
+        : "";
+      const parsed = registerSchema.safeParse({ ...ctx.body, name });
+
+      if (!parsed.success) {
+        throwValidationError(parsed.error);
+      }
+
+      return {
+        context: {
+          body: {
+            ...ctx.body,
+            ...parsed.data,
+            name,
+          },
+        },
+      };
     }
 
     const schema =

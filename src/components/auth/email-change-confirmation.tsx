@@ -15,17 +15,16 @@ function getActionCopy(action: EmailChangeAction) {
   if (action === "approve") {
     return {
       button: "Approve email change",
-      description:
-        "Confirm that you want to change the email address on your Grove account.",
-      title: "Approve email change",
+      description: "If you asked to change your Grove email, approve it here.",
+      title: "Approve this email change",
     };
   }
 
   return {
     button: "Confirm new email",
     description:
-      "Confirm this email address to finish changing the email on your Grove account.",
-    title: "Confirm new email",
+      "One last step: confirm this address and we'll finish the change.",
+    title: "Confirm your new email",
   };
 }
 
@@ -48,7 +47,7 @@ function EmailChangeConfirmation({
     setError(undefined);
 
     if (!canSubmit || !token) {
-      setError("This email change link is invalid or expired.");
+      setError("That email change link is invalid or expired.");
       return;
     }
 
@@ -72,19 +71,19 @@ function EmailChangeConfirmation({
       };
 
       if (!response.ok) {
-        setError(result.message || "This email change link could not be used.");
+        setError(result.message || "That email change link could not be used.");
         return;
       }
 
       if (!result.redirectURL) {
-        setError("This email change link could not be completed.");
+        setError("We could not complete that email change link.");
         return;
       }
 
       const redirectURL = new URL(result.redirectURL, window.location.origin);
 
       if (redirectURL.origin !== window.location.origin) {
-        setError("This email change link could not be completed.");
+        setError("We could not complete that email change link.");
         return;
       }
 
@@ -100,7 +99,7 @@ function EmailChangeConfirmation({
     <AuthFormShell
       description={copy.description}
       footer={
-        <Link className="font-medium text-primary" href="/">
+        <Link className="link-text" href="/">
           Back to Grove
         </Link>
       }
@@ -109,7 +108,7 @@ function EmailChangeConfirmation({
       <form className="flex flex-col gap-5" onSubmit={onSubmit}>
         {status || !token ? (
           <AuthStatusMessage tone="error">
-            This email change link is invalid or expired.
+            That email change link is invalid or expired.
           </AuthStatusMessage>
         ) : null}
         {error ? (

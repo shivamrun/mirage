@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { LoginForm } from "@/components/auth";
+import AuthContainer from "@/components/auth/auth-container";
 import { getSafeAuthRedirect } from "@/lib/auth/redirect";
 
 export const metadata: Metadata = {
@@ -18,9 +19,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const { callbackURL, reset } = await searchParams;
 
   return (
-    <LoginForm
-      redirectTo={getSafeAuthRedirect(callbackURL)}
-      resetSuccess={reset === "success"}
+    <AuthContainer
+      authForm={
+        <LoginForm
+          redirectTo={getSafeAuthRedirect(callbackURL)}
+          resetSuccess={reset === "success"}
+        />
+      }
     />
   );
 }

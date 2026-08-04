@@ -59,13 +59,13 @@ function LoginForm({
 
   return (
     <AuthFormShell
-      title="Welcome back"
+      title="Welcome Back"
       description="Sign in with your email and password."
       footer={
         <>
           New here?{" "}
           <Link
-            className="font-medium text-primary"
+            className="link-text"
             href={
               redirectTo === "/"
                 ? "/register"
@@ -102,19 +102,17 @@ function LoginForm({
             id="password"
             description="Enter your account password."
             error={form.formState.errors.password?.message}
-            placeholder="Your password"
+            placeholder="*********"
             required
             {...form.register("password")}
           />
         </FieldGroup>
-        <div className="flex items-center justify-between text-sm">
-          <Link
-            className="text-muted-foreground hover:text-foreground"
-            href="/forgot-password"
-          >
-            Forgot password?
-          </Link>
-        </div>
+        <Link
+          className="link-text text-sm hover:brightness-100"
+          href="/forgot-password"
+        >
+          Forgot password?
+        </Link>
         <Button
           className="w-full"
           disabled={form.formState.isSubmitting}

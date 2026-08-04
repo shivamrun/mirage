@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { ResetPasswordForm } from "@/components/auth";
+import AuthContainer from "@/components/auth/auth-container";
 
 export const metadata: Metadata = {
   title: "Choose New Password | Grove",
@@ -18,5 +19,9 @@ export default async function ResetPasswordPage({
 }: ResetPasswordPageProps) {
   const { error, token } = await searchParams;
 
-  return <ResetPasswordForm error={error} token={token} />;
+  return (
+    <AuthContainer
+      authForm={<ResetPasswordForm error={error} token={token} />}
+    />
+  );
 }

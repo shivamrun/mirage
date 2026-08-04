@@ -24,8 +24,9 @@ import {
 } from "@/zod";
 
 const resetLinkErrorMessages: Record<string, string> = {
-  INVALID_TOKEN: "This reset link is invalid or expired. Request a new link.",
-  TOKEN_EXPIRED: "This reset link has expired. Request a new link.",
+  INVALID_TOKEN:
+    "That reset link is invalid or expired. Please request a new one.",
+  TOKEN_EXPIRED: "That reset link has expired. Please request a new one.",
 };
 
 function getResetLinkErrorMessage(error?: string) {
@@ -35,7 +36,7 @@ function getResetLinkErrorMessage(error?: string) {
 
   return Object.hasOwn(resetLinkErrorMessages, error)
     ? resetLinkErrorMessages[error]
-    : "This reset link could not be used. Request a new link.";
+    : "That reset link could not be used. Please request a new one.";
 }
 
 function ResetPasswordForm({
@@ -64,7 +65,7 @@ function ResetPasswordForm({
     if (!canSubmit) {
       setError(
         linkErrorMessage ||
-          "This reset link is missing a token. Request a new link.",
+          "That reset link is missing a token. Please request a new one.",
       );
       return;
     }
@@ -89,11 +90,11 @@ function ResetPasswordForm({
 
   return (
     <AuthFormShell
-      title="Choose a new password"
-      description="Set a fresh password for your Grove account."
+      title="Set a new password"
+      description="Choose something fresh and you'll be back in shortly."
       footer={
-        <Link className="font-medium text-primary" href="/forgot-password">
-          Request a new link
+        <Link className="link-text" href="/forgot-password">
+          Get a new reset link
         </Link>
       }
     >
@@ -104,7 +105,7 @@ function ResetPasswordForm({
         <FieldGroup>
           {linkErrorMessage || !token ? (
             <AuthStatusMessage tone="error">
-              {linkErrorMessage || "This reset link is missing a token."}
+              {linkErrorMessage || "That reset link is missing a token."}
             </AuthStatusMessage>
           ) : null}
           {error ? (
@@ -112,7 +113,7 @@ function ResetPasswordForm({
           ) : null}
           <PasswordField
             autoComplete="new-password"
-            description="Choose something you have not used here before."
+            description="Pick a password you have not used here before."
             disabled={!canSubmit}
             id="password"
             error={form.formState.errors.password?.message}
@@ -125,7 +126,7 @@ function ResetPasswordForm({
             autoComplete="new-password"
             disabled={!canSubmit}
             id="confirmPassword"
-            description="Type it again so we know it matches."
+            description="Type it once more so we know it matches."
             error={form.formState.errors.confirmPassword?.message}
             label="Confirm password"
             minLength={8}

@@ -25,6 +25,8 @@ Use TypeScript with strict mode. Biome is the source of truth for formatting: 2-
 
 Use PascalCase for React components, camelCase for functions and variables, and lowercase route filenames following Next conventions. Keep server-only code under `src/server` or server route files.
 
+Text links in the UI should use the shared `.link-text` class from `src/app/globals.css`. Add only local utility modifiers when a link needs a different size or emphasis.
+
 ## Testing Guidelines
 
 No test runner is configured yet. Until one is added, validate changes with:

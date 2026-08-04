@@ -49,7 +49,7 @@ function ForgotPasswordForm() {
 
       setSuccess(
         result.data?.message ||
-          "If that email exists, a reset link is on the way.",
+          "If we find an account for that email, a reset link is on the way.",
       );
     } catch (reason) {
       setError(getUnexpectedAuthErrorMessage(reason));
@@ -58,10 +58,10 @@ function ForgotPasswordForm() {
 
   return (
     <AuthFormShell
-      title="Reset password"
-      description="Enter your email and we will send a reset link."
+      title="Forgot your password?"
+      description="No stress. Enter your email and we'll send you a reset link."
       footer={
-        <Link className="font-medium text-primary" href="/login">
+        <Link className="link-text" href="/login">
           Back to sign in
         </Link>
       }
@@ -79,7 +79,7 @@ function ForgotPasswordForm() {
           ) : null}
           <EmailField
             id="email"
-            description="Send the link to the email on your account."
+            description="Send the link to the email you use for Grove."
             error={form.formState.errors.email?.message}
             placeholder="you@company.com"
             required

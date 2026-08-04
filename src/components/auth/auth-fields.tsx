@@ -1,6 +1,6 @@
 "use client";
 
-import { RiEyeLine, RiEyeOffLine } from "@remixicon/react";
+import { Eye, EyeOff } from "lucide-react";
 import * as React from "react";
 
 import {
@@ -150,7 +150,7 @@ function PasswordField({
             size="icon-xs"
             onClick={() => setIsVisible((current) => !current)}
           >
-            {isVisible ? <RiEyeOffLine /> : <RiEyeLine />}
+            {isVisible ? <EyeOff /> : <Eye />}
           </InputGroupButton>
         </InputGroupAddon>
       </InputGroup>

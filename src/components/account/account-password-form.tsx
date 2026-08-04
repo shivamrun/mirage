@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { RiSave3Line } from "@remixicon/react";
+import { Save } from "lucide-react";
 import * as React from "react";
 import { useForm } from "react-hook-form";
 
@@ -108,7 +108,7 @@ function AccountPasswordForm() {
         disabled={form.formState.isSubmitting}
         type="submit"
       >
-        <RiSave3Line data-icon="inline-start" />
+        <Save data-icon="inline-start" />
         {form.formState.isSubmitting ? "Updating..." : "Update password"}
       </Button>
     </form>

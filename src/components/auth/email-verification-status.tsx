@@ -6,21 +6,21 @@ import {
 } from "@/components/auth/auth-form-shell";
 
 const verificationErrorMessages: Record<string, string> = {
-  INVALID_TOKEN: "This verification link is invalid. Please request a new one.",
+  INVALID_TOKEN: "That verification link is invalid. Please request a new one.",
   TOKEN_EXPIRED:
-    "This verification link has expired. Please request a new one.",
-  USER_NOT_FOUND: "We could not find the account for this verification link.",
-  INVALID_USER: "This verification link does not match the current account.",
+    "That verification link has expired. Please request a new one.",
+  USER_NOT_FOUND: "We could not find an account for that verification link.",
+  INVALID_USER: "That verification link does not match the current account.",
 };
 
 function getVerificationErrorMessage(error?: string) {
   if (!error) {
-    return "We could not verify your email from this link.";
+    return "We could not verify your email from that link.";
   }
 
   return Object.hasOwn(verificationErrorMessages, error)
     ? verificationErrorMessages[error]
-    : "Email verification failed.";
+    : "We could not verify your email.";
 }
 
 function EmailVerificationStatus({
@@ -37,18 +37,18 @@ function EmailVerificationStatus({
       title={isSuccess ? "Email verified" : "Verification failed"}
       description={
         isSuccess
-          ? "Your email is confirmed. You are good to go."
+          ? "You're all set. Your Grove account is ready to use."
           : "That link did not work. You can request a fresh verification email from your account page."
       }
       footer={
-        <Link className="font-medium text-primary" href="/login">
+        <Link className="link-text" href="/login">
           Back to sign in
         </Link>
       }
     >
       <AuthStatusMessage tone={isSuccess ? "success" : "error"}>
         {isSuccess
-          ? "Thanks, your email has been verified."
+          ? "Thanks, your email is verified."
           : getVerificationErrorMessage(error)}
       </AuthStatusMessage>
     </AuthFormShell>

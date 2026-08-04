@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -17,14 +16,11 @@ function AuthFormShell({
   footer,
 }: AuthFormShellProps) {
   return (
-    <section className="w-full max-w-sm rounded-lg border bg-card p-6 shadow-sm">
-      <div className="mb-6 space-y-2">
-        <Link href="/" className="font-semibold text-lg tracking-tight">
-          Grove
-        </Link>
-        <div className="space-y-1">
-          <h1 className="font-semibold text-2xl tracking-tight">{title}</h1>
-          <p className="text-muted-foreground text-sm">{description}</p>
+    <section className="w-full max-w-md">
+      <div className="mb-6 space-y-2 pt-4 pb-2">
+        <div className="space-y-1 text-center">
+          <h1 className="text-4xl">{title}</h1>
+          <p className="text-muted-foreground text-base">{description}</p>
         </div>
       </div>
       {children}

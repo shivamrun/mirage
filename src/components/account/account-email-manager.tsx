@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { RiCloseLine, RiRefreshLine, RiSave3Line } from "@remixicon/react";
+import { RefreshCw, Save, X } from "lucide-react";
 import * as React from "react";
 import { useForm } from "react-hook-form";
 
@@ -285,7 +285,7 @@ function AccountEmailManager({
         type="button"
         variant="outline"
       >
-        <RiRefreshLine data-icon="inline-start" />
+        <RefreshCw data-icon="inline-start" />
         {isSendingVerification ? "Sending..." : "Send verification link"}
       </Button>
 
@@ -296,7 +296,7 @@ function AccountEmailManager({
           type="button"
           variant="outline"
         >
-          <RiCloseLine data-icon="inline-start" />
+          <X data-icon="inline-start" />
           {isCancellingEmailChange ? "Canceling..." : "Cancel email change"}
         </Button>
       ) : null}
@@ -320,7 +320,7 @@ function AccountEmailManager({
           disabled={form.formState.isSubmitting}
           type="submit"
         >
-          <RiSave3Line data-icon="inline-start" />
+          <Save data-icon="inline-start" />
           {form.formState.isSubmitting ? "Changing..." : "Change email"}
         </Button>
       </form>

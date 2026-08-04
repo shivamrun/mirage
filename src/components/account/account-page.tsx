@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  RiLockPasswordLine,
-  RiLogoutBoxLine,
-  RiMailCheckLine,
-  RiUserLine,
-} from "@remixicon/react";
+import { LockKeyhole, LogOut, MailCheck, User } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -49,11 +44,14 @@ function AccountPage({ emailChangeStatus }: { emailChangeStatus?: string }) {
   }
 
   return (
-    <main className="min-h-dvh bg-muted/30 px-4 py-8 sm:px-6 lg:px-8">
+    <main className="min-h-dvh px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
-            <Link href="/" className="font-semibold text-lg tracking-tight">
+            <Link
+              href="/"
+              className="link-text font-semibold text-lg tracking-tight"
+            >
               Grove
             </Link>
             <h1 className="font-semibold text-3xl tracking-tight">Account</h1>
@@ -65,7 +63,7 @@ function AccountPage({ emailChangeStatus }: { emailChangeStatus?: string }) {
             type="button"
             variant="outline"
           >
-            <RiLogoutBoxLine data-icon="inline-start" />
+            <LogOut data-icon="inline-start" />
             {isSigningOut ? "Signing out..." : "Sign out"}
           </Button>
         </header>
@@ -74,7 +72,7 @@ function AccountPage({ emailChangeStatus }: { emailChangeStatus?: string }) {
           <div className="flex flex-col gap-6">
             <AccountSection
               description="Update the public details tied to your Grove account."
-              icon={<RiUserLine />}
+              icon={<User />}
               title="Profile"
             >
               <AccountProfileForm
@@ -85,7 +83,7 @@ function AccountPage({ emailChangeStatus }: { emailChangeStatus?: string }) {
 
             <AccountSection
               description="Change your password and keep this session active."
-              icon={<RiLockPasswordLine />}
+              icon={<LockKeyhole />}
               title="Security"
             >
               <AccountPasswordForm />
@@ -95,7 +93,7 @@ function AccountPage({ emailChangeStatus }: { emailChangeStatus?: string }) {
           <aside className="flex flex-col gap-6">
             <AccountSection
               description="View your current address, send a verification link, or change it."
-              icon={<RiMailCheckLine />}
+              icon={<MailCheck />}
               title="Email"
             >
               <AccountEmailManager

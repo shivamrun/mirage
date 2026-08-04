@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { EmailVerificationStatus } from "@/components/auth";
+import AuthContainer from "@/components/auth/auth-container";
 
 export const metadata: Metadata = {
   title: "Verify Email | Grove",
@@ -18,5 +19,9 @@ export default async function EmailVerificationPage({
 }: EmailVerificationPageProps) {
   const { error, status } = await searchParams;
 
-  return <EmailVerificationStatus error={error} status={status} />;
+  return (
+    <AuthContainer
+      authForm={<EmailVerificationStatus error={error} status={status} />}
+    />
+  );
 }

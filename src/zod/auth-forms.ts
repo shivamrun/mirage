@@ -20,7 +20,12 @@ export const registerSchema = z.object({
     .max(100, "Name must be 100 characters or fewer."),
   email: emailSchema,
   password: passwordSchema,
+  agreeToTerms: z.boolean().refine((value) => value, {
+    message: "You must agree before creating an account.",
+  }),
 });
+
+export const registerFormSchema = registerSchema.omit({ name: true });
 
 export const forgotPasswordSchema = z.object({
   email: emailSchema,
@@ -92,6 +97,8 @@ export type LoginInput = z.input<typeof loginSchema>;
 export type LoginValues = z.output<typeof loginSchema>;
 export type RegisterInput = z.input<typeof registerSchema>;
 export type RegisterValues = z.output<typeof registerSchema>;
+export type RegisterFormInput = z.input<typeof registerFormSchema>;
+export type RegisterFormValues = z.output<typeof registerFormSchema>;
 export type ForgotPasswordInput = z.input<typeof forgotPasswordSchema>;
 export type ForgotPasswordValues = z.output<typeof forgotPasswordSchema>;
 export type RequestPasswordResetInput = z.input<

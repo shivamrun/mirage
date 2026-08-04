@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import AuthContainer from "@/components/auth/auth-container";
 import { EmailChangeConfirmation } from "@/components/auth/email-change-confirmation";
 
 export const metadata: Metadata = {
@@ -20,10 +21,14 @@ export default async function EmailChangePage({
   const { action, status, token } = await searchParams;
 
   return (
-    <EmailChangeConfirmation
-      action={action === "approve" ? "approve" : "confirm"}
-      status={status}
-      token={token}
+    <AuthContainer
+      authForm={
+        <EmailChangeConfirmation
+          action={action === "approve" ? "approve" : "confirm"}
+          status={status}
+          token={token}
+        />
+      }
     />
   );
 }
