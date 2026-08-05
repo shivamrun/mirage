@@ -10,7 +10,7 @@ import type {
 } from "./types";
 import {
   getDate,
-  normalizeEmails,
+  normalizeInviteEmails,
   resolveInvitePayload,
   resolveTokenGenerator,
 } from "./utils";
@@ -32,7 +32,7 @@ export const getInviteAdapter = (
       const payload = resolveInvitePayload(invite, options);
       const generateToken = resolveTokenGenerator(payload.tokenType, options);
 
-      const emails = normalizeEmails<string[]>(invite.email, []);
+      const emails = normalizeInviteEmails(invite.email);
       const isPrivate = emails.length > 0;
 
       const expiresAt = getDate(payload.expiresIn, "sec");
@@ -55,7 +55,8 @@ export const getInviteAdapter = (
           infinityMaxUses: isUnlimited,
           redirectToAfterUpgrade: payload.redirectToAfterUpgrade,
           shareInviterName: payload.shareInviterName,
-          emails: normalizeEmails(invite.email),
+          email: emails[0],
+          emails: isPrivate ? emails : undefined,
           role: invite.role,
           newAccount,
           status: "pending",
@@ -144,6 +145,23 @@ export const getInviteAdapter = (
         ],
         update: {
           status,
+        },
+      }),
+    claimInvitationUse: (id: string) =>
+      baseAdapter.update<InviteTypeWithId>({
+        model: inviteTable,
+        where: [
+          {
+            field: "id",
+            value: id,
+          },
+          {
+            field: "status",
+            value: "pending",
+          },
+        ],
+        update: {
+          status: "used",
         },
       }),
     listInvitations: (data?: {

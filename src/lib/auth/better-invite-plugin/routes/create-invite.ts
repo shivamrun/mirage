@@ -1,3 +1,4 @@
+import type { GenericEndpointContext } from "better-auth";
 import {
   APIError,
   createAuthEndpoint,
@@ -5,14 +6,16 @@ import {
 } from "better-auth/api";
 import type { UserWithRole } from "better-auth/plugins";
 import * as z from "zod";
-import { getInviteAdapter } from "../adapter";
+import { getInviteAdapter, type InviteAdapter } from "../adapter";
 import { ERROR_CODES, Tokens } from "../constants";
 import type { InviteTypeWithId, NewInviteOptions } from "../types";
 import {
   checkPermissions,
   createRedirectURL,
-  normalizeEmails,
+  normalizeInviteEmail,
+  normalizeInviteEmails,
   resolveInvitePayload,
+  userHasRole,
 } from "../utils";
 
 export const createInvite = (options: NewInviteOptions) => {
@@ -61,7 +64,7 @@ export const createInvite = (options: NewInviteOptions) => {
         customInviteUrl,
       } = resolveInvitePayload(ctx.body, options);
 
-      const emails = normalizeEmails<string[]>(email, []);
+      const emails = Array.from(new Set(normalizeInviteEmails(email)));
       const isPrivate = emails.length > 0;
 
       // If the invite is public we use [undefined] so the loop runs once and knows it's as a public invite
@@ -79,7 +82,10 @@ export const createInvite = (options: NewInviteOptions) => {
         );
       }
 
-      const basicInvitedUser = { email, role };
+      const basicInvitedUser = {
+        email: Array.isArray(email) ? emails : emails[0],
+        role,
+      };
 
       const canCreateInviteOption =
         typeof options.canCreateInvite === "function"
@@ -102,6 +108,18 @@ export const createInvite = (options: NewInviteOptions) => {
       }
 
       const adapter = getInviteAdapter(ctx.context, options);
+      const privateTargets = isPrivate
+        ? await preparePrivateInviteTargets({
+            adapter,
+            ctx,
+            emails,
+            inviterUser,
+            now: options.getDate(),
+            redirectToSignIn,
+            redirectToSignUp,
+            role,
+          })
+        : [];
 
       await options.inviteHooks?.beforeCreateInvite?.({ ctx });
 
@@ -119,29 +137,20 @@ export const createInvite = (options: NewInviteOptions) => {
           continue;
         }
 
-        const invitedUser = await ctx.context.internalAdapter.findUserByEmail(
-          email,
-          {
-            includeAccounts: true,
-          },
-        );
-
-        if (
-          invitedUser &&
-          userHasRole((invitedUser.user as UserWithStoredRole).role, role)
-        ) {
-          throw APIError.from("BAD_REQUEST", ERROR_CODES.USER_ALREADY_HAS_ROLE);
+        const target = privateTargets.find((target) => target.email === email);
+        if (!target) {
+          throw APIError.from("BAD_REQUEST", ERROR_CODES.INVALID_EMAIL);
         }
 
-        const callbackURL = invitedUser ? redirectToSignIn : redirectToSignUp;
-
-        const newAccount = !invitedUser;
-
-        const invitation = await adapter.createInvite(
-          { ...ctx.body, email },
+        const invitation = await createPrivateInviteOrThrowPending({
+          adapter,
+          body: { ...ctx.body, email },
+          email,
           inviterUser,
-          newAccount,
-        );
+          newAccount: target.newAccount,
+          now: options.getDate(),
+          role,
+        });
 
         invitations.push(invitation);
 
@@ -150,7 +159,7 @@ export const createInvite = (options: NewInviteOptions) => {
           const redirectURL = createRedirectURL({
             ctx,
             invitation,
-            callbackURL,
+            callbackURL: target.callbackURL,
             customInviteUrl,
           });
 
@@ -166,11 +175,11 @@ export const createInvite = (options: NewInviteOptions) => {
             await options.sendUserInvitation(
               {
                 email,
-                name: invitedUser?.user.name,
+                name: target.invitedUser?.user.name,
                 role,
                 url: redirectURL.toString(),
                 token: invitation.token,
-                newAccount,
+                newAccount: target.newAccount,
               },
               ctx.request,
             );
@@ -360,13 +369,160 @@ type UserWithStoredRole = {
   role?: string | string[] | null;
 };
 
-function userHasRole(
-  roleValue: string | string[] | null | undefined,
-  role: string,
-) {
-  const roles = Array.isArray(roleValue)
-    ? roleValue
-    : (roleValue ?? "").split(",");
+type InvitedUserLookup = {
+  user: UserWithRole & UserWithStoredRole;
+} | null;
 
-  return roles.map((value) => value.trim()).includes(role);
+type PreparedPrivateInviteTarget = {
+  email: string;
+  invitedUser: InvitedUserLookup;
+  callbackURL: string;
+  newAccount: boolean;
+};
+
+async function preparePrivateInviteTargets({
+  adapter,
+  ctx,
+  emails,
+  inviterUser,
+  now,
+  redirectToSignIn,
+  redirectToSignUp,
+  role,
+}: {
+  adapter: InviteAdapter;
+  ctx: GenericEndpointContext;
+  emails: string[];
+  inviterUser: UserWithRole;
+  now: Date;
+  redirectToSignIn: string;
+  redirectToSignUp: string;
+  role: string;
+}) {
+  const normalizedInviterEmail = normalizeInviteEmail(inviterUser.email);
+  const targets: PreparedPrivateInviteTarget[] = [];
+
+  for (const email of emails) {
+    if (normalizedInviterEmail === email) {
+      throw APIError.from("BAD_REQUEST", ERROR_CODES.SELF_INVITE_NOT_ALLOWED);
+    }
+
+    const existingPendingInvite = await findPendingInviteForEmailAndRole({
+      adapter,
+      email,
+      now,
+      role,
+    });
+
+    if (existingPendingInvite) {
+      throw APIError.from(
+        "BAD_REQUEST",
+        ERROR_CODES.INVITATION_ALREADY_PENDING,
+      );
+    }
+
+    const invitedUser = (await ctx.context.internalAdapter.findUserByEmail(
+      email,
+      { includeAccounts: true },
+    )) as InvitedUserLookup;
+
+    if (
+      invitedUser &&
+      userHasRole((invitedUser.user as UserWithStoredRole).role, role)
+    ) {
+      throw APIError.from("BAD_REQUEST", ERROR_CODES.USER_ALREADY_HAS_ROLE);
+    }
+
+    targets.push({
+      email,
+      invitedUser,
+      callbackURL: invitedUser ? redirectToSignIn : redirectToSignUp,
+      newAccount: !invitedUser,
+    });
+  }
+
+  return targets;
+}
+
+async function createPrivateInviteOrThrowPending({
+  adapter,
+  body,
+  email,
+  inviterUser,
+  newAccount,
+  now,
+  role,
+}: {
+  adapter: InviteAdapter;
+  body: CreateInvite;
+  email: string;
+  inviterUser: UserWithRole;
+  newAccount: boolean;
+  now: Date;
+  role: string;
+}) {
+  try {
+    return await adapter.createInvite(body, inviterUser, newAccount);
+  } catch (error) {
+    const existingPendingInvite = await findPendingInviteForEmailAndRole({
+      adapter,
+      email,
+      now,
+      role,
+    });
+
+    if (existingPendingInvite) {
+      throw APIError.from(
+        "BAD_REQUEST",
+        ERROR_CODES.INVITATION_ALREADY_PENDING,
+      );
+    }
+
+    throw error;
+  }
+}
+
+async function findPendingInviteForEmailAndRole({
+  adapter,
+  email,
+  now,
+  role,
+}: {
+  adapter: InviteAdapter;
+  email: string;
+  now: Date;
+  role: string;
+}) {
+  const pendingInvites = await adapter.listInvitations({
+    where: [
+      {
+        field: "role",
+        value: role,
+      },
+      {
+        field: "status",
+        value: "pending",
+      },
+    ],
+  });
+  const normalizedEmail = normalizeInviteEmail(email);
+
+  for (const invitation of pendingInvites) {
+    const matchesEmail = normalizeInviteEmails(
+      invitation.emails ?? invitation.email,
+    ).includes(normalizedEmail);
+
+    if (!matchesEmail) {
+      continue;
+    }
+
+    if (invitation.expiresAt <= now) {
+      await adapter.updateInvitation(invitation.id, "expired");
+      continue;
+    }
+
+    return invitation;
+  }
+
+  return null;
 }

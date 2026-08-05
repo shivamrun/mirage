@@ -1,5 +1,12 @@
-import { relations } from "drizzle-orm";
-import { boolean, index, integer, pgTable, text } from "drizzle-orm/pg-core";
+import { relations, sql } from "drizzle-orm";
+import {
+  boolean,
+  index,
+  integer,
+  pgTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 import {
   auditTimestamps,
@@ -118,12 +125,15 @@ export const invite = pgTable(
     role: text("role").notNull(),
     newAccount: boolean("new_account"),
     status: text("status", {
-      enum: ["pending", "rejected", "canceled", "used"],
+      enum: ["pending", "rejected", "canceled", "used", "expired"],
     }).notNull(),
   },
   (table) => [
     index("invite_createdByUserId_idx").on(table.createdByUserId),
     index("invite_status_idx").on(table.status),
+    uniqueIndex("invite_pending_email_role_unique_idx")
+      .on(table.email, table.role)
+      .where(sql`${table.status} = 'pending' and ${table.email} is not null`),
   ],
 );
 

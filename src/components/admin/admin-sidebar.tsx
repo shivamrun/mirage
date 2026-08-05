@@ -59,7 +59,7 @@ function AdminSidebar() {
                     buttonVariants({
                       variant: isActive ? "secondary" : "ghost",
                     }),
-                    "w-full justify-start gap-x-3",
+                    "w-full justify-start gap-x-3 text-sm font-normal",
                   )}
                   href={item.href}
                 >

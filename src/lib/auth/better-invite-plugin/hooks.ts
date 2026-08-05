@@ -7,6 +7,7 @@ import { getInviteAdapter } from "./adapter";
 import { ERROR_CODES, INVITE_COOKIE_NAME } from "./constants";
 import type { NewInviteOptions } from "./types";
 import {
+  canReuseAcceptedInvite,
   consumeInvite,
   createInviteCompletionRedirect,
   redirectError,
@@ -65,8 +66,30 @@ export const invitesHooks = (options: NewInviteOptions) => {
           const invitation = await adapter.findInvitation(inviteToken);
           if (!invitation) return;
 
+          if (canReuseAcceptedInvite({ invitation, user: invitedUser })) {
+            expireCookie(ctx, inviteCookie);
+
+            return ctx.redirect(
+              redirectError(
+                ctx.context,
+                createInviteCompletionRedirect({
+                  invitation,
+                  newAccount: invitation.newAccount === true,
+                  token: inviteToken,
+                }),
+              ),
+            );
+          }
+
+          if (invitation.status && invitation.status !== "pending") {
+            expireCookie(ctx, inviteCookie);
+            throw APIError.from("BAD_REQUEST", ERROR_CODES.INVALID_TOKEN);
+          }
+
           // Validate invite expiration
           if (invitation.expiresAt < options.getDate()) {
+            await adapter.updateInvitation(invitation.id, "expired");
+            expireCookie(ctx, inviteCookie);
             throw APIError.from(
               "BAD_REQUEST",
               ERROR_CODES.INVALID_OR_EXPIRED_INVITE,

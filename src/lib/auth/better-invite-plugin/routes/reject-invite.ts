@@ -8,7 +8,11 @@ import * as z from "zod";
 import { getInviteAdapter } from "../adapter";
 import { ERROR_CODES } from "../constants";
 import type { NewInviteOptions } from "../types";
-import { checkPermissions, normalizeEmails } from "../utils";
+import {
+  checkPermissions,
+  inviteMatchesUserEmail,
+  normalizeInviteEmails,
+} from "../utils";
 
 export const rejectInvite = (options: NewInviteOptions) => {
   return createAuthEndpoint(
@@ -80,20 +84,33 @@ export const rejectInvite = (options: NewInviteOptions) => {
         throw APIError.from("BAD_REQUEST", ERROR_CODES.INVALID_TOKEN);
       }
 
-      const emails = normalizeEmails<string[]>(
+      const emails = normalizeInviteEmails(
         invitation.emails ?? invitation.email,
-        [],
       );
       const isPrivate = emails.length > 0;
 
       // Throws error if the invite is public or if the user email doesn’t match the invite
-      if (!isPrivate || !invitation.emails?.includes(inviteeUser.email)) {
+      if (
+        !isPrivate ||
+        !inviteMatchesUserEmail({
+          invitation,
+          userEmail: inviteeUser.email,
+        })
+      ) {
         throw APIError.from("BAD_REQUEST", ERROR_CODES.CANT_REJECT_INVITE);
       }
 
       // Throws error if the invite is already rejected, accepted...
       if (invitation.status !== "pending" && invitation.status !== undefined) {
         throw APIError.from("BAD_REQUEST", ERROR_CODES.INVALID_TOKEN);
+      }
+
+      if (invitation.expiresAt <= options.getDate()) {
+        await adapter.updateInvitation(invitation.id, "expired");
+        throw APIError.from(
+          "BAD_REQUEST",
+          ERROR_CODES.INVALID_OR_EXPIRED_INVITE,
+        );
       }
 
       const canRejectInviteOptions =

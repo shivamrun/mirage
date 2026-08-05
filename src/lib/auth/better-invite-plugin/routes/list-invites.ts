@@ -194,11 +194,18 @@ export const listInvites = (options: NewInviteOptions) => {
             : undefined,
         });
 
+        const now = options.getDate();
         const expiredInvitations = invitations.filter(
-          ({ expiresAt }) => !!expiresAt && expiresAt < new Date(),
+          ({ expiresAt, status }) =>
+            status === "pending" && !!expiresAt && expiresAt < now,
         );
         const expiredIds = new Set(expiredInvitations.map(({ id }) => id));
         if (expiredIds.size > 0) {
+          await Promise.all(
+            expiredInvitations.map((invitation) =>
+              adapter.updateInvitation(invitation.id, "expired"),
+            ),
+          );
           invitations = invitations.map((i) => {
             if (!expiredIds.has(i.id)) {
               return i;

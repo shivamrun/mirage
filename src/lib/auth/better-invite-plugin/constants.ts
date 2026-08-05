@@ -18,6 +18,9 @@ export const ERROR_CODES = defineErrorCodes({
   INVITATION_EMAIL_NOT_ENABLED: "Invitation email is not enabled",
   INVITE_TOKEN_HAS_ALREADY_BEEN_USED: "Invite token has already been used",
   INVITATION_NOT_CREATED: "Invitation could not be created",
+  INVITATION_ALREADY_PENDING:
+    "An invite is already pending for this email and role",
+  SELF_INVITE_NOT_ALLOWED: "You cannot invite yourself",
   USER_ALREADY_HAS_ROLE: "This user already has that role",
 });
 

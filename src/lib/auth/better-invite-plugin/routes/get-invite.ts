@@ -8,7 +8,7 @@ import * as z from "zod";
 import { getInviteAdapter } from "../adapter";
 import { ERROR_CODES } from "../constants";
 import type { NewInviteOptions } from "../types";
-import { normalizeEmails } from "../utils";
+import { inviteMatchesUserEmail, normalizeInviteEmails } from "../utils";
 
 export const getInvite = (options: NewInviteOptions) => {
   return createAuthEndpoint(
@@ -91,9 +91,8 @@ export const getInvite = (options: NewInviteOptions) => {
         throw APIError.from("BAD_REQUEST", ERROR_CODES.INVALID_TOKEN);
       }
 
-      const emails = normalizeEmails<string[]>(
+      const emails = normalizeInviteEmails(
         invitation.emails ?? invitation.email,
-        [],
       );
       const isPrivate = emails.length > 0;
 
@@ -102,7 +101,12 @@ export const getInvite = (options: NewInviteOptions) => {
 
       // For private invites, the requester must exist, match the invite email, and the invite must have a creator.
       if (
-        (isPrivate && (!sessionUser || !emails?.includes(sessionUser.email))) ||
+        (isPrivate &&
+          (!sessionUser ||
+            !inviteMatchesUserEmail({
+              invitation,
+              userEmail: sessionUser.email,
+            }))) ||
         !invitation.createdByUserId
       ) {
         throw APIError.from("BAD_REQUEST", ERROR_CODES.INVALID_TOKEN);

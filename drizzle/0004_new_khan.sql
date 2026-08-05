@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "invite_pending_email_role_unique_idx" ON "invite" USING btree ("email","role") WHERE "invite"."status" = 'pending' and "invite"."email" is not null;

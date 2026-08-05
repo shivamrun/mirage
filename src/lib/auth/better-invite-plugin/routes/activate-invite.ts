@@ -11,6 +11,7 @@ import { getInviteAdapter } from "../adapter";
 import { ERROR_CODES, INVITE_COOKIE_NAME } from "../constants";
 import type { NewInviteOptions } from "../types";
 import {
+  canReuseAcceptedInvite,
   consumeInvite,
   createInviteCompletionRedirect,
   getMaxUses,
@@ -114,6 +115,30 @@ export const activateInviteLogic = async (
     throw APIError.from("BAD_REQUEST", ERROR_CODES.INVALID_TOKEN);
   }
 
+  const sessionData = await getSessionFromCtx(ctx);
+  const session = sessionData?.session;
+  let user = sessionData?.user as UserWithRole | null;
+  if (user) {
+    user = await findStoredUserForInvite(ctx, user);
+  }
+
+  if (user && canReuseAcceptedInvite({ invitation, user })) {
+    return ctx.json({
+      status: true,
+      message: "Invite already accepted",
+      action: "REDIRECT_TO_AFTER_UPGRADE",
+      redirectTo: createInviteCompletionRedirect({
+        invitation,
+        newAccount: invitation.newAccount === true,
+        token: invitation.token,
+      }),
+    });
+  }
+
+  if (invitation.status && invitation.status !== "pending") {
+    throw APIError.from("BAD_REQUEST", ERROR_CODES.INVALID_TOKEN);
+  }
+
   const maxUses = getMaxUses(invitation);
   const timesUsed = await adapter.countInvitationUses(invitation.id);
 
@@ -127,13 +152,9 @@ export const activateInviteLogic = async (
 
   // Check if the invite expired
   if (options.getDate() > invitation.expiresAt) {
+    await adapter.updateInvitation(invitation.id, "expired");
     throw APIError.from("BAD_REQUEST", ERROR_CODES.INVALID_OR_EXPIRED_INVITE);
   }
-
-  // Get current session and user
-  const sessionData = await getSessionFromCtx(ctx);
-  const session = sessionData?.session;
-  let user = sessionData?.user as UserWithRole | null;
 
   // If the user is already logged in, accept the invite
   if (user && session) {
@@ -197,3 +218,15 @@ export const activateInviteLogic = async (
     redirectTo: body.callbackURL ?? options.defaultRedirectToSignIn,
   });
 };
+
+async function findStoredUserForInvite(
+  ctx: GenericEndpointContext,
+  fallbackUser: UserWithRole,
+) {
+  const storedUser = await ctx.context.adapter.findOne<UserWithRole>({
+    model: "user",
+    where: [{ field: "id", value: fallbackUser.id }],
+  });
+
+  return storedUser ?? fallbackUser;
+}

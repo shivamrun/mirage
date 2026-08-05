@@ -57,15 +57,11 @@ export const consumeInvite = async ({
 }: ConsumeInviteParams) => {
   const { userId, token, timesUsed, newAccount } = meta;
 
-  // Normalize emails and detect private invite
-  const emails = normalizeEmails<string[]>(
-    invitation.emails ?? invitation.email,
-    [],
-  );
+  const emails = normalizeInviteEmails(invitation.emails ?? invitation.email);
   const isPrivate = emails.length > 0;
 
   // Validate email for private invites
-  if (isPrivate && !emails.includes(invitedUser.email)) {
+  if (isPrivate && !emails.includes(normalizeInviteEmail(invitedUser.email))) {
     throw APIError.from("BAD_REQUEST", ERROR_CODES.INVALID_EMAIL);
   }
 
@@ -89,6 +85,23 @@ export const consumeInvite = async ({
     throw APIError.from("BAD_REQUEST", ERROR_CODES.CANT_ACCEPT_INVITE);
   }
 
+  const maxUses = getMaxUses(invitation);
+  const usedAt = options.getDate();
+  const isLastUse = timesUsed === maxUses - 1;
+  const shouldCleanup = isLastUse && options.cleanupInvitesAfterMaxUses;
+  const shouldCreateInviteUse = !shouldCleanup;
+
+  if (isLastUse) {
+    const claimedInvitation = await adapter.claimInvitationUse(invitation.id);
+
+    if (!claimedInvitation) {
+      throw APIError.from(
+        "BAD_REQUEST",
+        ERROR_CODES.INVITE_TOKEN_HAS_ALREADY_BEEN_USED,
+      );
+    }
+  }
+
   const updatedRole = mergeRoles(invitedUser.role, invitation.role);
 
   // Update user role
@@ -106,20 +119,10 @@ export const consumeInvite = async ({
     user: updatedUser,
   });
 
-  const maxUses = getMaxUses(invitation);
-  const usedAt = options.getDate();
-  const isLastUse = timesUsed === maxUses - 1;
-  const shouldCleanup = isLastUse && options.cleanupInvitesAfterMaxUses;
-  const shouldCreateInviteUse = !shouldCleanup;
-
   // Handle invite lifecycle
   if (shouldCleanup) {
     await adapter.deleteInviteUses(invitation.id);
     await adapter.deleteInvitation(token);
-  }
-
-  if (isLastUse && !options.cleanupInvitesAfterMaxUses) {
-    await adapter.updateInvitation(invitation.id, "used");
   }
 
   // Track usage only if invite still active
@@ -147,6 +150,61 @@ export const consumeInvite = async ({
 
 export function getMaxUses(invitation: InviteTypeWithId) {
   return invitation.infinityMaxUses ? Infinity : invitation.maxUses;
+}
+
+export function normalizeInviteEmail(email: string) {
+  return email.trim().normalize("NFKC").toLowerCase();
+}
+
+export function normalizeInviteEmails(
+  email: string | string[] | undefined = undefined,
+) {
+  return normalizeEmails<string[]>(email, []).map(normalizeInviteEmail);
+}
+
+export function normalizeRoleValues(
+  roleValue: string | string[] | null | undefined,
+) {
+  const roles = Array.isArray(roleValue)
+    ? roleValue
+    : (roleValue ?? "").split(",");
+
+  return roles.map((value) => value.trim()).filter(Boolean);
+}
+
+export function userHasRole(
+  roleValue: string | string[] | null | undefined,
+  role: string,
+) {
+  return normalizeRoleValues(roleValue).includes(role);
+}
+
+export function inviteMatchesUserEmail({
+  invitation,
+  userEmail,
+}: {
+  invitation: InviteTypeWithId;
+  userEmail: string;
+}) {
+  const emails = normalizeInviteEmails(invitation.emails ?? invitation.email);
+
+  return (
+    emails.length === 0 || emails.includes(normalizeInviteEmail(userEmail))
+  );
+}
+
+export function canReuseAcceptedInvite({
+  invitation,
+  user,
+}: {
+  invitation: InviteTypeWithId;
+  user: UserWithRole;
+}) {
+  return (
+    invitation.status === "used" &&
+    inviteMatchesUserEmail({ invitation, userEmail: user.email }) &&
+    userHasRole(user.role, invitation.role)
+  );
 }
 
 export function createInviteCompletionRedirect({

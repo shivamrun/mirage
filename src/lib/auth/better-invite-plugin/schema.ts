@@ -19,7 +19,7 @@ export const schema = {
       role: { type: "string", required: true },
       newAccount: { type: "boolean", required: false },
       status: {
-        type: ["pending", "rejected", "canceled", "used"] as const,
+        type: ["pending", "rejected", "canceled", "used", "expired"] as const,
         required: true,
       },
     },

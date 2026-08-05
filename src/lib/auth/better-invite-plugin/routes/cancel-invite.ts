@@ -91,6 +91,14 @@ export const cancelInvite = (options: NewInviteOptions) => {
         throw APIError.from("BAD_REQUEST", ERROR_CODES.INVALID_TOKEN);
       }
 
+      if (invitation.expiresAt <= options.getDate()) {
+        await adapter.updateInvitation(invitation.id, "expired");
+        throw APIError.from(
+          "BAD_REQUEST",
+          ERROR_CODES.INVALID_OR_EXPIRED_INVITE,
+        );
+      }
+
       const canCancelInviteOption =
         typeof options.canCancelInvite === "function"
           ? await options.canCancelInvite({
