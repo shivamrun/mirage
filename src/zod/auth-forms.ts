@@ -47,6 +47,7 @@ export const resetPasswordSchema = z
   });
 
 export const sendVerificationEmailSchema = z.object({
+  callbackURL: z.string().min(1).optional(),
   email: emailSchema,
 });
 

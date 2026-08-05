@@ -45,7 +45,7 @@ function AuthStatusMessage({
   return (
     <p
       className={cn(
-        "rounded-lg border px-3 py-2 text-sm",
+        "rounded-lg border px-3 py-2 text-sm text-center",
         tone === "info" && "bg-muted/50 text-muted-foreground",
         tone === "success" &&
           "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300",

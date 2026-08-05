@@ -7,7 +7,10 @@ import { type AuthRole, authRoles } from "@/lib/auth/roles";
 import db from "@/server/db";
 import { user as userTable } from "@/server/db/schema";
 
-type RequestHeaders = Headers | Awaited<ReturnType<typeof requestHeaders>>;
+export type RequestHeaders =
+  | Headers
+  | Awaited<ReturnType<typeof requestHeaders>>;
+export type { AuthRole };
 type User = typeof userTable.$inferSelect;
 type RoleValue = User["role"] | string[] | null | undefined;
 
