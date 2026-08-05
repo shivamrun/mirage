@@ -1,7 +1,9 @@
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
+import { admin } from "better-auth/plugins";
 
 import { authHooks } from "@/lib/auth/hooks";
+import { authAccessControl, authRolePermissions } from "@/lib/auth/roles";
 import { env } from "@/lib/env";
 import { createAuthDatabaseAdapter } from "@/server/db/dal/auth";
 import {
@@ -70,5 +72,12 @@ export const auth = betterAuth({
   },
   hooks: authHooks,
   database: createAuthDatabaseAdapter(),
-  plugins: [nextCookies()],
+  plugins: [
+    admin({
+      ac: authAccessControl,
+      roles: authRolePermissions,
+      defaultRole: "user",
+    }),
+    nextCookies(),
+  ],
 });
