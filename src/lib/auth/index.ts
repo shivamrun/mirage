@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { admin } from "better-auth/plugins";
 
+import { invite } from "@/lib/auth/better-invite-plugin";
 import { authHooks } from "@/lib/auth/hooks";
 import { authAccessControl, authRolePermissions } from "@/lib/auth/roles";
 import { env } from "@/lib/env";
@@ -9,6 +10,7 @@ import { createAuthDatabaseAdapter } from "@/server/db/dal/auth";
 import {
   sendVerificationEmail as sendAuthVerificationEmail,
   sendPasswordResetEmail,
+  sendRoleInviteEmail,
   sendWelcomeEmail,
 } from "@/server/email";
 
@@ -77,6 +79,29 @@ export const auth = betterAuth({
       ac: authAccessControl,
       roles: authRolePermissions,
       defaultRole: "user",
+    }),
+    invite({
+      defaultRedirectAfterUpgrade: "/welcome",
+      defaultRedirectToSignIn: `/login?callbackURL=${encodeURIComponent(
+        "/welcome",
+      )}`,
+      defaultRedirectToSignUp: `/register?callbackURL=${encodeURIComponent(
+        "/welcome",
+      )}`,
+      invitationTokenExpiresIn: 60 * 60 * 24 * 7,
+      canCreateInvite: ({ invitedUser, inviterUser }) =>
+        inviterUser.emailVerified === true &&
+        inviterUser.role?.split(",").includes("admin") === true &&
+        ["creator", "moderator"].includes(invitedUser.role) &&
+        Boolean(invitedUser.email),
+      async sendUserInvitation({ email, name, role, url }) {
+        await sendRoleInviteEmail({
+          email,
+          inviteUrl: url,
+          name,
+          role,
+        });
+      },
     }),
     nextCookies(),
   ],

@@ -20,7 +20,7 @@ function AuthFormShell({
       <div className="mb-6 space-y-2 pt-4 pb-2">
         <div className="space-y-1 text-center">
           <h1 className="text-4xl">{title}</h1>
-          <p className="text-muted-foreground text-base">{description}</p>
+          <p className="text-muted-foreground text-base mt-3">{description}</p>
         </div>
       </div>
       {children}

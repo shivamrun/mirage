@@ -34,14 +34,10 @@ export function normalizeRoles(role: RoleValue): AuthRole[] {
   const values = Array.isArray(role) ? role : (role ?? "user").split(",");
   const roles = values.map((value) => value.trim()).filter(isAuthRole);
 
-  return roles.length > 0 ? Array.from(new Set(roles)) : ["user"];
+  return Array.from(new Set<AuthRole>(["user", ...roles]));
 }
 
-export function getAllowedRoles(user: Pick<User, "emailVerified" | "role">) {
-  if (!user.emailVerified) {
-    return ["user"] satisfies AuthRole[];
-  }
-
+export function getAllowedRoles(user: Pick<User, "role">) {
   return normalizeRoles(user.role);
 }
 

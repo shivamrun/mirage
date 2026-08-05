@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, Users } from "lucide-react";
+import { ChevronLeft, MailPlus, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -12,6 +12,16 @@ const adminNavItems = [
     href: "/admin/users",
     icon: Users,
     label: "Users",
+  },
+  {
+    href: "/admin/creator-invites",
+    icon: MailPlus,
+    label: "Creator invites",
+  },
+  {
+    href: "/admin/moderator-invites",
+    icon: ShieldCheck,
+    label: "Moderator invites",
   },
 ] as const;
 

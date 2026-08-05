@@ -6,6 +6,7 @@ type AuthErrorLike = {
 const authErrorMessages: Record<string, string> = {
   INVALID_TOKEN: "This link is invalid or expired. Request a new one.",
   TOKEN_EXPIRED: "This link has expired. Request a new one.",
+  USER_ALREADY_HAS_ROLE: "This user already has that role.",
 };
 
 function getAuthErrorMessage(error: AuthErrorLike | null | undefined) {
