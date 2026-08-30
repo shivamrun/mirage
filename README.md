@@ -1,7 +1,7 @@
-# Grove
+# Mirage
 
-Grove is a Next.js app with Better Auth, Elysia API routes, Drizzle ORM, and a
-local Postgres database.
+Mirage is a starter Next.js app with Better Auth, Elysia API routes, Drizzle
+ORM, Tailwind, and a local Postgres database already wired together.
 
 ## Development
 

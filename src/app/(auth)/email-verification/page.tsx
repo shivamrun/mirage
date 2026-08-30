@@ -4,7 +4,7 @@ import { EmailVerificationStatus } from "@/components/auth";
 import AuthContainer from "@/components/auth/auth-container";
 
 export const metadata: Metadata = {
-  title: "Verify Email | Grove",
+  title: "Verify Email | Mirage",
 };
 
 type EmailVerificationPageProps = {

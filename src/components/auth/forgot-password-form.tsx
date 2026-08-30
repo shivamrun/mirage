@@ -79,7 +79,7 @@ function ForgotPasswordForm() {
           ) : null}
           <EmailField
             id="email"
-            description="Send the link to the email you use for Grove."
+            description="Send the link to the email you use for Mirage."
             error={form.formState.errors.email?.message}
             placeholder="you@company.com"
             required

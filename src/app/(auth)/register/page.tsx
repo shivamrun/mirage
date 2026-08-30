@@ -1,12 +1,13 @@
-import { BadgeCheck, BookOpen, PenTool } from "lucide-react";
+import { BadgeCheck, Database, KeyRound } from "lucide-react";
 import type { Metadata } from "next";
+import Image from "next/image";
 
 import { RegisterForm } from "@/components/auth";
 import { isGoogleAuthConfigured } from "@/lib/auth";
 import { getSafeAuthRedirect } from "@/lib/auth/redirect";
 
 export const metadata: Metadata = {
-  title: "Create Account | Grove",
+  title: "Create Account | Mirage",
 };
 
 type RegisterPageProps = {
@@ -17,34 +18,19 @@ type RegisterPageProps = {
 
 const features = [
   {
-    icon: PenTool,
-    label: (
-      <>
-        Selected creators
-        <br />
-        publish original comics
-      </>
-    ),
+    description: "Email, password, and Google sign-in are ready to connect.",
+    icon: KeyRound,
+    label: "Auth ready",
   },
   {
     icon: BadgeCheck,
-    label: (
-      <>
-        Every submission
-        <br />
-        is editorially reviewed
-      </>
-    ),
+    description: "Admin, creator, and moderator spaces are role-gated.",
+    label: "Role gates",
   },
   {
-    icon: BookOpen,
-    label: (
-      <>
-        Curated stories
-        <br />
-        worth discovering
-      </>
-    ),
+    description: "Drizzle and Postgres are set up for the first model.",
+    icon: Database,
+    label: "Data layer",
   },
 ];
 
@@ -56,9 +42,16 @@ export default async function RegisterPage({
   return (
     <main className="relative grid min-h-screen lg:grid-cols-2">
       <div className="absolute top-8 left-8 z-10 flex items-center gap-3">
-        <img src="/logo.svg" alt="Grove logo" className="size-9" />
+        <Image
+          src="/logo.svg"
+          alt="Mirage logo"
+          width={36}
+          height={36}
+          className="size-9"
+          priority
+        />
 
-        <span className="text-2xl font-medium tracking-tight">Grove</span>
+        <span className="font-medium text-2xl">Mirage</span>
       </div>
 
       <section className="flex min-h-screen items-center justify-center px-6 py-24 lg:px-12">
@@ -68,39 +61,48 @@ export default async function RegisterPage({
         />
       </section>
 
-      <section className="hidden min-h-screen p-6 lg:block">
-        <div className="relative flex h-full min-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-3xl bg-white">
-          <div className="flex flex-1 bg-primary/40 flex-col items-center justify-center px-12 pb-32 text-center">
-            <img
+      <section className="hidden min-h-screen bg-secondary/35 p-6 lg:block">
+        <div className="flex h-full min-h-[calc(100vh-3rem)] flex-col justify-between overflow-hidden rounded-lg border border-border bg-card p-12">
+          <div className="max-w-xl space-y-6">
+            <Image
               src="/logo.svg"
               alt=""
-              className="size-20 mb-6 drop-shadow-sm"
+              width={64}
+              height={64}
+              className="size-16 drop-shadow-sm"
             />
 
-            <h1 className="max-w-xl text-5xl leading-[1.05] text-background">
-              A curated space for
-              <br />
-              original comics.
+            <p className="font-medium text-muted-foreground text-sm uppercase">
+              Mirage starter app
+            </p>
+
+            <h1 className="text-5xl leading-[1.05]">
+              Start with the product shell already assembled.
             </h1>
 
-            <p className="mt-6 max-w-md text-neutral-600 leading-relaxed">
-              Grove brings together original comics from a carefully chosen
-              group of creators.
+            <p className="max-w-md text-muted-foreground leading-relaxed">
+              Mirage gives a new product a clean base: accounts, protected
+              routes, invites, API handlers, and database wiring.
             </p>
           </div>
 
-          <div className="absolute right-0 bottom-0 left-0 grid grid-cols-3 px-12 pb-14">
-            {features.map(({ icon: Icon, label }) => (
+          <div className="grid gap-5">
+            {features.map(({ description, icon: Icon, label }) => (
               <div
-                key={Icon.displayName}
-                className="flex flex-col items-center text-center"
+                key={label}
+                className="grid grid-cols-[auto,1fr] items-start gap-4 border-border border-t pt-5"
               >
                 <Icon
-                  className="mb-4 size-6 text-neutral-600"
+                  className="mt-0.5 size-5 text-primary"
                   strokeWidth={1.8}
                 />
 
-                <p className="text-sm leading-5 text-neutral-600">{label}</p>
+                <div>
+                  <p className="font-medium text-sm">{label}</p>
+                  <p className="mt-1 text-muted-foreground text-sm leading-5">
+                    {description}
+                  </p>
+                </div>
               </div>
             ))}
           </div>

@@ -15,12 +15,12 @@ export function ResetPasswordTemplate({
 }: ResetPasswordTemplateProps) {
   return (
     <EmailLayout
-      previewText="Reset your Grove password."
+      previewText="Reset your Mirage password."
       title="Reset your password"
     >
       <EmailText>Hi {name || "there"},</EmailText>
       <EmailText>
-        We received a request to reset your Grove password. Use the link below
+        We received a request to reset your Mirage password. Use the link below
         to choose a new one.
       </EmailText>
       <EmailButton href={resetUrl}>Reset password</EmailButton>

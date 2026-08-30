@@ -51,10 +51,12 @@ export async function sendProtectedRouteVerificationEmail(
 
   if (!session) {
     redirect(`/login?callbackURL=${encodeURIComponent(callbackURL)}`);
+    throw new Error("Authentication required.");
   }
 
   if (session.user.emailVerified) {
     redirect(callbackURL);
+    throw new Error("Email already verified.");
   }
 
   try {

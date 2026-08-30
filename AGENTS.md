@@ -19,6 +19,14 @@ There is no dedicated test directory yet. When tests are added, colocate focused
 - `pnpm db:migrate`: apply Drizzle migrations.
 - `pnpm db:studio`: open Drizzle Studio.
 
+## Editing Guardrails
+
+Never modify ignored or generated output directly. This includes `node_modules`,
+`dist`, `.next`, and any file or directory covered by `.gitignore`.
+
+Never edit migration files directly. For database changes, update the Drizzle
+schema first, then generate a new migration with `pnpm db:generate`.
+
 ## Coding Style & Naming Conventions
 
 Use TypeScript with strict mode. Biome is the source of truth for formatting: 2-space indentation, semicolons, organized imports, and recommended React/Next rules. Prefer path aliases like `@/lib/env` over deep relative imports when practical.

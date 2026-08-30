@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { requireModerator } from "@/lib/auth/access";
 
 export const metadata: Metadata = {
-  title: "Moderator | Grove",
+  title: "Moderator | Mirage",
 };
 
 export default async function ModeratorPage() {
@@ -17,7 +17,7 @@ export default async function ModeratorPage() {
     <main className="flex min-h-dvh items-center justify-center px-6">
       <section className="w-full max-w-md space-y-5 text-center">
         <div className="space-y-2">
-          <p className="font-medium text-muted-foreground text-sm">Grove</p>
+          <p className="font-medium text-muted-foreground text-sm">Mirage</p>
           <h1 className="text-4xl">Moderator</h1>
           <p className="text-muted-foreground">
             Moderator access is active for {user.email}.

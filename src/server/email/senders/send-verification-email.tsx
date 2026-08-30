@@ -29,7 +29,7 @@ export function sendVerificationEmail({
         verificationUrl={verificationUrl}
       />
     ),
-    subject: heading ?? "Verify your Grove email",
+    subject: heading ?? "Verify your Mirage email",
     tags: [
       {
         name: "category",
@@ -39,7 +39,7 @@ export function sendVerificationEmail({
     text: [
       `Hi ${name || "there"},`,
       intro ||
-        "Confirm this email address so we can keep your Grove account secure.",
+        "Confirm this email address so we can keep your Mirage account secure.",
       `${actionLabel ?? "Verify email"}: ${verificationUrl}`,
     ].join("\n\n"),
     to: email,

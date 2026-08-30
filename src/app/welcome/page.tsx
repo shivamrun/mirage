@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { normalizeRoles, requireAuth } from "@/lib/auth/access";
 
 export const metadata: Metadata = {
-  title: "Welcome | Grove",
+  title: "Welcome | Mirage",
 };
 
 type WelcomeState = "creator" | "moderator" | "account";
@@ -34,34 +34,34 @@ const welcomeContent: Record<
   creator: {
     href: "/creator",
     joinedDescription:
-      "Your invitation has been accepted. Your creator space is ready, and you can start setting up your presence on Grove.",
-    joinedTitle: "You are in as a creator",
-    label: "Open creator space",
+      "Your invitation has been accepted. Your creator workspace is ready inside Mirage.",
+    joinedTitle: "Creator access is active",
+    label: "Open creator workspace",
     upgradedDescription:
-      "Creator access has been added to your account. Your creator space is ready when you are.",
+      "Creator access has been added to your account. Your workspace is ready when you are.",
     upgradedTitle: "Creator access is active",
   },
 
   moderator: {
     href: "/moderator",
     joinedDescription:
-      "Your invitation has been accepted. Your moderator workspace is ready for review and community care.",
-    joinedTitle: "You are in as a moderator",
+      "Your invitation has been accepted. Your moderator workspace is ready inside Mirage.",
+    joinedTitle: "Moderator access is active",
     label: "Open moderator workspace",
     upgradedDescription:
-      "Moderator access has been added to your account. Your review workspace is ready when you are.",
+      "Moderator access has been added to your account. Your workspace is ready when you are.",
     upgradedTitle: "Moderator access is active",
   },
 
   account: {
     href: "/account",
     joinedDescription:
-      "Your Grove account is ready. You can manage your profile and account settings from here.",
-    joinedTitle: "Welcome to Grove",
+      "Your Mirage account is ready. You can manage your profile and account settings from here.",
+    joinedTitle: "Welcome to Mirage",
     label: "Go to account",
     upgradedDescription:
-      "Your Grove account is ready. You can manage your profile and account settings from here.",
-    upgradedTitle: "Welcome to Grove",
+      "Your Mirage account is ready. You can manage your profile and account settings from here.",
+    upgradedTitle: "Welcome to Mirage",
   },
 };
 

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { RoleInvitesPage } from "@/components/admin/role-invites-page";
 
 export const metadata: Metadata = {
-  title: "Creator Invites | Grove Admin",
+  title: "Creator Invites | Mirage Admin",
 };
 
 export default function AdminCreatorInvitesPage() {

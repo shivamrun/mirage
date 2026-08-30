@@ -57,13 +57,10 @@ function AccountPage({
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
-            <Link
-              href="/"
-              className="link-text font-semibold text-lg tracking-tight"
-            >
-              Grove
+            <Link href="/" className="link-text font-semibold text-lg">
+              Mirage
             </Link>
-            <h1 className="font-semibold text-3xl tracking-tight">Account</h1>
+            <h1 className="font-semibold text-3xl">Account</h1>
             <p className="text-muted-foreground text-sm">{user.email}</p>
           </div>
           <Button
@@ -80,7 +77,7 @@ function AccountPage({
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="flex flex-col gap-6">
             <AccountSection
-              description="Update the public details tied to your Grove account."
+              description="Update the public details tied to your Mirage account."
               icon={<User />}
               title="Profile"
             >

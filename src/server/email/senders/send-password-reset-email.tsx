@@ -15,7 +15,7 @@ export function sendPasswordResetEmail({
 }: SendPasswordResetEmailOptions) {
   return sendEmail({
     react: <ResetPasswordTemplate name={name} resetUrl={resetUrl} />,
-    subject: "Reset your Grove password",
+    subject: "Reset your Mirage password",
     tags: [
       {
         name: "category",
@@ -24,7 +24,7 @@ export function sendPasswordResetEmail({
     ],
     text: [
       `Hi ${name || "there"},`,
-      "We received a request to reset your Grove password. Use the link below to choose a new one.",
+      "We received a request to reset your Mirage password. Use the link below to choose a new one.",
       `Reset password: ${resetUrl}`,
       "If you did not request a password reset, no changes have been made.",
     ].join("\n\n"),

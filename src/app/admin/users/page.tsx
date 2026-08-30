@@ -20,7 +20,7 @@ import { auth } from "@/lib/auth";
 import { requireAdmin } from "@/lib/auth/access";
 
 export const metadata = {
-  title: "Users | Grove Admin",
+  title: "Users | Mirage Admin",
 };
 
 const usersPageSize = 10;

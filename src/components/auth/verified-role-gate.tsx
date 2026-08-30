@@ -18,7 +18,9 @@ const fallbackCallbackURLByRole: Record<AuthRole, string> = {
 };
 
 function getRequestedPath(headers: RequestHeaders, role: AuthRole) {
-  return headers.get("x-grove-current-path") ?? fallbackCallbackURLByRole[role];
+  return (
+    headers.get("x-mirage-current-path") ?? fallbackCallbackURLByRole[role]
+  );
 }
 
 function isVerificationSent(callbackURL: string) {
@@ -48,10 +50,12 @@ async function VerifiedRoleGate({
 
   if (!user) {
     redirect(`/login?callbackURL=${encodeURIComponent(callbackURL)}`);
+    throw new Error("Authentication required.");
   }
 
   if (!user.roles.includes(requiredRole)) {
     notFound();
+    throw new Error(`Role required: ${requiredRole}`);
   }
 
   if (!user.emailVerified) {

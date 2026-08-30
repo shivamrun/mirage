@@ -1,13 +1,13 @@
-name: grove-db
+name: mirage-db
 services:
   db:
-    container_name: grove-db
+    container_name: mirage-db
     image: postgres:17
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: grove-db
+      POSTGRES_DB: mirage-db
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - 5432:5432

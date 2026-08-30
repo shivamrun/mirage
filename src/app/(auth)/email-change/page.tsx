@@ -4,7 +4,7 @@ import AuthContainer from "@/components/auth/auth-container";
 import { EmailChangeConfirmation } from "@/components/auth/email-change-confirmation";
 
 export const metadata: Metadata = {
-  title: "Confirm Email Change | Grove",
+  title: "Confirm Email Change | Mirage",
 };
 
 type EmailChangePageProps = {

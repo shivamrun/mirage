@@ -77,7 +77,7 @@ function RegisterForm({
   return (
     <AuthFormShell
       title="Create your account"
-      description="Tell us the basics and we'll get Grove ready for you."
+      description="Tell us the basics and we'll get Mirage ready for you."
       footer={
         <>
           Already have an account?{" "}

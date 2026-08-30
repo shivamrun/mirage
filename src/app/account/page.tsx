@@ -4,7 +4,7 @@ import { AccountPage } from "@/components/account";
 import { isGoogleAuthConfigured } from "@/lib/auth";
 
 export const metadata: Metadata = {
-  title: "Account | Grove",
+  title: "Account | Mirage",
 };
 
 type AccountRoutePageProps = {

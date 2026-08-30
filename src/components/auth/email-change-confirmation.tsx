@@ -15,7 +15,7 @@ function getActionCopy(action: EmailChangeAction) {
   if (action === "approve") {
     return {
       button: "Approve email change",
-      description: "If you asked to change your Grove email, approve it here.",
+      description: "If you asked to change your Mirage email, approve it here.",
       title: "Approve this email change",
     };
   }
@@ -100,7 +100,7 @@ function EmailChangeConfirmation({
       description={copy.description}
       footer={
         <Link className="link-text" href="/">
-          Back to Grove
+          Back to Mirage
         </Link>
       }
       title={copy.title}

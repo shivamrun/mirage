@@ -19,7 +19,7 @@ export function sendRoleInviteEmail({
     react: (
       <RoleInviteEmailTemplate inviteUrl={inviteUrl} name={name} role={role} />
     ),
-    subject: `You are invited to join Grove as a ${role}`,
+    subject: `You are invited to join Mirage as a ${role}`,
     tags: [
       {
         name: "category",
@@ -28,7 +28,7 @@ export function sendRoleInviteEmail({
     ],
     text: [
       `Hi ${name || "there"},`,
-      `You have been invited to join Grove as a ${role}.`,
+      `You have been invited to join Mirage as a ${role}.`,
       `Accept invite: ${inviteUrl}`,
     ].join("\n\n"),
     to: email,

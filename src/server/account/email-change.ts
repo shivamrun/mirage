@@ -180,7 +180,8 @@ async function createPendingEmailChange({
     actionLabel: "Confirm email change",
     email: newEmail,
     heading: "Confirm your new email",
-    intro: "Use this link to confirm the email address for your Grove account.",
+    intro:
+      "Use this link to confirm the email address for your Mirage account.",
     verificationUrl: confirmationURL.toString(),
   });
 
@@ -226,7 +227,7 @@ async function createPendingEmailChangeApproval({
     actionLabel: "Approve email change",
     email: currentEmail,
     heading: "Approve your email change",
-    intro: `Approve changing your Grove account email to ${newEmail}.`,
+    intro: `Approve changing your Mirage account email to ${newEmail}.`,
     verificationUrl: approvalURL.toString(),
   });
 

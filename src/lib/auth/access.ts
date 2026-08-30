@@ -71,21 +71,28 @@ export async function getCurrentUser(
   };
 }
 
-export async function requireAuth(options: AccessOptions = {}) {
+export async function requireAuth(
+  options: AccessOptions = {},
+): Promise<CurrentUser> {
   const user = await getCurrentUser(options);
 
   if (!user) {
     redirect(`/login?callbackURL=${options.callbackUrl ?? "/"}`);
+    throw new Error("Authentication required.");
   }
 
   return user;
 }
 
-export async function requireRole(role: AuthRole, options: AccessOptions = {}) {
+export async function requireRole(
+  role: AuthRole,
+  options: AccessOptions = {},
+): Promise<CurrentUser> {
   const user = await getCurrentUser(options);
 
   if (!user || !user.roles.includes(role)) {
     notFound();
+    throw new Error(`Role required: ${role}`);
   }
 
   return user;

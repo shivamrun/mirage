@@ -4,7 +4,7 @@ import { ResetPasswordForm } from "@/components/auth";
 import AuthContainer from "@/components/auth/auth-container";
 
 export const metadata: Metadata = {
-  title: "Choose New Password | Grove",
+  title: "Choose New Password | Mirage",
 };
 
 type ResetPasswordPageProps = {

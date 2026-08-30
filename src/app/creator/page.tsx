@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { requireCreator } from "@/lib/auth/access";
 
 export const metadata: Metadata = {
-  title: "Creator | Grove",
+  title: "Creator | Mirage",
 };
 
 export default async function CreatorPage() {
@@ -17,7 +17,7 @@ export default async function CreatorPage() {
     <main className="flex min-h-dvh items-center justify-center px-6">
       <section className="w-full max-w-md space-y-5 text-center">
         <div className="space-y-2">
-          <p className="font-medium text-muted-foreground text-sm">Grove</p>
+          <p className="font-medium text-muted-foreground text-sm">Mirage</p>
           <h1 className="text-4xl">Creator</h1>
           <p className="text-muted-foreground">
             Creator access is active for {user.email}.

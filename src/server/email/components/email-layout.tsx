@@ -17,8 +17,8 @@ type EmailTextProps = {
 
 const pageStyle: CSSProperties = {
   margin: 0,
-  backgroundColor: "#f4f7f2",
-  color: "#1e271d",
+  backgroundColor: "#14120f",
+  color: "#f7f4ef",
   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   padding: "32px 16px",
 };
@@ -29,7 +29,7 @@ const containerStyle: CSSProperties = {
 };
 
 const brandStyle: CSSProperties = {
-  color: "#27402a",
+  color: "#56d9bf",
   fontSize: "18px",
   fontWeight: 700,
   letterSpacing: 0,
@@ -37,14 +37,14 @@ const brandStyle: CSSProperties = {
 };
 
 const panelStyle: CSSProperties = {
-  backgroundColor: "#ffffff",
-  border: "1px solid #dfe7dc",
+  backgroundColor: "#1d1a16",
+  border: "1px solid #34302a",
   borderRadius: "8px",
   padding: "32px",
 };
 
 const titleStyle: CSSProperties = {
-  color: "#172016",
+  color: "#f7f4ef",
   fontSize: "24px",
   fontWeight: 700,
   letterSpacing: 0,
@@ -53,16 +53,16 @@ const titleStyle: CSSProperties = {
 };
 
 const textStyle: CSSProperties = {
-  color: "#465343",
+  color: "#c8c0b6",
   fontSize: "15px",
   lineHeight: "24px",
   margin: "0 0 16px",
 };
 
 const buttonStyle: CSSProperties = {
-  backgroundColor: "#2f5d34",
+  backgroundColor: "#56d9bf",
   borderRadius: "6px",
-  color: "#ffffff",
+  color: "#101815",
   display: "inline-block",
   fontSize: "15px",
   fontWeight: 700,
@@ -73,7 +73,7 @@ const buttonStyle: CSSProperties = {
 };
 
 const footerStyle: CSSProperties = {
-  color: "#71806e",
+  color: "#8f877c",
   fontSize: "12px",
   lineHeight: "18px",
   margin: "18px 0 0",
@@ -100,13 +100,13 @@ export function EmailLayout({
       <body style={pageStyle}>
         <div style={hiddenPreviewStyle}>{previewText}</div>
         <main style={containerStyle}>
-          <div style={brandStyle}>Grove</div>
+          <div style={brandStyle}>Mirage</div>
           <section style={panelStyle}>
             <h1 style={titleStyle}>{title}</h1>
             {children}
           </section>
           <p style={footerStyle}>
-            This message was sent by Grove. If you did not request it, you can
+            This message was sent by Mirage. If you did not request it, you can
             safely ignore it.
           </p>
         </main>

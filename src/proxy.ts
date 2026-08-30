@@ -29,7 +29,7 @@ export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set(
-    "x-grove-current-path",
+    "x-mirage-current-path",
     `${request.nextUrl.pathname}${request.nextUrl.search}`,
   );
 

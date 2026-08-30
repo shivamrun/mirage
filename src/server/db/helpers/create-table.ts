@@ -1,2 +1,2 @@
 import { pgTableCreator } from "drizzle-orm/pg-core";
-export const createTable = pgTableCreator((name) => `grove_${name}`);
+export const createTable = pgTableCreator((name) => `mirage_${name}`);

@@ -4,7 +4,7 @@ import { InviteActivation } from "@/components/auth";
 import { getSafeAuthRedirect } from "@/lib/auth/redirect";
 
 export const metadata: Metadata = {
-  title: "Creator Invite | Grove",
+  title: "Workspace Invite | Mirage",
 };
 
 type InvitePageProps = {

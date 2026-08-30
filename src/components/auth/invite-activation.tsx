@@ -67,7 +67,7 @@ export function InviteActivation({
   return (
     <AuthFormShell
       title="Opening your invite"
-      description="We are checking this Grove creator invite."
+      description="We are checking this Mirage workspace invite."
       footer={
         <>
           Already have an account?{" "}
@@ -85,7 +85,7 @@ export function InviteActivation({
           <AuthStatusMessage tone="error">{error}</AuthStatusMessage>
         ) : (
           <AuthStatusMessage tone="success">
-            Preparing your creator access...
+            Preparing your access...
           </AuthStatusMessage>
         )}
         {error ? (

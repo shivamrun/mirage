@@ -6,7 +6,7 @@ import { isGoogleAuthConfigured } from "@/lib/auth";
 import { getSafeAuthRedirect } from "@/lib/auth/redirect";
 
 export const metadata: Metadata = {
-  title: "Sign In | Grove",
+  title: "Sign In | Mirage",
 };
 
 type LoginPageProps = {

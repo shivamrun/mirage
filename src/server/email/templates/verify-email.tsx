@@ -15,13 +15,13 @@ type VerifyEmailTemplateProps = {
 export function VerifyEmailTemplate({
   actionLabel = "Verify email",
   heading = "Verify your email",
-  intro = "Confirm this email address so we can keep your Grove account secure.",
+  intro = "Confirm this email address so we can keep your Mirage account secure.",
   name,
   verificationUrl,
 }: VerifyEmailTemplateProps) {
   return (
     <EmailLayout
-      previewText="Confirm your Grove email address."
+      previewText="Confirm your Mirage email address."
       title={heading}
     >
       <EmailText>Hi {name || "there"},</EmailText>

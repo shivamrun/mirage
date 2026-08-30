@@ -4,7 +4,7 @@ import { ForgotPasswordForm } from "@/components/auth";
 import AuthContainer from "@/components/auth/auth-container";
 
 export const metadata: Metadata = {
-  title: "Reset Password | Grove",
+  title: "Reset Password | Mirage",
 };
 
 export default function ForgotPasswordPage() {

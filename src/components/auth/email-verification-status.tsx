@@ -37,7 +37,7 @@ function EmailVerificationStatus({
       title={isSuccess ? "Email verified" : "Verification failed"}
       description={
         isSuccess
-          ? "You're all set. Your Grove account is ready to use."
+          ? "You're all set. Your Mirage account is ready to use."
           : "That link did not work. You can request a fresh verification email from your account page."
       }
       footer={

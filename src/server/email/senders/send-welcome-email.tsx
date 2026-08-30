@@ -16,7 +16,7 @@ export function sendWelcomeEmail({
 }: SendWelcomeEmailOptions) {
   return sendEmail({
     react: <WelcomeEmailTemplate appUrl={appUrl} name={name} />,
-    subject: "Welcome to Grove",
+    subject: "Welcome to Mirage",
     tags: [
       {
         name: "category",
@@ -25,8 +25,8 @@ export function sendWelcomeEmail({
     ],
     text: [
       `Hi ${name || "there"},`,
-      "Welcome to Grove. Please verify your email address to keep your account secure.",
-      `Open Grove: ${appUrl}`,
+      "Welcome to Mirage. Please verify your email address to keep your account secure.",
+      `Open Mirage: ${appUrl}`,
     ].join("\n\n"),
     to: email,
   });
