@@ -12,6 +12,7 @@ import { AccountProfileForm } from "@/components/account/account-profile-form";
 import { AccountSection } from "@/components/account/account-section";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth/client";
+import { siteConfig } from "@/lib/metadata";
 
 function AccountPage({
   emailChangeStatus,
@@ -57,8 +58,11 @@ function AccountPage({
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
-            <Link href="/" className="link-text font-semibold text-lg">
-              Mirage
+            <Link
+              href={siteConfig.links.home}
+              className="link-text font-semibold text-lg"
+            >
+              {siteConfig.name}
             </Link>
             <h1 className="font-semibold text-3xl">Account</h1>
             <p className="text-muted-foreground text-sm">{user.email}</p>
@@ -77,7 +81,7 @@ function AccountPage({
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="flex flex-col gap-6">
             <AccountSection
-              description="Update the public details tied to your Mirage account."
+              description={`Update the public details tied to your ${siteConfig.name} account.`}
               icon={<User />}
               title="Profile"
             >

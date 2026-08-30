@@ -1,12 +1,5 @@
-import { relations, sql } from "drizzle-orm";
-import {
-  boolean,
-  index,
-  integer,
-  pgTable,
-  text,
-  uniqueIndex,
-} from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+import { boolean, index, pgTable, text } from "drizzle-orm/pg-core";
 
 import {
   auditTimestamps,
@@ -104,67 +97,11 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
-export const invite = pgTable(
-  "invite",
-  {
-    id: text("id").primaryKey(),
-
-    token: text("token").notNull().unique(),
-    createdAt: requiredTimestamp("created_at"),
-    expiresAt: requiredTimestamp("expires_at"),
-    maxUses: integer("max_uses").notNull(),
-    infinityMaxUses: boolean("infinity_max_uses").default(false).notNull(),
-
-    createdByUserId: text("created_by_user_id").references(() => user.id, {
-      onDelete: "set null",
-    }),
-    redirectToAfterUpgrade: text("redirect_to_after_upgrade"),
-    shareInviterName: boolean("share_inviter_name").notNull(),
-    email: text("email"),
-    emails: text("emails").array(),
-    role: text("role").notNull(),
-    newAccount: boolean("new_account"),
-    status: text("status", {
-      enum: ["pending", "rejected", "canceled", "used", "expired"],
-    }).notNull(),
-  },
-  (table) => [
-    index("invite_createdByUserId_idx").on(table.createdByUserId),
-    index("invite_status_idx").on(table.status),
-    uniqueIndex("invite_pending_email_role_unique_idx")
-      .on(table.email, table.role)
-      .where(sql`${table.status} = 'pending' and ${table.email} is not null`),
-  ],
-);
-
-export const inviteUse = pgTable(
-  "invite_use",
-  {
-    id: text("id").primaryKey(),
-
-    inviteId: text("invite_id")
-      .notNull()
-      .references(() => invite.id, {
-        onDelete: "cascade",
-      }),
-    usedAt: requiredTimestamp("used_at"),
-    usedByUserId: text("used_by_user_id").references(() => user.id, {
-      onDelete: "set null",
-    }),
-  },
-  (table) => [
-    index("inviteUse_inviteId_idx").on(table.inviteId),
-    index("inviteUse_usedByUserId_idx").on(table.usedByUserId),
-  ],
-);
-
 // RELATIONS
 
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
-  createdInvites: many(invite),
-  inviteUses: many(inviteUse),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -177,25 +114,6 @@ export const sessionRelations = relations(session, ({ one }) => ({
 export const accountRelations = relations(account, ({ one }) => ({
   user: one(user, {
     fields: [account.userId],
-    references: [user.id],
-  }),
-}));
-
-export const inviteRelations = relations(invite, ({ many, one }) => ({
-  creator: one(user, {
-    fields: [invite.createdByUserId],
-    references: [user.id],
-  }),
-  uses: many(inviteUse),
-}));
-
-export const inviteUseRelations = relations(inviteUse, ({ one }) => ({
-  invite: one(invite, {
-    fields: [inviteUse.inviteId],
-    references: [invite.id],
-  }),
-  user: one(user, {
-    fields: [inviteUse.usedByUserId],
     references: [user.id],
   }),
 }));

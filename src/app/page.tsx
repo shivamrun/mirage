@@ -1,6 +1,5 @@
 import {
   ArrowRight,
-  BadgeCheck,
   Database,
   LockKeyhole,
   ShieldCheck,
@@ -10,6 +9,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { siteConfig } from "@/lib/metadata";
 
 const starterModules = [
   {
@@ -19,8 +19,7 @@ const starterModules = [
     title: "Auth",
   },
   {
-    description:
-      "Account, admin, creator, and moderator workspaces are protected by role gates.",
+    description: "Account and admin workspaces are protected by role gates.",
     icon: ShieldCheck,
     title: "Access",
   },
@@ -40,16 +39,10 @@ const workspaceLinks = [
     label: "Account",
   },
   {
-    description: "User overview and role invite management.",
+    description: "User overview and admin-only controls.",
     href: "/admin",
     icon: ShieldCheck,
     label: "Admin",
-  },
-  {
-    description: "A protected workspace for creator-scoped product flows.",
-    href: "/creator",
-    icon: BadgeCheck,
-    label: "Creator",
   },
 ] as const;
 
@@ -58,16 +51,19 @@ const Page = () => {
     <main className="min-h-dvh bg-background">
       <header className="border-border border-b">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-5">
-          <Link className="flex items-center gap-3" href="/">
+          <Link
+            className="flex items-center gap-3"
+            href={siteConfig.links.home}
+          >
             <Image
-              src="/logo.svg"
-              alt="Mirage logo"
+              src={siteConfig.logo}
+              alt={`${siteConfig.name} logo`}
               width={36}
               height={36}
               className="size-9"
               priority
             />
-            <span className="font-semibold text-lg">Mirage</span>
+            <span className="font-semibold text-lg">{siteConfig.name}</span>
           </Link>
           <nav className="flex items-center gap-2" aria-label="Primary">
             <Button asChild className="hidden sm:inline-flex" variant="ghost">
@@ -93,9 +89,9 @@ const Page = () => {
               A calm starting point for your next product.
             </h1>
             <p className="max-w-2xl text-lg text-muted-foreground leading-8">
-              Mirage ships with the product plumbing already in place:
-              authenticated users, role-aware workspaces, API routes, and a
-              Postgres-backed data layer.
+              {siteConfig.name} ships with the product plumbing already in
+              place: authenticated users, role-aware workspaces, API routes, and
+              a Postgres-backed data layer.
             </p>
           </div>
 

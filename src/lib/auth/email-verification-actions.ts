@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 
-const protectedRoutePrefixes = ["/admin", "/creator", "/moderator"];
+const protectedRoutePrefixes = ["/admin"];
 
 function isProtectedAccessPath(pathname: string) {
   return protectedRoutePrefixes.some(

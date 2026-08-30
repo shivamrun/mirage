@@ -4,11 +4,8 @@ type AuthErrorLike = {
 };
 
 const authErrorMessages: Record<string, string> = {
-  INVITATION_ALREADY_PENDING: "An invite is already pending for this email.",
   INVALID_TOKEN: "This link is invalid or expired. Request a new one.",
-  SELF_INVITE_NOT_ALLOWED: "You cannot invite yourself.",
   TOKEN_EXPIRED: "This link has expired. Request a new one.",
-  USER_ALREADY_HAS_ROLE: "This user already has that role.",
 };
 
 function getAuthErrorMessage(error: AuthErrorLike | null | undefined) {

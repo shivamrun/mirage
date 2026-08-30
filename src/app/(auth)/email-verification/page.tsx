@@ -1,11 +1,10 @@
-import type { Metadata } from "next";
-
 import { EmailVerificationStatus } from "@/components/auth";
 import AuthContainer from "@/components/auth/auth-container";
+import { getPageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "Verify Email | Mirage",
-};
+export const metadata = getPageMetadata("Verify Email", {
+  path: "/email-verification",
+});
 
 type EmailVerificationPageProps = {
   searchParams: Promise<{

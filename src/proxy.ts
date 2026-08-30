@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 
 const authRoutes = new Set(["/login", "/register"]);
-const protectedRoutePrefixes = ["/account", "/admin", "/creator", "/moderator"];
+const protectedRoutePrefixes = ["/account", "/admin"];
 
 function isProtectedRoute(pathname: string) {
   return protectedRoutePrefixes.some(
@@ -53,12 +53,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/account/:path*",
-    "/admin/:path*",
-    "/creator/:path*",
-    "/moderator/:path*",
-    "/login",
-    "/register",
-  ],
+  matcher: ["/account/:path*", "/admin/:path*", "/login", "/register"],
 };

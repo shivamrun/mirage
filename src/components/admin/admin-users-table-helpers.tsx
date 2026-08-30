@@ -27,8 +27,6 @@ export function getInitials(name: string) {
 
 const roleBadgeClassNames: Record<string, string> = {
   admin: "border-primary/30 bg-primary/15 text-primary-foreground",
-  creator: "border-emerald-400/25 bg-emerald-400/10 text-emerald-200",
-  moderator: "border-amber-400/25 bg-amber-400/10 text-amber-200",
   user: "border-border bg-muted text-muted-foreground",
 };
 

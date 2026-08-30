@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FieldError, FieldGroup } from "@/components/ui/field";
 import { authClient } from "@/lib/auth/client";
+import { siteConfig } from "@/lib/metadata";
 import {
   type RegisterFormInput,
   type RegisterFormValues,
@@ -77,7 +78,7 @@ function RegisterForm({
   return (
     <AuthFormShell
       title="Create your account"
-      description="Tell us the basics and we'll get Mirage ready for you."
+      description={`Tell us the basics and we'll get ${siteConfig.name} ready for you.`}
       footer={
         <>
           Already have an account?{" "}

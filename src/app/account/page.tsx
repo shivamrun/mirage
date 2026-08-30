@@ -1,11 +1,8 @@
-import type { Metadata } from "next";
-
 import { AccountPage } from "@/components/account";
 import { isGoogleAuthConfigured } from "@/lib/auth";
+import { getPageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "Account | Mirage",
-};
+export const metadata = getPageMetadata("Account", { path: "/account" });
 
 type AccountRoutePageProps = {
   searchParams: Promise<{

@@ -1,11 +1,10 @@
-import type { Metadata } from "next";
-
 import AuthContainer from "@/components/auth/auth-container";
 import { EmailChangeConfirmation } from "@/components/auth/email-change-confirmation";
+import { getPageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "Confirm Email Change | Mirage",
-};
+export const metadata = getPageMetadata("Confirm Email Change", {
+  path: "/email-change",
+});
 
 type EmailChangePageProps = {
   searchParams: Promise<{

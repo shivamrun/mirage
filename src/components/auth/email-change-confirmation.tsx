@@ -8,6 +8,7 @@ import {
   AuthStatusMessage,
 } from "@/components/auth/auth-form-shell";
 import { Button } from "@/components/ui/button";
+import { siteConfig } from "@/lib/metadata";
 
 type EmailChangeAction = "approve" | "confirm";
 
@@ -15,7 +16,7 @@ function getActionCopy(action: EmailChangeAction) {
   if (action === "approve") {
     return {
       button: "Approve email change",
-      description: "If you asked to change your Mirage email, approve it here.",
+      description: `If you asked to change your ${siteConfig.name} email, approve it here.`,
       title: "Approve this email change",
     };
   }
@@ -99,8 +100,8 @@ function EmailChangeConfirmation({
     <AuthFormShell
       description={copy.description}
       footer={
-        <Link className="link-text" href="/">
-          Back to Mirage
+        <Link className="link-text" href={siteConfig.links.home}>
+          Back to {siteConfig.name}
         </Link>
       }
       title={copy.title}

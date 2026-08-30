@@ -12,8 +12,6 @@ import {
 
 const fallbackCallbackURLByRole: Record<AuthRole, string> = {
   admin: "/admin",
-  creator: "/creator",
-  moderator: "/moderator",
   user: "/account",
 };
 

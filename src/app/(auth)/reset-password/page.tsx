@@ -1,11 +1,10 @@
-import type { Metadata } from "next";
-
 import { ResetPasswordForm } from "@/components/auth";
 import AuthContainer from "@/components/auth/auth-container";
+import { getPageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "Choose New Password | Mirage",
-};
+export const metadata = getPageMetadata("Choose New Password", {
+  path: "/reset-password",
+});
 
 type ResetPasswordPageProps = {
   searchParams: Promise<{

@@ -101,11 +101,3 @@ export async function requireRole(
 export async function requireAdmin(options: AccessOptions = {}) {
   return requireRole("admin", options);
 }
-
-export async function requireModerator(options: AccessOptions = {}) {
-  return requireRole("moderator", options);
-}
-
-export async function requireCreator(options: AccessOptions = {}) {
-  return requireRole("creator", options);
-}

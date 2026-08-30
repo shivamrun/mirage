@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
 import { authClient } from "@/lib/auth/client";
+import { siteConfig } from "@/lib/metadata";
 import {
   type ForgotPasswordInput,
   type ForgotPasswordValues,
@@ -79,7 +80,7 @@ function ForgotPasswordForm() {
           ) : null}
           <EmailField
             id="email"
-            description="Send the link to the email you use for Mirage."
+            description={`Send the link to the email you use for ${siteConfig.name}.`}
             error={form.formState.errors.email?.message}
             placeholder="you@company.com"
             required

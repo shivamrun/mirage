@@ -1,3 +1,4 @@
+import { AppShell } from "@/components/app/app-shell";
 import { VerifiedRoleGate } from "@/components/auth/verified-role-gate";
 
 export default function AdminLayout({
@@ -5,5 +6,9 @@ export default function AdminLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <VerifiedRoleGate requiredRole="admin">{children}</VerifiedRoleGate>;
+  return (
+    <VerifiedRoleGate requiredRole="admin">
+      <AppShell>{children}</AppShell>
+    </VerifiedRoleGate>
+  );
 }

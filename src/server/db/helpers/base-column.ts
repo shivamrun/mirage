@@ -61,7 +61,6 @@ export function auditTimestamps() {
  * Common uses:
  * - `createdAt`
  * - `updatedAt`
- * - `invitedAt`
  *
  * @param name Database column name.
  */
@@ -76,7 +75,6 @@ export function autoTimestamp(name: string) {
  * by application logic rather than the current database time.
  *
  * Common uses:
- * - `inviteExpiresAt`
  * - `scheduledPublishAt`
  * - `subscriptionEndsAt`
  *

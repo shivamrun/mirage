@@ -1,14 +1,14 @@
 import { BadgeCheck, Database, KeyRound } from "lucide-react";
-import type { Metadata } from "next";
 import Image from "next/image";
 
 import { RegisterForm } from "@/components/auth";
 import { isGoogleAuthConfigured } from "@/lib/auth";
 import { getSafeAuthRedirect } from "@/lib/auth/redirect";
+import { getPageMetadata, siteConfig } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "Create Account | Mirage",
-};
+export const metadata = getPageMetadata("Create Account", {
+  path: "/register",
+});
 
 type RegisterPageProps = {
   searchParams: Promise<{
@@ -24,7 +24,7 @@ const features = [
   },
   {
     icon: BadgeCheck,
-    description: "Admin, creator, and moderator spaces are role-gated.",
+    description: "Account and admin spaces are role-gated.",
     label: "Role gates",
   },
   {
@@ -43,15 +43,15 @@ export default async function RegisterPage({
     <main className="relative grid min-h-screen lg:grid-cols-2">
       <div className="absolute top-8 left-8 z-10 flex items-center gap-3">
         <Image
-          src="/logo.svg"
-          alt="Mirage logo"
+          src={siteConfig.logo}
+          alt={`${siteConfig.name} logo`}
           width={36}
           height={36}
           className="size-9"
           priority
         />
 
-        <span className="font-medium text-2xl">Mirage</span>
+        <span className="font-medium text-2xl">{siteConfig.name}</span>
       </div>
 
       <section className="flex min-h-screen items-center justify-center px-6 py-24 lg:px-12">
@@ -73,7 +73,7 @@ export default async function RegisterPage({
             />
 
             <p className="font-medium text-muted-foreground text-sm uppercase">
-              Mirage starter app
+              {siteConfig.name} starter app
             </p>
 
             <h1 className="text-5xl leading-[1.05]">
@@ -81,8 +81,8 @@ export default async function RegisterPage({
             </h1>
 
             <p className="max-w-md text-muted-foreground leading-relaxed">
-              Mirage gives a new product a clean base: accounts, protected
-              routes, invites, API handlers, and database wiring.
+              {siteConfig.name} gives a new product a clean base: accounts,
+              protected routes, API handlers, and database wiring.
             </p>
           </div>
 

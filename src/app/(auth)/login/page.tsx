@@ -1,13 +1,10 @@
-import type { Metadata } from "next";
-
 import { LoginForm } from "@/components/auth";
 import AuthContainer from "@/components/auth/auth-container";
 import { isGoogleAuthConfigured } from "@/lib/auth";
 import { getSafeAuthRedirect } from "@/lib/auth/redirect";
+import { getPageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "Sign In | Mirage",
-};
+export const metadata = getPageMetadata("Sign In", { path: "/login" });
 
 type LoginPageProps = {
   searchParams: Promise<{

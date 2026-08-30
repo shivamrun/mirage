@@ -43,38 +43,4 @@ export const elysiaAuth = new Elysia({ name: "better-auth" }).macro({
       return { authUser };
     },
   },
-  moderator: {
-    async resolve({ request, status }) {
-      const authUser = await getCurrentUser({
-        headers: request.headers,
-      });
-
-      if (!authUser) {
-        return status(404, { message: "Not Found" });
-      }
-
-      if (!authUser.roles.includes("moderator")) {
-        return status(404, { message: "Not Found" });
-      }
-
-      return { authUser };
-    },
-  },
-  creator: {
-    async resolve({ request, status }) {
-      const authUser = await getCurrentUser({
-        headers: request.headers,
-      });
-
-      if (!authUser) {
-        return status(404, { message: "Not Found" });
-      }
-
-      if (!authUser.roles.includes("creator")) {
-        return status(404, { message: "Not Found" });
-      }
-
-      return { authUser };
-    },
-  },
 });

@@ -4,6 +4,7 @@ import {
   AuthFormShell,
   AuthStatusMessage,
 } from "@/components/auth/auth-form-shell";
+import { siteConfig } from "@/lib/metadata";
 
 const verificationErrorMessages: Record<string, string> = {
   INVALID_TOKEN: "That verification link is invalid. Please request a new one.",
@@ -37,7 +38,7 @@ function EmailVerificationStatus({
       title={isSuccess ? "Email verified" : "Verification failed"}
       description={
         isSuccess
-          ? "You're all set. Your Mirage account is ready to use."
+          ? `You're all set. Your ${siteConfig.name} account is ready to use.`
           : "That link did not work. You can request a fresh verification email from your account page."
       }
       footer={
