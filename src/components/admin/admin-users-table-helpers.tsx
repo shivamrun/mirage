@@ -1,9 +1,9 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { normalizeRoles } from "@/lib/auth/roles";
+import { normalizeRoles, type RoleValue } from "@/lib/auth/roles";
 import { cn } from "@/lib/utils";
 
-type UserRole = Parameters<typeof normalizeRoles>[0];
+export type UserRole = RoleValue;
 
 const joinedDateFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
