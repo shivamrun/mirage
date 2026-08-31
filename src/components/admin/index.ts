@@ -51,6 +51,7 @@ export {
 export { AdminUsersTable } from "./admin-users-table";
 export {
   formatJoinedDate,
+  getInitials,
   RoleBadges,
   UserAvatar,
   type UserRole,

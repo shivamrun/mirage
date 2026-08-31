@@ -38,7 +38,7 @@ export function getInitials(name: string) {
     .join("");
 }
 
-function formatRoleName(role: string) {
+export function formatRoleName(role: string) {
   return role
     .replace(/[-_]/g, " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());

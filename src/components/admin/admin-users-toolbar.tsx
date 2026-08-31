@@ -29,7 +29,7 @@ export function AdminUsersToolbar({
   status,
 }: AdminUsersToolbarProps) {
   return (
-    <div className="shrink-0 px-6 pb-4">
+    <div className="shrink-0 pb-4">
       <div className="flex items-center gap-2">
         <form
           action={applyAdminUsersListState}

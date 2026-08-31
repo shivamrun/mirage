@@ -104,7 +104,7 @@ export default async function AdminUsersPage({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <header className="shrink-0 px-6 pt-6 pb-5">
+      <header className="shrink-0 pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
 
         <p className="mt-1 text-sm text-muted-foreground">

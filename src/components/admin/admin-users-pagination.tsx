@@ -50,7 +50,7 @@ export function AdminUsersPagination({
   const lastResult = Math.min(page * ADMIN_USERS_PAGE_SIZE, total);
 
   return (
-    <footer className="flex shrink-0 items-center justify-between gap-4 px-6 py-4">
+    <footer className="flex shrink-0 items-center justify-between gap-4 pt-4">
       <p className="text-sm text-muted-foreground">
         {total > 0 ? (
           <>

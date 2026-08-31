@@ -34,7 +34,7 @@ export function AdminUsersTable({
   users,
 }: AdminUsersTableProps) {
   return (
-    <section className="min-h-0 flex-1 overflow-hidden px-6">
+    <section className="min-h-0 flex-1 overflow-hidden">
       <ScrollArea className="h-full rounded-xl border bg-card">
         <Table className="min-w-[760px]">
           <TableHeader className="sticky top-0 z-20 bg-muted/80 backdrop-blur">
