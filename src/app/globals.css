@@ -144,7 +144,7 @@
   --chart-4: oklch(0.45 0 0);
   --chart-5: oklch(0.3 0 0);
 
-  --sidebar: oklch(0.11 0 0);
+  --sidebar: var(--background);
   --sidebar-foreground: oklch(0.985 0 0);
 
   --sidebar-primary: oklch(0.985 0 0);

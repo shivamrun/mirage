@@ -1,7 +1,4 @@
-import { and, eq } from "drizzle-orm";
-
-import db from "@/server/db";
-import { account } from "@/server/db/schema";
+import { getGoogleAccountByUserId } from "@/server/db/dal/google-account";
 import type { AuthSession } from "@/server/routes/auth";
 
 type GoogleIdTokenPayload = {
@@ -40,17 +37,7 @@ async function getConnectedGoogleAccount({
 }: {
   authSession: AuthSession;
 }) {
-  const connectedAccount = await db.query.account.findFirst({
-    columns: {
-      accountId: true,
-      createdAt: true,
-      idToken: true,
-    },
-    where: and(
-      eq(account.userId, authSession.user.id),
-      eq(account.providerId, "google"),
-    ),
-  });
+  const connectedAccount = await getGoogleAccountByUserId(authSession.user.id);
 
   if (!connectedAccount) {
     return null;

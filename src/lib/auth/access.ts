@@ -1,46 +1,29 @@
-import { eq } from "drizzle-orm";
 import { headers as requestHeaders } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
-import { type AuthRole, authRoles } from "@/lib/auth/roles";
-import db from "@/server/db";
-import { user as userTable } from "@/server/db/schema";
+import { type AuthRole, normalizeRoles } from "@/lib/auth/roles";
+import { type AuthUserRecord, getAuthUserById } from "@/server/db/dal/auth";
 
 export type RequestHeaders =
   | Headers
   | Awaited<ReturnType<typeof requestHeaders>>;
 export type { AuthRole };
-type User = typeof userTable.$inferSelect;
-type RoleValue = User["role"] | string[] | null | undefined;
 
 type AccessOptions = {
   callbackUrl?: string;
   headers?: RequestHeaders;
 };
 
-export type CurrentUser = User & {
+export type CurrentUser = AuthUserRecord & {
   roles: AuthRole[];
 };
-
-const authRoleSet = new Set<string>(authRoles);
-
-function isAuthRole(role: string): role is AuthRole {
-  return authRoleSet.has(role);
-}
 
 async function getHeaders(headers?: RequestHeaders) {
   return headers ?? (await requestHeaders());
 }
 
-export function normalizeRoles(role: RoleValue): AuthRole[] {
-  const values = Array.isArray(role) ? role : (role ?? "user").split(",");
-  const roles = values.map((value) => value.trim()).filter(isAuthRole);
-
-  return Array.from(new Set<AuthRole>(["user", ...roles]));
-}
-
-export function getAllowedRoles(user: Pick<User, "role">) {
+export function getAllowedRoles(user: Pick<AuthUserRecord, "role">) {
   return normalizeRoles(user.role);
 }
 
@@ -55,11 +38,7 @@ export async function getCurrentUser(
     return null;
   }
 
-  const [user] = await db
-    .select()
-    .from(userTable)
-    .where(eq(userTable.id, session.user.id))
-    .limit(1);
+  const user = await getAuthUserById(session.user.id);
 
   if (!user) {
     return null;
@@ -78,7 +57,6 @@ export async function requireAuth(
 
   if (!user) {
     redirect(`/login?callbackURL=${options.callbackUrl ?? "/"}`);
-    throw new Error("Authentication required.");
   }
 
   return user;
@@ -92,7 +70,6 @@ export async function requireRole(
 
   if (!user || !user.roles.includes(role)) {
     notFound();
-    throw new Error(`Role required: ${role}`);
   }
 
   return user;

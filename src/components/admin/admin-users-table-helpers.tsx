@@ -1,47 +1,65 @@
-import type { CSSProperties } from "react";
-
-import { normalizeRoles } from "@/lib/auth/access";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { normalizeRoles } from "@/lib/auth/roles";
+import { cn } from "@/lib/utils";
 
 type UserRole = Parameters<typeof normalizeRoles>[0];
 
-export function formatJoinedDate(date: Date) {
-  return new Intl.DateTimeFormat("en-US", {
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+const joinedDateFormatter = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
+const roleStyles: Record<string, string> = {
+  admin: "border-primary/20 bg-primary/10 text-primary hover:bg-primary/10",
+  user: "border-border bg-muted/60 text-muted-foreground hover:bg-muted/60",
+};
+
+export function formatJoinedDate(date: Date | string) {
+  const value = date instanceof Date ? date : new Date(date);
+
+  if (Number.isNaN(value.getTime())) {
+    return "—";
+  }
+
+  return joinedDateFormatter.format(value);
 }
 
 export function getInitials(name: string) {
-  const initials = name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.at(0)?.toUpperCase())
-    .join("");
+  const parts = name.trim().split(/\s+/).filter(Boolean);
 
-  return initials || "U";
+  if (parts.length === 0) {
+    return "U";
+  }
+
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 }
 
-const roleBadgeClassNames: Record<string, string> = {
-  admin: "border-primary/30 bg-primary/15 text-primary-foreground",
-  user: "border-border bg-muted text-muted-foreground",
-};
+function formatRoleName(role: string) {
+  return role
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
 
 export function RoleBadges({ role }: { role: UserRole }) {
+  const roles = normalizeRoles(role);
+
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {normalizeRoles(role).map((roleName) => (
-        <span
-          className={`inline-flex h-6 items-center rounded-md border px-2 font-medium text-xs ${
-            roleBadgeClassNames[roleName] ?? roleBadgeClassNames.user
-          }`}
+    <div className="flex flex-wrap items-center gap-1.5">
+      {roles.map((roleName) => (
+        <Badge
           key={roleName}
+          variant="outline"
+          className={cn(
+            "h-6 rounded-md px-2 font-medium text-xs",
+            roleStyles[roleName] ?? roleStyles.user,
+          )}
         >
-          {roleName}
-        </span>
+          {formatRoleName(roleName)}
+        </Badge>
       ))}
     </div>
   );
@@ -54,19 +72,13 @@ export function UserAvatar({
   image?: null | string;
   name: string;
 }) {
-  const style = image
-    ? ({
-        backgroundImage: `url("${image}")`,
-      } satisfies CSSProperties)
-    : undefined;
-
   return (
-    <div
-      aria-hidden="true"
-      className="flex size-10 shrink-0 items-center justify-center rounded-md border border-border bg-muted bg-cover bg-center font-semibold text-muted-foreground text-sm"
-      style={style}
-    >
-      {!image ? getInitials(name) : null}
-    </div>
+    <Avatar>
+      {image ? (
+        <AvatarImage src={image} alt={name} className="object-cover" />
+      ) : null}
+
+      <AvatarFallback>{getInitials(name)}</AvatarFallback>
+    </Avatar>
   );
 }

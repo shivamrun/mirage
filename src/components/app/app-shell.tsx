@@ -1,6 +1,5 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import type * as React from "react";
 
 import {
@@ -15,10 +14,7 @@ type AppShellProps = {
 };
 
 function AppShell({ children }: AppShellProps) {
-  const pathname = usePathname();
-  const isAdminShell = pathname.startsWith("/admin");
-  const sidebarSide = isAdminShell ? "right" : "left";
-  const sidebar = <AppSidebar side={sidebarSide} />;
+  const sidebar = <AppSidebar side="left" />;
   const content = (
     <SidebarInset className="max-w-6xl mx-auto">
       <SidebarTrigger className="mb-2 text-muted-foreground hover:text-foreground md:hidden" />
@@ -30,17 +26,8 @@ function AppShell({ children }: AppShellProps) {
 
   return (
     <SidebarProvider>
-      {isAdminShell ? (
-        <>
-          {content}
-          {sidebar}
-        </>
-      ) : (
-        <>
-          {sidebar}
-          {content}
-        </>
-      )}
+      {sidebar}
+      {content}
     </SidebarProvider>
   );
 }

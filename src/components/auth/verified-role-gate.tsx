@@ -48,12 +48,10 @@ async function VerifiedRoleGate({
 
   if (!user) {
     redirect(`/login?callbackURL=${encodeURIComponent(callbackURL)}`);
-    throw new Error("Authentication required.");
   }
 
   if (!user.roles.includes(requiredRole)) {
     notFound();
-    throw new Error(`Role required: ${requiredRole}`);
   }
 
   if (!user.emailVerified) {

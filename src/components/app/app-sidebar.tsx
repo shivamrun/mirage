@@ -1,12 +1,10 @@
 "use client";
 
 import {
-  BookOpen,
-  FileText,
-  History,
   LayoutDashboard,
   Settings2,
-  Sparkles,
+  ShieldCheck,
+  Users,
 } from "lucide-react";
 import type * as React from "react";
 
@@ -36,81 +34,40 @@ const data = {
   navMain: [
     {
       title: "Dashboard",
-      url: "/dashboard",
+      url: "/admin",
       icon: LayoutDashboard,
     },
     {
-      title: "Documents",
-      url: "/documents",
-      icon: FileText,
+      title: "Users",
+      url: "/admin/users",
+      icon: Users,
       items: [
         {
-          title: "All Documents",
-          url: "/documents",
+          title: "List Users",
+          url: "/admin/users",
         },
         {
-          title: "Recent",
-          url: "/documents/recent",
+          title: "Create User",
+          url: "/admin/users/new",
         },
       ],
     },
     {
-      title: "Conversions",
-      url: "/conversions",
-      icon: Sparkles,
-      items: [
-        {
-          title: "Markdown to PDF",
-          url: "/convert/pdf",
-        },
-        {
-          title: "Markdown to DOCX",
-          url: "/convert/docx",
-        },
-        {
-          title: "Markdown to Markdown",
-          url: "/convert/markdown",
-        },
-      ],
-    },
-    {
-      title: "History",
-      url: "/history",
-      icon: History,
-    },
-    {
-      title: "Documentation",
-      url: "/docs",
-      icon: BookOpen,
+      title: "Roles & Permissions",
+      url: "/admin/roles",
+      icon: ShieldCheck,
     },
     {
       title: "Settings",
-      url: "/settings",
+      url: "/admin/settings",
       icon: Settings2,
-      items: [
-        {
-          title: "General",
-          url: "/settings",
-        },
-        {
-          title: "API Keys",
-          url: "/settings/api-keys",
-        },
-        {
-          title: "Usage",
-          url: "/settings/usage",
-        },
-        {
-          title: "Billing",
-          url: "/settings/billing",
-        },
-      ],
     },
   ],
 };
 
 function SidebarBrand() {
   const { state } = useSidebar();
+
   const collapsed = state === "collapsed";
 
   if (collapsed) {
@@ -123,9 +80,18 @@ function SidebarBrand() {
 
   return (
     <div className="flex h-10 items-center gap-2 px-2">
-      <a href="/dashboard" className="flex min-w-0 flex-1 items-center gap-2">
+      <a
+        href="/admin"
+        className="flex min-w-0 flex-1 items-center gap-2"
+      >
         <div className="min-w-0 flex-1 leading-tight">
-          <div className="truncate font-medium">{siteConfig.name}</div>
+          <div className="truncate font-medium">
+            {siteConfig.name}
+          </div>
+
+          <div className="truncate text-xs text-muted-foreground">
+            Admin
+          </div>
         </div>
       </a>
 
@@ -134,7 +100,15 @@ function SidebarBrand() {
   );
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+type AppSidebarProps =
+  React.ComponentProps<typeof Sidebar> & {
+    showRail?: boolean;
+  };
+
+export function AppSidebar({
+  showRail = true,
+  ...props
+}: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="p-2">
@@ -153,7 +127,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavUser user={data.user} />
       </SidebarFooter>
 
-      <SidebarRail />
+      {showRail ? <SidebarRail /> : null}
     </Sidebar>
   );
 }
