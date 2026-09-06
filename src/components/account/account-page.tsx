@@ -7,12 +7,19 @@ import * as React from "react";
 
 import { AccountConnectedAccounts } from "@/components/account/account-connected-accounts";
 import { AccountEmailManager } from "@/components/account/account-email-manager";
+import { AccountImpersonationNotice } from "@/components/account/account-impersonation-notice";
 import { AccountPasswordForm } from "@/components/account/account-password-form";
 import { AccountProfileForm } from "@/components/account/account-profile-form";
 import { AccountSection } from "@/components/account/account-section";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth/client";
 import { siteConfig } from "@/lib/metadata";
+
+type ImpersonatedSessionData = {
+  session?: {
+    impersonatedBy?: null | string;
+  };
+};
 
 function AccountPage({
   emailChangeStatus,
@@ -26,6 +33,8 @@ function AccountPage({
   const router = useRouter();
   const session = authClient.useSession();
   const user = session.data?.user;
+  const impersonatedBy = (session.data as ImpersonatedSessionData | null)
+    ?.session?.impersonatedBy;
   const [isSigningOut, setIsSigningOut] = React.useState(false);
 
   React.useEffect(() => {
@@ -77,6 +86,8 @@ function AccountPage({
             {isSigningOut ? "Signing out..." : "Sign out"}
           </Button>
         </header>
+
+        <AccountImpersonationNotice impersonatedBy={impersonatedBy} />
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="flex flex-col gap-6">

@@ -1,3 +1,5 @@
+export { AdminUserDetailView } from "./admin-user-detail-view";
+export { AdminUserImpersonateDialog } from "./admin-user-impersonation-controls";
 export {
   AdminUserBanDialog,
   AdminUserEmailUpdateDialog,
