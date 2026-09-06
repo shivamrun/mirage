@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import {
   type AdminUserDetailSection,
   AdminUserDetailView,
-} from "@/components/admin/admin-user-detail-view";
+} from "@/components/admin";
 import { requireAdmin } from "@/lib/auth/access";
 import { getAdminUserDetail } from "@/server/db/dal/admin-user-detail";
 

@@ -1,26 +1,22 @@
 import { CheckCircle2, Fingerprint, XCircle } from "lucide-react";
 
 import type { AdminUserDetail } from "@/server/db/dal/admin-user-detail";
+import { CopyableId } from "./copyable-id";
 import {
   AdminUserAccountManageDialog,
   type AdminUserLinkedAccount,
-} from "./admin-user-account-management-dialog";
-import { CopyableId } from "./admin-user-copyable-id";
+} from "./dialogs/account-management-dialog";
+import {
+  type AdminUserManagedSession,
+  AdminUserSessionManageDialog,
+} from "./dialogs/session-management-dialog";
 import {
   formatDate,
   formatProviderName,
   formatValue,
   isFutureDate,
-} from "./admin-user-detail-formatters";
-import {
-  DetailPanel,
-  EmptyState,
-  StatusBadge,
-} from "./admin-user-detail-primitives";
-import {
-  type AdminUserManagedSession,
-  AdminUserSessionManageDialog,
-} from "./admin-user-session-management-dialog";
+} from "./formatters";
+import { DetailPanel, EmptyState, StatusBadge } from "./primitives";
 
 type AccountRecord = AdminUserDetail["accounts"][number];
 type SessionRecord = AdminUserDetail["sessions"][number];

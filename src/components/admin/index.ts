@@ -1,70 +1,9 @@
-export { AdminUserDetailView } from "./admin-user-detail-view";
-export { AdminUserImpersonateDialog } from "./admin-user-impersonation-controls";
-export {
-  AdminUserBanDialog,
-  AdminUserEmailUpdateDialog,
-  AdminUserImageUpdateDialog,
-  AdminUserNameUpdateDialog,
-  AdminUserPasswordResetDialog,
-  AdminUserPasswordUpdateDialog,
-  AdminUserRoleUpdateDialog,
-} from "./admin-user-name-update-dialog";
-export { AdminUsersFilterDialog } from "./admin-users-filter-dialog";
-export { AdminUsersPagination } from "./admin-users-pagination";
-export {
-  ADMIN_USERS_BOOLEAN_FILTER_VALUES,
-  ADMIN_USERS_FILTER_FIELD_CONFIGS,
-  ADMIN_USERS_FILTER_FIELDS,
-  ADMIN_USERS_FILTER_OPERATORS,
-  ADMIN_USERS_PAGE_PATH,
-  ADMIN_USERS_PAGE_SIZE,
-  ADMIN_USERS_ROLE_FILTER_VALUES,
-  ADMIN_USERS_SEARCH_FIELDS,
-  ADMIN_USERS_SEARCH_OPERATORS,
-  ADMIN_USERS_SORT_FIELDS,
-  type AdminUserListItem,
-  type AdminUsersFilterFieldConfig,
-  type AdminUsersFilterStatus,
-  type AdminUsersFilterValueOption,
-  type AdminUsersListFilter,
-  type AdminUsersPageSearchParams,
-  type AdminUsersQueryState,
-  adminUsersHrefFromFormData,
-  adminUsersHrefFromSearchParams,
-  adminUsersRawHrefFromSearchParams,
-  DEFAULT_FILTER_FIELD,
-  DEFAULT_SEARCH_FIELD,
-  DEFAULT_SEARCH_OPERATOR,
-  DEFAULT_SORT_BY,
-  DEFAULT_SORT_DIRECTION,
-  type FilterField,
-  type FilterOperator,
-  type FilterValueKind,
-  getAdminUsersFilterFieldConfig,
-  getAdminUsersFilterOperatorLabel,
-  getAdminUsersFilterOperatorOptions,
-  getAdminUsersFilterStatus,
-  getAdminUsersListFilter,
-  getAdminUsersSearchField,
-  getDefaultAdminUsersFilterOperator,
-  normalizeFilterValue,
-  type ParsedAdminUsersSearchParams,
-  parseAdminUsersSearchParams,
-  type RoleFilterValue,
-  type SearchField,
-  type SearchOperator,
-  type SearchParamValue,
-  type SortDirection,
-  type SortField,
-  type UsersHrefOptions,
-  usersPageHref,
-} from "./admin-users-query";
-export { AdminUsersTable } from "./admin-users-table";
 export {
   formatJoinedDate,
   getInitials,
   RoleBadges,
   UserAvatar,
   type UserRole,
-} from "./admin-users-table-helpers";
-export { AdminUsersToolbar } from "./admin-users-toolbar";
+} from "./shared/user-display";
+export * from "./user-detail";
+export * from "./users";

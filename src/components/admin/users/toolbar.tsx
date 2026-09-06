@@ -4,8 +4,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-import { applyAdminUsersListState } from "./admin-users-actions";
-import { AdminUsersFilterDialog } from "./admin-users-filter-dialog";
+import { applyAdminUsersListState } from "./actions";
+import { AdminUsersFilterDialog } from "./filter-dialog";
 import {
   type AdminUsersFilterStatus,
   type AdminUsersQueryState,
@@ -13,7 +13,7 @@ import {
   DEFAULT_SEARCH_OPERATOR,
   DEFAULT_SORT_BY,
   DEFAULT_SORT_DIRECTION,
-} from "./admin-users-query";
+} from "./query";
 
 type AdminUsersToolbarProps = {
   state: AdminUsersQueryState;

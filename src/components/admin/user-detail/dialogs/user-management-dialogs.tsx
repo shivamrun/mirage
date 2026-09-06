@@ -70,7 +70,7 @@ import {
   adminUserPasswordUpdateSchema,
   adminUserRoleUpdateSchema,
 } from "@/zod";
-import { formatRoleName } from "./admin-users-table-helpers";
+import { formatRoleName } from "../../shared/user-display";
 
 type StatusMessage = {
   text: string;

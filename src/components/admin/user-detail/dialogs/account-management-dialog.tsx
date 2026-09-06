@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatProviderName } from "./admin-user-detail-formatters";
+import { formatProviderName } from "../formatters";
 
 type StatusMessage = {
   text: string;

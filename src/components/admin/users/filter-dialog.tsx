@@ -22,17 +22,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { applyAdminUsersListState } from "./admin-users-actions";
-import { AdminUsersFilterControls } from "./admin-users-filter-controls";
-import type {
-  AdminUsersFilterStatus,
-  AdminUsersQueryState,
-} from "./admin-users-query";
+import { applyAdminUsersListState } from "./actions";
+import { AdminUsersFilterControls } from "./filter-controls";
+import type { AdminUsersFilterStatus, AdminUsersQueryState } from "./query";
 import {
   ADMIN_USERS_SEARCH_FIELDS,
   ADMIN_USERS_SEARCH_OPERATORS,
   ADMIN_USERS_SORT_FIELDS,
-} from "./admin-users-query";
+} from "./query";
 
 type AdminUsersFilterDialogProps = {
   state: AdminUsersQueryState;

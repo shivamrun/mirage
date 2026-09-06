@@ -1,11 +1,8 @@
 import type { AdminUserDetail } from "@/server/db/dal/admin-user-detail";
-import {
-  AdminUserAccountsTab,
-  AdminUserSessionsTab,
-} from "./admin-user-detail-activity-tabs";
-import { isFutureDate } from "./admin-user-detail-formatters";
-import { AdminUserDetailHeader } from "./admin-user-detail-header";
-import { AdminUserDetailOverview } from "./admin-user-detail-overview";
+import { AdminUserAccountsTab, AdminUserSessionsTab } from "./activity-tabs";
+import { isFutureDate } from "./formatters";
+import { AdminUserDetailHeader } from "./header";
+import { AdminUserDetailOverview } from "./overview";
 
 export type AdminUserDetailSection = "accounts" | "overview" | "sessions";
 

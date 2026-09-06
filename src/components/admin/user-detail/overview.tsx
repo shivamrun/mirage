@@ -1,6 +1,8 @@
 import { Ban, CheckCircle2, CircleOff } from "lucide-react";
-
-import { AdminUserImpersonateDialog } from "@/components/admin/admin-user-impersonation-controls";
+import { normalizeRoles } from "@/lib/auth/roles";
+import type { AdminUserDetail } from "@/server/db/dal/admin-user-detail";
+import { formatRoleName } from "../shared/user-display";
+import { AdminUserImpersonateDialog } from "./dialogs/impersonation-dialog";
 import {
   AdminUserBanDialog,
   AdminUserEmailUpdateDialog,
@@ -9,17 +11,14 @@ import {
   AdminUserPasswordResetDialog,
   AdminUserPasswordUpdateDialog,
   AdminUserRoleUpdateDialog,
-} from "@/components/admin/admin-user-name-update-dialog";
-import { normalizeRoles } from "@/lib/auth/roles";
-import type { AdminUserDetail } from "@/server/db/dal/admin-user-detail";
-import { formatDate, formatValue } from "./admin-user-detail-formatters";
+} from "./dialogs/user-management-dialogs";
+import { formatDate, formatValue } from "./formatters";
 import {
   DetailPanel,
   DetailRow,
   DetailSection,
   StatusBadge,
-} from "./admin-user-detail-primitives";
-import { formatRoleName } from "./admin-users-table-helpers";
+} from "./primitives";
 
 type AdminUserDetailOverviewProps = {
   currentUserId: string;

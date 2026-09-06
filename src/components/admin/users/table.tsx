@@ -11,14 +11,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  ADMIN_USERS_PAGE_PATH,
-  type AdminUserListItem,
-} from "./admin-users-query";
-import {
   formatJoinedDate,
   RoleBadges,
   UserAvatar,
-} from "./admin-users-table-helpers";
+} from "../shared/user-display";
+import { ADMIN_USERS_PAGE_PATH, type AdminUserListItem } from "./query";
 
 type AdminUsersTableProps = {
   users: AdminUserListItem[];

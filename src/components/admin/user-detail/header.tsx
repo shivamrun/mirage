@@ -5,8 +5,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { normalizeRoles } from "@/lib/auth/roles";
 import { cn } from "@/lib/utils";
 import type { AdminUserDetail } from "@/server/db/dal/admin-user-detail";
-import type { AdminUserDetailSection } from "./admin-user-detail-view";
-import { getInitials } from "./admin-users-table-helpers";
+import { getInitials } from "../shared/user-display";
+import type { AdminUserDetailSection } from "./view";
 
 type AdminUserDetailHeaderProps = {
   accountsLength: number;

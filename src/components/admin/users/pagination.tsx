@@ -7,7 +7,7 @@ import {
   ADMIN_USERS_PAGE_SIZE,
   type AdminUsersQueryState,
   usersPageHref,
-} from "./admin-users-query";
+} from "./query";
 
 type PaginationButtonProps = {
   children: ReactNode;

@@ -15,14 +15,14 @@ import type {
   AdminUsersQueryState,
   FilterField,
   FilterOperator,
-} from "./admin-users-query";
+} from "./query";
 import {
   ADMIN_USERS_FILTER_FIELDS,
   getAdminUsersFilterFieldConfig,
   getAdminUsersFilterOperatorLabel,
   getAdminUsersFilterOperatorOptions,
   getDefaultAdminUsersFilterOperator,
-} from "./admin-users-query";
+} from "./query";
 
 type AdminUsersFilterControlsProps = {
   state: AdminUsersQueryState;
