@@ -22,6 +22,7 @@ export const auth = betterAuth({
   trustedOrigins: [env.NEXT_PUBLIC_BASE_URL],
   account: {
     accountLinking: {
+      allowDifferentEmails: true,
       enabled: true,
       requireLocalEmailVerified: false,
       trustedProviders: ["google"],
