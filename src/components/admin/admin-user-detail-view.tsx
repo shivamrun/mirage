@@ -47,11 +47,15 @@ export function AdminUserDetailView({
         ) : null}
 
         {section === "accounts" ? (
-          <AdminUserAccountsTab accounts={accounts} />
+          <AdminUserAccountsTab accounts={accounts} userId={user.id} />
         ) : null}
 
         {section === "sessions" ? (
-          <AdminUserSessionsTab now={now} sessions={sessions} />
+          <AdminUserSessionsTab
+            now={now}
+            sessions={sessions}
+            userId={user.id}
+          />
         ) : null}
       </div>
     </div>

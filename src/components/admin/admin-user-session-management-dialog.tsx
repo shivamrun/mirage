@@ -1,0 +1,179 @@
+"use client";
+
+import { XCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+
+import { AuthStatusMessage } from "@/components/auth";
+import { getUnexpectedAuthErrorMessage } from "@/components/auth/auth-errors";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+type StatusMessage = {
+  text: string;
+  tone: "success" | "error" | "info";
+};
+
+export type AdminUserManagedSession = {
+  createdAt: string;
+  expiresAt: string;
+  id: string;
+  impersonatedBy: null | string;
+  ipAddress: null | string;
+  userAgent: null | string;
+};
+
+type AdminUserSessionManageDialogProps = {
+  className?: string;
+  session: AdminUserManagedSession;
+  userId: string;
+};
+
+export function AdminUserSessionManageDialog({
+  className,
+  session,
+  userId,
+}: AdminUserSessionManageDialogProps) {
+  const router = useRouter();
+  const [open, setOpen] = React.useState(false);
+  const [status, setStatus] = React.useState<StatusMessage>();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    setStatus(undefined);
+  }, [open]);
+
+  async function revokeSession() {
+    setStatus(undefined);
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch(
+        `/api/admin/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(session.id)}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      if (!response.ok) {
+        setStatus({
+          text: await getResponseMessage(response),
+          tone: "error",
+        });
+        return;
+      }
+
+      setOpen(false);
+      router.refresh();
+    } catch (reason) {
+      setStatus({
+        text: getUnexpectedAuthErrorMessage(reason),
+        tone: "error",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button
+          aria-haspopup="dialog"
+          className={cn("min-w-0 gap-2", className)}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          <XCircle className="size-4 shrink-0" />
+          <span className="min-w-0 truncate">Remove</span>
+        </Button>
+      </AlertDialogTrigger>
+
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remove session</AlertDialogTitle>
+          <AlertDialogDescription>
+            Revoke this active session and require the user to sign in again.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <div className="grid gap-3 rounded-lg border bg-muted/20 p-3 text-sm">
+          <SessionDetail label="Session ID" value={session.id} />
+          <SessionDetail label="Created" value={session.createdAt} />
+          <SessionDetail label="Expires" value={session.expiresAt} />
+          <SessionDetail label="IP address" value={session.ipAddress ?? "-"} />
+          <SessionDetail label="User agent" value={session.userAgent ?? "-"} />
+          {session.impersonatedBy ? (
+            <SessionDetail
+              label="Impersonated by"
+              value={session.impersonatedBy}
+            />
+          ) : null}
+        </div>
+
+        {status ? (
+          <AuthStatusMessage className="text-left" tone={status.tone}>
+            {status.text}
+          </AuthStatusMessage>
+        ) : null}
+
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+
+          <Button
+            disabled={isSubmitting}
+            onClick={revokeSession}
+            type="button"
+            variant="destructive"
+          >
+            <XCircle data-icon="inline-start" />
+            {isSubmitting ? "Revoking..." : "Revoke session"}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function SessionDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid min-w-0 gap-1 sm:grid-cols-[7rem_minmax(0,1fr)]">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="break-words font-mono text-xs">{value}</span>
+    </div>
+  );
+}
+
+async function getResponseMessage(response: Response) {
+  try {
+    const body = await response.json();
+
+    if (
+      body &&
+      typeof body === "object" &&
+      "message" in body &&
+      typeof body.message === "string"
+    ) {
+      return body.message;
+    }
+  } catch {
+    // Fall through to the generic message below.
+  }
+
+  return "Could not revoke this session. Please try again.";
+}

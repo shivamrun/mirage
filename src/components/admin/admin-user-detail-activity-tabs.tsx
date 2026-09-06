@@ -1,12 +1,10 @@
-import {
-  CheckCircle2,
-  Fingerprint,
-  Link2,
-  ListChecks,
-  XCircle,
-} from "lucide-react";
+import { CheckCircle2, Fingerprint, XCircle } from "lucide-react";
 
 import type { AdminUserDetail } from "@/server/db/dal/admin-user-detail";
+import {
+  AdminUserAccountManageDialog,
+  type AdminUserLinkedAccount,
+} from "./admin-user-account-management-dialog";
 import { CopyableId } from "./admin-user-copyable-id";
 import {
   formatDate,
@@ -16,31 +14,31 @@ import {
 } from "./admin-user-detail-formatters";
 import {
   DetailPanel,
-  DialogButton,
   EmptyState,
   StatusBadge,
 } from "./admin-user-detail-primitives";
+import {
+  type AdminUserManagedSession,
+  AdminUserSessionManageDialog,
+} from "./admin-user-session-management-dialog";
 
 type AccountRecord = AdminUserDetail["accounts"][number];
 type SessionRecord = AdminUserDetail["sessions"][number];
 
 export function AdminUserAccountsTab({
   accounts,
+  userId,
 }: {
   accounts: AdminUserDetail["accounts"];
+  userId: string;
 }) {
   return (
     <DetailPanel
-      actions={
-        <DialogButton icon={Link2} target="manage-accounts">
-          Manage accounts
-        </DialogButton>
-      }
       description="Authentication providers and stored credential state."
       title="Linked Accounts"
     >
       {accounts.length > 0 ? (
-        <AccountsTable accounts={accounts} />
+        <AccountsTable accounts={accounts} userId={userId} />
       ) : (
         <EmptyState
           description="This user does not have linked authentication account rows."
@@ -54,32 +52,19 @@ export function AdminUserAccountsTab({
 export function AdminUserSessionsTab({
   now,
   sessions,
+  userId,
 }: {
   now: Date;
   sessions: AdminUserDetail["sessions"];
+  userId: string;
 }) {
   return (
     <DetailPanel
-      actions={
-        <>
-          <DialogButton icon={ListChecks} target="manage-sessions">
-            Manage sessions
-          </DialogButton>
-
-          <DialogButton
-            icon={XCircle}
-            target="revoke-all-sessions"
-            variant="destructive"
-          >
-            Revoke all
-          </DialogButton>
-        </>
-      }
       description="Devices, expiry, and impersonation metadata."
       title="Sessions"
     >
       {sessions.length > 0 ? (
-        <SessionsTable now={now} sessions={sessions} />
+        <SessionsTable now={now} sessions={sessions} userId={userId} />
       ) : (
         <EmptyState
           description="There are no stored sessions for this user."
@@ -90,7 +75,13 @@ export function AdminUserSessionsTab({
   );
 }
 
-function AccountsTable({ accounts }: { accounts: AccountRecord[] }) {
+function AccountsTable({
+  accounts,
+  userId,
+}: {
+  accounts: AccountRecord[];
+  userId: string;
+}) {
   return (
     <div className="min-w-0 overflow-hidden bg-card">
       <div className="overflow-x-auto">
@@ -109,7 +100,7 @@ function AccountsTable({ accounts }: { accounts: AccountRecord[] }) {
 
           <tbody className="divide-y">
             {accounts.map((account) => (
-              <AccountRow account={account} key={account.id} />
+              <AccountRow account={account} key={account.id} userId={userId} />
             ))}
           </tbody>
         </table>
@@ -118,7 +109,13 @@ function AccountsTable({ accounts }: { accounts: AccountRecord[] }) {
   );
 }
 
-function AccountRow({ account }: { account: AccountRecord }) {
+function AccountRow({
+  account,
+  userId,
+}: {
+  account: AccountRecord;
+  userId: string;
+}) {
   const scopes = parseScopes(account.scope);
 
   return (
@@ -214,20 +211,37 @@ function AccountRow({ account }: { account: AccountRecord }) {
       </TableCell>
 
       <TableCell className="text-right">
-        <DialogButton icon={Link2} target={`manage-account-${account.id}`}>
-          Manage
-        </DialogButton>
+        {isExternalProviderAccount(account) ? (
+          <AdminUserAccountManageDialog
+            account={toLinkedAccount(account)}
+            userId={userId}
+          />
+        ) : null}
       </TableCell>
     </tr>
   );
 }
 
+function isExternalProviderAccount(account: AccountRecord) {
+  return account.providerId !== "credential";
+}
+
+function toLinkedAccount(account: AccountRecord): AdminUserLinkedAccount {
+  return {
+    accountId: account.accountId,
+    id: account.id,
+    providerId: account.providerId,
+  };
+}
+
 function SessionsTable({
   now,
   sessions,
+  userId,
 }: {
   now: Date;
   sessions: SessionRecord[];
+  userId: string;
 }) {
   return (
     <div className="min-w-0 overflow-hidden bg-card">
@@ -247,7 +261,12 @@ function SessionsTable({
 
           <tbody className="divide-y">
             {sessions.map((session) => (
-              <SessionRow key={session.id} now={now} session={session} />
+              <SessionRow
+                key={session.id}
+                now={now}
+                session={session}
+                userId={userId}
+              />
             ))}
           </tbody>
         </table>
@@ -256,7 +275,15 @@ function SessionsTable({
   );
 }
 
-function SessionRow({ now, session }: { now: Date; session: SessionRecord }) {
+function SessionRow({
+  now,
+  session,
+  userId,
+}: {
+  now: Date;
+  session: SessionRecord;
+  userId: string;
+}) {
   const active = isFutureDate(session.expiresAt, now);
 
   return (
@@ -318,12 +345,26 @@ function SessionRow({ now, session }: { now: Date; session: SessionRecord }) {
       </TableCell>
 
       <TableCell className="text-right">
-        <DialogButton icon={ListChecks} target={`manage-session-${session.id}`}>
-          Manage
-        </DialogButton>
+        {active ? (
+          <AdminUserSessionManageDialog
+            session={toManagedSession(session)}
+            userId={userId}
+          />
+        ) : null}
       </TableCell>
     </tr>
   );
+}
+
+function toManagedSession(session: SessionRecord): AdminUserManagedSession {
+  return {
+    createdAt: formatDate(session.createdAt),
+    expiresAt: formatDate(session.expiresAt),
+    id: session.id,
+    impersonatedBy: session.impersonatedBy,
+    ipAddress: session.ipAddress,
+    userAgent: session.userAgent,
+  };
 }
 
 function IdentifierField({ label, value }: { label: string; value: string }) {
