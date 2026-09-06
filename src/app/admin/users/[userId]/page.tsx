@@ -3,13 +3,10 @@ import {
   Ban,
   CheckCircle2,
   CircleOff,
-  Crown,
   Fingerprint,
-  KeyRound,
   Link2,
   ListChecks,
   type LucideIcon,
-  MailCheck,
   Monitor,
   UserRound,
   XCircle,
@@ -19,7 +16,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ComponentProps, ReactNode } from "react";
 
-import { getInitials } from "@/components/admin";
+import {
+  AdminUserBanDialog,
+  AdminUserEmailUpdateDialog,
+  AdminUserImageUpdateDialog,
+  AdminUserNameUpdateDialog,
+  AdminUserPasswordResetDialog,
+  AdminUserPasswordUpdateDialog,
+  AdminUserRoleUpdateDialog,
+  getInitials,
+} from "@/components/admin";
 import { formatRoleName } from "@/components/admin/admin-users-table-helpers";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -684,13 +690,10 @@ export default async function AdminUserDetailPage({
                 <DetailSection title="Identity">
                   <DetailRow
                     action={
-                      <DialogButton
-                        icon={UserRound}
-                        size="xs"
-                        target="update-profile"
-                      >
-                        Update
-                      </DialogButton>
+                      <AdminUserNameUpdateDialog
+                        currentName={user.name}
+                        userId={user.id}
+                      />
                     }
                     label="Name"
                   >
@@ -698,22 +701,10 @@ export default async function AdminUserDetailPage({
                   </DetailRow>
                   <DetailRow
                     action={
-                      <div className="flex flex-wrap gap-2">
-                        <DialogButton
-                          icon={UserRound}
-                          size="xs"
-                          target="update-profile"
-                        >
-                          Update
-                        </DialogButton>
-                        <DialogButton
-                          icon={MailCheck}
-                          size="xs"
-                          target="send-reset-link"
-                        >
-                          Reset link
-                        </DialogButton>
-                      </div>
+                      <AdminUserEmailUpdateDialog
+                        currentEmail={user.email}
+                        userId={user.id}
+                      />
                     }
                     label="Email"
                   >
@@ -724,22 +715,10 @@ export default async function AdminUserDetailPage({
                   </DetailRow>
                   <DetailRow
                     action={
-                      <div className="flex flex-wrap gap-2">
-                        <DialogButton
-                          icon={Crown}
-                          size="xs"
-                          target="upgrade-role"
-                        >
-                          Upgrade
-                        </DialogButton>
-                        <DialogButton
-                          icon={CircleOff}
-                          size="xs"
-                          target="remove-role"
-                        >
-                          Remove
-                        </DialogButton>
-                      </div>
+                      <AdminUserRoleUpdateDialog
+                        currentRole={user.role}
+                        userId={user.id}
+                      />
                     }
                     label="Role"
                   >
@@ -749,13 +728,10 @@ export default async function AdminUserDetailPage({
                   </DetailRow>
                   <DetailRow
                     action={
-                      <DialogButton
-                        icon={UserRound}
-                        size="xs"
-                        target="update-profile"
-                      >
-                        Update
-                      </DialogButton>
+                      <AdminUserImageUpdateDialog
+                        currentImage={user.image}
+                        userId={user.id}
+                      />
                     }
                     label="Profile image"
                     mono
@@ -765,18 +741,7 @@ export default async function AdminUserDetailPage({
                 </DetailSection>
 
                 <DetailSection title="Status">
-                  <DetailRow
-                    action={
-                      <DialogButton
-                        icon={MailCheck}
-                        size="xs"
-                        target="send-verification-link"
-                      >
-                        Send link
-                      </DialogButton>
-                    }
-                    label="Email verified"
-                  >
+                  <DetailRow label="Email verified">
                     <StatusBadge
                       icon={user.emailVerified ? CheckCircle2 : CircleOff}
                       tone={user.emailVerified ? "good" : "warning"}
@@ -786,14 +751,11 @@ export default async function AdminUserDetailPage({
                   </DetailRow>
                   <DetailRow
                     action={
-                      <DialogButton
-                        icon={isBanned ? CheckCircle2 : Ban}
-                        size="xs"
-                        target={isBanned ? "unban-user" : "ban-user"}
-                        variant={isBanned ? "outline" : "destructive"}
-                      >
-                        {isBanned ? "Unban" : "Ban"}
-                      </DialogButton>
+                      <AdminUserBanDialog
+                        isBanned={isBanned}
+                        userId={user.id}
+                        userName={user.name}
+                      />
                     }
                     label="Account access"
                   >
@@ -819,13 +781,13 @@ export default async function AdminUserDetailPage({
                   </DetailRow>
                   <DetailRow
                     action={
-                      <DialogButton
-                        icon={KeyRound}
-                        size="xs"
-                        target="update-password"
-                      >
-                        Update
-                      </DialogButton>
+                      <div className="flex flex-wrap gap-2">
+                        <AdminUserPasswordUpdateDialog userId={user.id} />
+                        <AdminUserPasswordResetDialog
+                          currentEmail={user.email}
+                          userId={user.id}
+                        />
+                      </div>
                     }
                     label="Password"
                   >
@@ -920,11 +882,6 @@ export default async function AdminUserDetailPage({
 
           <TabsContent className="mt-0 min-w-0" value="verification">
             <TabHeader
-              actions={
-                <DialogButton icon={MailCheck} target="send-verification-link">
-                  Send verification
-                </DialogButton>
-              }
               description="Email verification and email-change records."
               title="Verification Activity"
             />

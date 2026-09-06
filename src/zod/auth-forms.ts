@@ -74,6 +74,66 @@ export const accountProfileSchema = z.object({
     .pipe(z.url("Image must be a valid URL.").nullable()),
 });
 
+export const adminUserNameUpdateSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required.")
+    .max(100, "Name must be 100 characters or fewer."),
+});
+
+export const adminUserEmailUpdateSchema = z.object({
+  email: emailSchema,
+});
+
+export const adminUserImageUpdateSchema = z.object({
+  image: z
+    .string()
+    .trim()
+    .max(2048, "Image URL must be 2048 characters or fewer.")
+    .transform((value) => value || null)
+    .pipe(z.url("Image must be a valid URL.").nullable()),
+});
+
+export const adminUserBanSchema = z.object({
+  banReason: z
+    .string()
+    .trim()
+    .max(500, "Ban reason must be 500 characters or fewer.")
+    .transform((value) => value || undefined),
+  banExpiresInDays: z.preprocess(
+    (value) => {
+      if (typeof value === "string" && value.trim() === "") {
+        return undefined;
+      }
+
+      return typeof value === "string" ? Number(value) : value;
+    },
+    z
+      .number({
+        error: "Ban duration must be a number.",
+      })
+      .int("Ban duration must use whole days.")
+      .min(1, "Ban duration must be at least 1 day.")
+      .max(3650, "Ban duration must be 3650 days or fewer.")
+      .optional(),
+  ),
+});
+
+export const adminUserPasswordUpdateSchema = z
+  .object({
+    newPassword: passwordSchema,
+    confirmPassword: passwordSchema,
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords do not match.",
+    path: ["confirmPassword"],
+  });
+
+export const adminUserRoleUpdateSchema = z.object({
+  roles: z.array(z.enum(["user", "admin"])).min(1, "Select at least one role."),
+});
+
 export const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, "Current password is required."),
@@ -120,6 +180,38 @@ export type ChangeEmailInput = z.input<typeof changeEmailSchema>;
 export type ChangeEmailValues = z.output<typeof changeEmailSchema>;
 export type AccountProfileInput = z.input<typeof accountProfileSchema>;
 export type AccountProfileValues = z.output<typeof accountProfileSchema>;
+export type AdminUserBanInput = z.input<typeof adminUserBanSchema>;
+export type AdminUserBanValues = z.output<typeof adminUserBanSchema>;
+export type AdminUserEmailUpdateInput = z.input<
+  typeof adminUserEmailUpdateSchema
+>;
+export type AdminUserEmailUpdateValues = z.output<
+  typeof adminUserEmailUpdateSchema
+>;
+export type AdminUserImageUpdateInput = z.input<
+  typeof adminUserImageUpdateSchema
+>;
+export type AdminUserImageUpdateValues = z.output<
+  typeof adminUserImageUpdateSchema
+>;
+export type AdminUserNameUpdateInput = z.input<
+  typeof adminUserNameUpdateSchema
+>;
+export type AdminUserNameUpdateValues = z.output<
+  typeof adminUserNameUpdateSchema
+>;
+export type AdminUserPasswordUpdateInput = z.input<
+  typeof adminUserPasswordUpdateSchema
+>;
+export type AdminUserPasswordUpdateValues = z.output<
+  typeof adminUserPasswordUpdateSchema
+>;
+export type AdminUserRoleUpdateInput = z.input<
+  typeof adminUserRoleUpdateSchema
+>;
+export type AdminUserRoleUpdateValues = z.output<
+  typeof adminUserRoleUpdateSchema
+>;
 export type ChangePasswordInput = z.input<typeof changePasswordSchema>;
 export type ChangePasswordValues = z.output<typeof changePasswordSchema>;
 export type VerifyEmailInput = z.input<typeof verifyEmailSchema>;

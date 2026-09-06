@@ -1,3 +1,12 @@
+export {
+  AdminUserBanDialog,
+  AdminUserEmailUpdateDialog,
+  AdminUserImageUpdateDialog,
+  AdminUserNameUpdateDialog,
+  AdminUserPasswordResetDialog,
+  AdminUserPasswordUpdateDialog,
+  AdminUserRoleUpdateDialog,
+} from "./admin-user-name-update-dialog";
 export { AdminUsersFilterDialog } from "./admin-users-filter-dialog";
 export { AdminUsersPagination } from "./admin-users-pagination";
 export {
