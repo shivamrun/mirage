@@ -175,9 +175,3 @@
     cursor: pointer;
   }
 }
-
-@layer components {
-  .link-text {
-    @apply font-medium text-primary underline underline-offset-4 brightness-125;
-  }
-}

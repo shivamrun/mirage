@@ -3,7 +3,6 @@ import type { ComponentProps, ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 export function StatusBadge({
@@ -18,7 +17,7 @@ export function StatusBadge({
   return (
     <Badge
       className={cn(
-        "h-6 min-w-0 rounded-md px-2 font-medium text-xs",
+        "p-1 min-w-0 rounded-md font-medium text-xs",
         tone === "good" &&
           "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
         tone === "warning" &&
@@ -79,6 +78,37 @@ export function DetailSection({
       </div>
       <div className="divide-y">{children}</div>
     </div>
+  );
+}
+
+export function DetailPanel({
+  actions,
+  children,
+  description,
+  title,
+}: {
+  actions?: ReactNode;
+  children: ReactNode;
+  description: string;
+  title: string;
+}) {
+  return (
+    <section className="flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card">
+      <div className="flex min-w-0 flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="font-semibold text-base">{title}</h2>
+          <p className="mt-0.5 text-muted-foreground text-sm">{description}</p>
+        </div>
+
+        {actions ? (
+          <div className="flex min-w-0 flex-wrap gap-2 sm:justify-end">
+            {actions}
+          </div>
+        ) : null}
+      </div>
+
+      {children}
+    </section>
   );
 }
 
@@ -175,57 +205,5 @@ export function RecordField({
         {children}
       </dd>
     </div>
-  );
-}
-
-export function TabHeader({
-  actions,
-  description,
-  title,
-}: {
-  actions?: ReactNode;
-  description: string;
-  title: string;
-}) {
-  return (
-    <div className="mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div className="min-w-0">
-        <h2 className="font-semibold text-base">{title}</h2>
-        <p className="mt-0.5 text-muted-foreground text-sm">{description}</p>
-      </div>
-
-      {actions ? (
-        <div className="flex min-w-0 flex-wrap gap-2 sm:justify-end">
-          {actions}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-export function WorkspaceTabTrigger({
-  count,
-  icon: Icon,
-  label,
-  value,
-}: {
-  count?: number;
-  icon: LucideIcon;
-  label: string;
-  value: string;
-}) {
-  return (
-    <TabsTrigger
-      className="h-10 min-w-0 justify-center border-0 border-b-2 rounded-none px-2.5 text-left text-sm data-[state=active]:bg-muted data-[state=active]:text-foreground lg:w-full"
-      value={value}
-    >
-      <Icon className="size-4 shrink-0" />
-      <span className="min-w-0 truncate">
-        {label}{" "}
-        {typeof count === "number" ? (
-          <span className="text-muted-foreground">[ {count} ]</span>
-        ) : null}
-      </span>
-    </TabsTrigger>
   );
 }

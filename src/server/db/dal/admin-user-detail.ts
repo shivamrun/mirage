@@ -1,23 +1,11 @@
-import { desc, eq, like, or, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 
 import db from "@/server/db";
 import {
   account as accountTable,
   session as sessionTable,
   user as userTable,
-  verification as verificationTable,
 } from "@/server/db/schema";
-
-const EMAIL_CHANGE_PREFIX = "account-email-change";
-const EMAIL_CHANGE_APPROVAL_PREFIX = "account-email-change-approval";
-
-function escapeLikePattern(value: string) {
-  return value.replace(/[\\%_]/g, (character) => `\\${character}`);
-}
-
-function verificationIdentifierPrefix(prefix: string, userId: string) {
-  return `${escapeLikePattern(`${prefix}:${userId}:`)}%`;
-}
 
 export async function getAdminUserDetail(userId: string) {
   const [record] = await db
@@ -30,7 +18,7 @@ export async function getAdminUserDetail(userId: string) {
     return null;
   }
 
-  const [accounts, sessions, verifications] = await Promise.all([
+  const [accounts, sessions] = await Promise.all([
     db
       .select({
         id: accountTable.id,
@@ -65,36 +53,12 @@ export async function getAdminUserDetail(userId: string) {
       .from(sessionTable)
       .where(eq(sessionTable.userId, userId))
       .orderBy(desc(sessionTable.createdAt)),
-    db
-      .select({
-        id: verificationTable.id,
-        identifier: verificationTable.identifier,
-        expiresAt: verificationTable.expiresAt,
-        createdAt: verificationTable.createdAt,
-        updatedAt: verificationTable.updatedAt,
-      })
-      .from(verificationTable)
-      .where(
-        or(
-          eq(verificationTable.identifier, record.email),
-          like(
-            verificationTable.identifier,
-            verificationIdentifierPrefix(EMAIL_CHANGE_PREFIX, userId),
-          ),
-          like(
-            verificationTable.identifier,
-            verificationIdentifierPrefix(EMAIL_CHANGE_APPROVAL_PREFIX, userId),
-          ),
-        ),
-      )
-      .orderBy(desc(verificationTable.createdAt)),
   ]);
 
   return {
     user: record,
     accounts,
     sessions,
-    verifications,
   };
 }
 

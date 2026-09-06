@@ -1,6 +1,5 @@
 import {
   CheckCircle2,
-  CircleOff,
   Fingerprint,
   Link2,
   ListChecks,
@@ -8,26 +7,22 @@ import {
 } from "lucide-react";
 
 import type { AdminUserDetail } from "@/server/db/dal/admin-user-detail";
+import { CopyableId } from "./admin-user-copyable-id";
 import {
   formatDate,
   formatProviderName,
   formatValue,
-  getVerificationLabel,
   isFutureDate,
-  maskVerificationIdentifier,
 } from "./admin-user-detail-formatters";
 import {
+  DetailPanel,
   DialogButton,
   EmptyState,
-  RecordField,
-  RecordGrid,
   StatusBadge,
-  TabHeader,
 } from "./admin-user-detail-primitives";
 
 type AccountRecord = AdminUserDetail["accounts"][number];
 type SessionRecord = AdminUserDetail["sessions"][number];
-type VerificationRecord = AdminUserDetail["verifications"][number];
 
 export function AdminUserAccountsTab({
   accounts,
@@ -35,30 +30,24 @@ export function AdminUserAccountsTab({
   accounts: AdminUserDetail["accounts"];
 }) {
   return (
-    <>
-      <TabHeader
-        actions={
-          <DialogButton icon={Link2} target="manage-accounts">
-            Manage accounts
-          </DialogButton>
-        }
-        description="Authentication providers and stored credential state."
-        title="Linked Accounts"
-      />
-
+    <DetailPanel
+      actions={
+        <DialogButton icon={Link2} target="manage-accounts">
+          Manage accounts
+        </DialogButton>
+      }
+      description="Authentication providers and stored credential state."
+      title="Linked Accounts"
+    >
       {accounts.length > 0 ? (
-        <div className="grid min-w-0 gap-3 xl:grid-cols-[repeat(2,minmax(0,1fr))]">
-          {accounts.map((account) => (
-            <AccountCard account={account} key={account.id} />
-          ))}
-        </div>
+        <AccountsTable accounts={accounts} />
       ) : (
         <EmptyState
           description="This user does not have linked authentication account rows."
           title="No linked accounts"
         />
       )}
-    </>
+    </DetailPanel>
   );
 }
 
@@ -70,255 +59,379 @@ export function AdminUserSessionsTab({
   sessions: AdminUserDetail["sessions"];
 }) {
   return (
-    <>
-      <TabHeader
-        actions={
-          <>
-            <DialogButton icon={ListChecks} target="manage-sessions">
-              Manage sessions
-            </DialogButton>
-            <DialogButton
-              icon={XCircle}
-              target="revoke-all-sessions"
-              variant="destructive"
-            >
-              Revoke all
-            </DialogButton>
-          </>
-        }
-        description="Devices, expiry, and impersonation metadata."
-        title="Sessions"
-      />
+    <DetailPanel
+      actions={
+        <>
+          <DialogButton icon={ListChecks} target="manage-sessions">
+            Manage sessions
+          </DialogButton>
 
+          <DialogButton
+            icon={XCircle}
+            target="revoke-all-sessions"
+            variant="destructive"
+          >
+            Revoke all
+          </DialogButton>
+        </>
+      }
+      description="Devices, expiry, and impersonation metadata."
+      title="Sessions"
+    >
       {sessions.length > 0 ? (
-        <div className="grid min-w-0 gap-3 xl:grid-cols-[repeat(2,minmax(0,1fr))]">
-          {sessions.map((session) => (
-            <SessionCard key={session.id} now={now} session={session} />
-          ))}
-        </div>
+        <SessionsTable now={now} sessions={sessions} />
       ) : (
         <EmptyState
           description="There are no stored sessions for this user."
           title="No sessions"
         />
       )}
-    </>
+    </DetailPanel>
   );
 }
 
-export function AdminUserVerificationTab({
-  now,
-  user,
-  verifications,
-}: {
-  now: Date;
-  user: AdminUserDetail["user"];
-  verifications: AdminUserDetail["verifications"];
-}) {
+function AccountsTable({ accounts }: { accounts: AccountRecord[] }) {
   return (
-    <>
-      <TabHeader
-        description="Email verification and email-change records."
-        title="Verification Activity"
-      />
+    <div className="min-w-0 overflow-hidden bg-card">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] text-left text-sm">
+          <thead className="border-b bg-muted/40">
+            <tr className="text-muted-foreground">
+              <TableHeader>Provider</TableHeader>
+              <TableHeader>Account</TableHeader>
+              <TableHeader>Scope</TableHeader>
+              <TableHeader>Event Times</TableHeader>
+              <TableHeader className="w-0">
+                <span className="sr-only">Actions</span>
+              </TableHeader>
+            </tr>
+          </thead>
 
-      {verifications.length > 0 ? (
-        <div className="grid min-w-0 gap-3 xl:grid-cols-[repeat(2,minmax(0,1fr))]">
-          {verifications.map((verification) => (
-            <VerificationCard
-              email={user.email}
-              key={verification.id}
-              now={now}
-              userId={user.id}
-              verification={verification}
-            />
-          ))}
-        </div>
-      ) : (
-        <EmptyState
-          description="No email verification or email-change records are stored for this user."
-          title="No verification activity"
-        />
-      )}
-    </>
+          <tbody className="divide-y">
+            {accounts.map((account) => (
+              <AccountRow account={account} key={account.id} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
-function AccountCard({ account }: { account: AccountRecord }) {
-  const credentialLabels = [
-    account.hasPassword ? "Password" : null,
-    account.hasAccessToken ? "Access token" : null,
-    account.hasRefreshToken ? "Refresh token" : null,
-    account.hasIdToken ? "ID token" : null,
-  ].filter((label): label is string => Boolean(label));
+function AccountRow({ account }: { account: AccountRecord }) {
+  const scopes = parseScopes(account.scope);
 
   return (
-    <article className="min-w-0 overflow-hidden rounded-lg border bg-card p-4">
-      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/40 text-muted-foreground">
-            <Link2 className="size-4" />
-          </span>
-          <div className="min-w-0">
-            <h3 className="font-medium text-sm">
+    <tr className="align-top transition-colors hover:bg-muted/20">
+      <TableCell>
+        <div className="space-y-2">
+          <div>
+            <p className="font-medium">
               {formatProviderName(account.providerId)}
-            </h3>
-            <p className="mt-1 break-all font-mono text-muted-foreground text-xs">
-              {account.accountId}
+            </p>
+
+            <p className="mt-0.5 font-mono text-muted-foreground text-xs">
+              {account.providerId}
             </p>
           </div>
-        </div>
 
-        <DialogButton
-          className="w-full sm:w-auto"
-          icon={Link2}
-          target={`manage-account-${account.id}`}
-        >
+          <div className="flex flex-wrap gap-1.5">
+            {account.hasPassword ? (
+              <StatusBadge icon={CheckCircle2} tone="good">
+                Password
+              </StatusBadge>
+            ) : null}
+
+            {account.hasAccessToken ? <StatusBadge>Access</StatusBadge> : null}
+
+            {account.hasRefreshToken ? (
+              <StatusBadge>Refresh</StatusBadge>
+            ) : null}
+
+            {account.hasIdToken ? <StatusBadge>ID Token</StatusBadge> : null}
+
+            {!account.hasPassword &&
+            !account.hasAccessToken &&
+            !account.hasRefreshToken &&
+            !account.hasIdToken ? (
+              <StatusBadge>No credentials</StatusBadge>
+            ) : null}
+          </div>
+        </div>
+      </TableCell>
+
+      <TableCell>
+        <div className="space-y-2.5">
+          <IdentifierField label="Account ID" value={account.accountId} />
+
+          <IdentifierField label="Row ID" value={account.id} />
+        </div>
+      </TableCell>
+
+      <TableCell>
+        {scopes.length > 0 ? (
+          <div className="flex max-w-[260px] flex-wrap gap-1.5">
+            {scopes.map((scope) => (
+              <span
+                className="inline-flex items-center rounded-md border bg-muted/30 px-2 py-1 font-medium text-xs"
+                key={scope}
+              >
+                {scope}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </TableCell>
+
+      <TableCell>
+        <div className="grid min-w-[290px] gap-2">
+          <TimeRow
+            label="Created"
+            value={formatDate(account.createdAt)}
+            variant="event"
+          />
+
+          <TimeRow
+            label="Updated"
+            value={formatDate(account.updatedAt)}
+            variant="event"
+          />
+
+          <TimeRow
+            label="Access"
+            value={formatDate(account.accessTokenExpiresAt)}
+            variant="token"
+          />
+
+          <TimeRow
+            label="Refresh"
+            value={formatDate(account.refreshTokenExpiresAt)}
+            variant="token"
+          />
+        </div>
+      </TableCell>
+
+      <TableCell className="text-right">
+        <DialogButton icon={Link2} target={`manage-account-${account.id}`}>
           Manage
         </DialogButton>
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {credentialLabels.length > 0 ? (
-          credentialLabels.map((label) => (
-            <StatusBadge
-              icon={label === "Password" ? CheckCircle2 : CircleOff}
-              key={label}
-              tone={label === "Password" ? "good" : "neutral"}
-            >
-              {label}
-            </StatusBadge>
-          ))
-        ) : (
-          <StatusBadge>No credentials</StatusBadge>
-        )}
-      </div>
-
-      <RecordGrid className="mt-3" compact>
-        <RecordField label="Row ID" mono>
-          {account.id}
-        </RecordField>
-        <RecordField label="Provider">{account.providerId}</RecordField>
-        <RecordField label="Created">
-          {formatDate(account.createdAt)}
-        </RecordField>
-        <RecordField label="Updated">
-          {formatDate(account.updatedAt)}
-        </RecordField>
-        <RecordField label="Access token expires">
-          {formatDate(account.accessTokenExpiresAt)}
-        </RecordField>
-        <RecordField label="Refresh token expires">
-          {formatDate(account.refreshTokenExpiresAt)}
-        </RecordField>
-        <RecordField label="Scope" mono>
-          {formatValue(account.scope)}
-        </RecordField>
-      </RecordGrid>
-    </article>
+      </TableCell>
+    </tr>
   );
 }
 
-function SessionCard({ now, session }: { now: Date; session: SessionRecord }) {
+function SessionsTable({
+  now,
+  sessions,
+}: {
+  now: Date;
+  sessions: SessionRecord[];
+}) {
+  return (
+    <div className="min-w-0 overflow-hidden bg-card">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] text-left text-sm">
+          <thead className="border-b bg-muted/40">
+            <tr className="text-muted-foreground">
+              <TableHeader>Session</TableHeader>
+              <TableHeader>Event Times</TableHeader>
+              <TableHeader>Client</TableHeader>
+              <TableHeader>Impersonated By</TableHeader>
+              <TableHeader className="w-0">
+                <span className="sr-only">Actions</span>
+              </TableHeader>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y">
+            {sessions.map((session) => (
+              <SessionRow key={session.id} now={now} session={session} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function SessionRow({ now, session }: { now: Date; session: SessionRecord }) {
   const active = isFutureDate(session.expiresAt, now);
 
   return (
-    <article className="min-w-0 overflow-hidden rounded-lg border bg-card p-4">
-      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
+    <tr className="align-top transition-colors hover:bg-muted/20">
+      <TableCell>
+        <div className="space-y-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
+            <CopyableId value={session.id} />
             <StatusBadge
               icon={active ? CheckCircle2 : XCircle}
               tone={active ? "good" : "neutral"}
             >
               {active ? "Active" : "Expired"}
             </StatusBadge>
+
             {session.impersonatedBy ? (
               <StatusBadge icon={Fingerprint} tone="warning">
                 Impersonated
               </StatusBadge>
             ) : null}
           </div>
+        </div>
+      </TableCell>
 
-          <p className="mt-2 break-all font-mono text-muted-foreground text-xs">
-            {session.id}
+      <TableCell>
+        <div className="grid min-w-[270px] gap-2">
+          <TimeRow
+            label="Created"
+            value={formatDate(session.createdAt)}
+            variant="event"
+          />
+
+          <TimeRow
+            label="Expires"
+            value={formatDate(session.expiresAt)}
+            variant="token"
+          />
+        </div>
+      </TableCell>
+
+      <TableCell>
+        <div className="min-w-[260px] max-w-[380px] space-y-2.5">
+          <p className="mt-0.5 font-mono text-xs">
+            {formatValue(session.ipAddress)}
+          </p>
+
+          <p className="mt-0.5 break-words text-xs">
+            {formatValue(session.userAgent)}
           </p>
         </div>
+      </TableCell>
 
-        <DialogButton
-          className="w-full sm:w-auto"
-          icon={ListChecks}
-          target={`manage-session-${session.id}`}
-        >
+      <TableCell>
+        {session.impersonatedBy ? (
+          <CopyableId value={session.impersonatedBy} />
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </TableCell>
+
+      <TableCell className="text-right">
+        <DialogButton icon={ListChecks} target={`manage-session-${session.id}`}>
           Manage
         </DialogButton>
-      </div>
-
-      <RecordGrid className="mt-3" compact>
-        <RecordField label="Created">
-          {formatDate(session.createdAt)}
-        </RecordField>
-        <RecordField label="Expires">
-          {formatDate(session.expiresAt)}
-        </RecordField>
-        <RecordField label="IP address" mono>
-          {formatValue(session.ipAddress)}
-        </RecordField>
-        <RecordField label="Impersonated by" mono>
-          {formatValue(session.impersonatedBy)}
-        </RecordField>
-        <RecordField label="User agent">
-          {formatValue(session.userAgent)}
-        </RecordField>
-      </RecordGrid>
-    </article>
+      </TableCell>
+    </tr>
   );
 }
 
-function VerificationCard({
-  email,
-  now,
-  userId,
-  verification,
-}: {
-  email: string;
-  now: Date;
-  userId: string;
-  verification: VerificationRecord;
-}) {
-  const active = isFutureDate(verification.expiresAt, now);
-
+function IdentifierField({ label, value }: { label: string; value: string }) {
   return (
-    <article className="min-w-0 overflow-hidden rounded-lg border bg-card p-4">
-      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h3 className="font-medium text-sm">
-            {getVerificationLabel(verification.identifier, userId, email)}
-          </h3>
-          <p className="mt-1 break-all font-mono text-muted-foreground text-xs">
-            {maskVerificationIdentifier(verification.identifier, userId, email)}
-          </p>
-        </div>
+    <div>
+      <p className="text-muted-foreground text-xs">{label}</p>
 
-        <StatusBadge
-          icon={active ? CheckCircle2 : XCircle}
-          tone={active ? "good" : "neutral"}
-        >
-          {active ? "Active" : "Expired"}
-        </StatusBadge>
+      <div className="mt-0.5">
+        <CopyableId value={value} />
       </div>
-
-      <RecordGrid className="mt-3" compact>
-        <RecordField label="Created">
-          {formatDate(verification.createdAt)}
-        </RecordField>
-        <RecordField label="Expires">
-          {formatDate(verification.expiresAt)}
-        </RecordField>
-        <RecordField label="Record ID" mono>
-          {verification.id}
-        </RecordField>
-      </RecordGrid>
-    </article>
+    </div>
   );
+}
+
+function TimeRow({
+  label,
+  value,
+  variant,
+}: {
+  label: string;
+  value: React.ReactNode;
+  variant: "event" | "token";
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <span
+        className={
+          variant === "event"
+            ? "inline-flex min-w-[76px] items-center justify-center rounded-md bg-muted px-2 py-1 font-medium text-muted-foreground text-xs"
+            : "inline-flex min-w-[76px] items-center justify-center rounded-md bg-primary/10 px-2 py-1 font-medium text-primary text-xs"
+        }
+      >
+        {label}
+      </span>
+
+      <span className="whitespace-nowrap text-xs">{value}</span>
+    </div>
+  );
+}
+
+function TableHeader({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <th
+      className={`px-6 py-4 font-medium text-xs ${className ?? ""}`}
+      scope="col"
+    >
+      {children}
+    </th>
+  );
+}
+
+function TableCell({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <td className={`px-6 py-5 ${className ?? ""}`}>{children}</td>;
+}
+
+function parseScopes(scope: string | null | undefined): string[] {
+  if (!scope) {
+    return [];
+  }
+
+  const scopes = scope
+    .split(/[,\s]+/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return [...new Set(scopes.map(formatScopeLabel))];
+}
+
+function formatScopeLabel(scope: string) {
+  const knownScopes: Record<string, string> = {
+    openid: "OpenID",
+    email: "Email",
+    profile: "Profile",
+
+    "https://www.googleapis.com/auth/userinfo.email": "Email",
+
+    "https://www.googleapis.com/auth/userinfo.profile": "Profile",
+  };
+
+  const known = knownScopes[scope];
+
+  if (known) {
+    return known;
+  }
+
+  if (scope.startsWith("https://www.googleapis.com/auth/")) {
+    return humanizeScope(scope.replace("https://www.googleapis.com/auth/", ""));
+  }
+
+  return humanizeScope(scope);
+}
+
+function humanizeScope(scope: string) {
+  return scope
+    .split(/[./:_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }

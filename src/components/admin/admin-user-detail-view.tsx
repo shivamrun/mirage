@@ -1,25 +1,24 @@
-import { Fingerprint, Link2, Monitor, UserRound } from "lucide-react";
-
-import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs";
 import type { AdminUserDetail } from "@/server/db/dal/admin-user-detail";
 import {
   AdminUserAccountsTab,
   AdminUserSessionsTab,
-  AdminUserVerificationTab,
 } from "./admin-user-detail-activity-tabs";
 import { isFutureDate } from "./admin-user-detail-formatters";
 import { AdminUserDetailHeader } from "./admin-user-detail-header";
 import { AdminUserDetailOverview } from "./admin-user-detail-overview";
-import { WorkspaceTabTrigger } from "./admin-user-detail-primitives";
+
+export type AdminUserDetailSection = "accounts" | "overview" | "sessions";
 
 export function AdminUserDetailView({
   currentUserId,
   detail,
+  section = "overview",
 }: {
   currentUserId: string;
   detail: AdminUserDetail;
+  section?: AdminUserDetailSection;
 }) {
-  const { accounts, sessions, user, verifications } = detail;
+  const { accounts, sessions, user } = detail;
   const now = new Date();
   const isBanned = Boolean(user.banned);
   const hasActiveBan = Boolean(
@@ -29,65 +28,32 @@ export function AdminUserDetailView({
   return (
     <div className="flex min-h-full min-w-0 flex-col">
       <AdminUserDetailHeader
+        accountsLength={accounts.length}
+        activeSection={section}
         hasActiveBan={hasActiveBan}
         isBanned={isBanned}
+        sessionsLength={sessions.length}
         user={user}
       />
 
-      <Tabs defaultValue="overview" className="min-h-0 flex-1 gap-5">
-        <TabsList className="flex h-10! w-full gap-1 overflow-hidden rounded-none rounded-t-md border-0 border-b bg-transparent p-0">
-          <WorkspaceTabTrigger
-            icon={UserRound}
-            label="Overview"
-            value="overview"
+      <div className="min-h-0 min-w-0 flex-1 pt-4 mb-6">
+        {section === "overview" ? (
+          <AdminUserDetailOverview
+            currentUserId={currentUserId}
+            hasActiveBan={hasActiveBan}
+            isBanned={isBanned}
+            user={user}
           />
-          <WorkspaceTabTrigger
-            count={accounts.length}
-            icon={Link2}
-            label="Accounts"
-            value="accounts"
-          />
-          <WorkspaceTabTrigger
-            count={sessions.length}
-            icon={Monitor}
-            label="Sessions"
-            value="sessions"
-          />
-          <WorkspaceTabTrigger
-            count={verifications.length}
-            icon={Fingerprint}
-            label="Verification"
-            value="verification"
-          />
-        </TabsList>
+        ) : null}
 
-        <div className="min-h-0 min-w-0">
-          <TabsContent className="mt-0 min-h-0 min-w-0" value="overview">
-            <AdminUserDetailOverview
-              currentUserId={currentUserId}
-              hasActiveBan={hasActiveBan}
-              isBanned={isBanned}
-              user={user}
-            />
-          </TabsContent>
+        {section === "accounts" ? (
+          <AdminUserAccountsTab accounts={accounts} />
+        ) : null}
 
-          <TabsContent className="mt-0 min-w-0" value="accounts">
-            <AdminUserAccountsTab accounts={accounts} />
-          </TabsContent>
-
-          <TabsContent className="mt-0 min-w-0" value="sessions">
-            <AdminUserSessionsTab now={now} sessions={sessions} />
-          </TabsContent>
-
-          <TabsContent className="mt-0 min-w-0" value="verification">
-            <AdminUserVerificationTab
-              now={now}
-              user={user}
-              verifications={verifications}
-            />
-          </TabsContent>
-        </div>
-      </Tabs>
+        {section === "sessions" ? (
+          <AdminUserSessionsTab now={now} sessions={sessions} />
+        ) : null}
+      </div>
     </div>
   );
 }
