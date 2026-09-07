@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound, Lock, LogOut } from "lucide-react";
+import { KeyRound, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
@@ -17,13 +17,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { FieldGroup } from "@/components/ui/field";
 
 type SecurityControlSummary = {
   activeBans: number;
@@ -47,7 +41,6 @@ export function SecurityControls({
       <div className="grid gap-4">
         <ForcePasswordResetPanel />
         <GlobalSessionRevokePanel activeSessions={summary.activeSessions} />
-        <MaintenanceLockoutPanel />
       </div>
 
       <aside className="h-fit rounded-lg border bg-card">
@@ -257,44 +250,6 @@ function GlobalSessionRevokePanel({
             </AlertDialogContent>
           </AlertDialog>
         </div>
-      </div>
-    </section>
-  );
-}
-
-function MaintenanceLockoutPanel() {
-  return (
-    <section className="rounded-lg border bg-card">
-      <div className="border-b px-4 py-3">
-        <h2 className="font-semibold text-base">Maintenance Lockout</h2>
-        <p className="mt-0.5 text-muted-foreground text-sm">
-          Requires a persisted security settings table before activation.
-        </p>
-      </div>
-
-      <div className="p-4">
-        <FieldGroup>
-          <Field>
-            <FieldLabel htmlFor="security-maintenance-message">
-              Lockout message
-            </FieldLabel>
-            <Input
-              disabled
-              id="security-maintenance-message"
-              placeholder="Maintenance is in progress."
-            />
-            <FieldDescription>
-              Add a settings store and auth gate before enabling this action.
-            </FieldDescription>
-          </Field>
-
-          <div className="flex justify-end">
-            <Button disabled type="button" variant="outline">
-              <Lock data-icon="inline-start" />
-              Enable lockout
-            </Button>
-          </div>
-        </FieldGroup>
       </div>
     </section>
   );
