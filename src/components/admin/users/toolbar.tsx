@@ -4,9 +4,9 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-import { applyAdminUsersListState } from "./actions";
 import { AdminUsersFilterDialog } from "./filter-dialog";
 import {
+  ADMIN_USERS_PAGE_PATH,
   type AdminUsersFilterStatus,
   type AdminUsersQueryState,
   DEFAULT_SEARCH_FIELD,
@@ -30,10 +30,11 @@ export function AdminUsersToolbar({
 }: AdminUsersToolbarProps) {
   return (
     <div className="shrink-0 pb-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <form
-          action={applyAdminUsersListState}
+          action={ADMIN_USERS_PAGE_PATH}
           className="flex min-w-0 flex-1 items-center gap-2"
+          method="get"
         >
           {state.searchField !== DEFAULT_SEARCH_FIELD ? (
             <input type="hidden" name="searchField" value={state.searchField} />

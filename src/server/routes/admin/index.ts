@@ -1,13 +1,25 @@
 import { and, eq } from "drizzle-orm";
 import { Elysia } from "elysia";
+import { z } from "zod";
 
+import { auth } from "@/lib/auth";
 import { env } from "@/lib/env";
 import db from "@/server/db";
+import {
+  getUserForPasswordReset,
+  revokeAllSessions,
+  revokeUserSessions,
+} from "@/server/db/dal/security";
 import {
   account as accountTable,
   session as sessionTable,
 } from "@/server/db/schema";
+import { emailSchema } from "@/zod/helpers";
 import { elysiaAuth } from "../auth";
+
+const forcePasswordResetSchema = z.object({
+  email: emailSchema,
+});
 
 function jsonResponse(message: string, status: number) {
   return Response.json({ message }, { status });
@@ -40,6 +52,14 @@ function isTrustedOriginRequest(request: Request) {
 
 function validateMutationRequest(request: Request) {
   return isTrustedOriginRequest(request) ? null : forbiddenResponse();
+}
+
+async function parseJsonRequest(request: Request) {
+  try {
+    return await request.json();
+  } catch {
+    return null;
+  }
 }
 
 export const adminRoutes = new Elysia({ prefix: "/admin" })
@@ -149,6 +169,72 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
 
       return {
         session: userSession,
+        status: true,
+      };
+    },
+    {
+      admin: true,
+    },
+  )
+  .post(
+    "/security/force-password-reset",
+    async ({ request }) => {
+      const invalidMutationResponse = validateMutationRequest(request);
+
+      if (invalidMutationResponse) {
+        return invalidMutationResponse;
+      }
+
+      const parsed = forcePasswordResetSchema.safeParse(
+        await parseJsonRequest(request),
+      );
+
+      if (!parsed.success) {
+        return jsonResponse(
+          parsed.error.issues[0]?.message ?? "Invalid password reset request.",
+          400,
+        );
+      }
+
+      const targetUser = await getUserForPasswordReset(parsed.data.email);
+
+      if (!targetUser) {
+        return jsonResponse("User not found.", 404);
+      }
+
+      const revokedSessions = await revokeUserSessions(targetUser.id);
+      const result = await auth.api.requestPasswordReset({
+        body: {
+          email: targetUser.email,
+          redirectTo: `${env.NEXT_PUBLIC_BASE_URL}/reset-password`,
+        },
+        headers: request.headers,
+      });
+
+      return {
+        message: `${result.message} Revoked ${revokedSessions.length} sessions for ${targetUser.email}.`,
+        revokedSessions: revokedSessions.length,
+        status: true,
+        user: targetUser,
+      };
+    },
+    {
+      admin: true,
+    },
+  )
+  .post(
+    "/security/revoke-all-sessions",
+    async ({ request }) => {
+      const invalidMutationResponse = validateMutationRequest(request);
+
+      if (invalidMutationResponse) {
+        return invalidMutationResponse;
+      }
+
+      const revokedSessions = await revokeAllSessions();
+
+      return {
+        revokedSessions: revokedSessions.length,
         status: true,
       };
     },

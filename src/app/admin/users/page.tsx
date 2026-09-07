@@ -10,14 +10,12 @@ import {
   adminUsersHrefFromSearchParams,
   adminUsersRawHrefFromSearchParams,
   getAdminUsersFilterStatus,
-  getAdminUsersListFilter,
-  getAdminUsersSearchField,
   parseAdminUsersSearchParams,
   usersPageHref,
 } from "@/components/admin";
-import { auth } from "@/lib/auth";
 import { requireAdmin } from "@/lib/auth/access";
 import { getPageMetadata } from "@/lib/metadata";
+import { listAdminUsers } from "@/server/db/dal/admin-users";
 
 export const metadata = getPageMetadata("Users", {
   path: "/admin/users",
@@ -34,7 +32,6 @@ export default async function AdminUsersPage({
   const { page, ...listState } = parseAdminUsersSearchParams(params);
   const canonicalHref = adminUsersHrefFromSearchParams(params);
   const filterStatus = getAdminUsersFilterStatus(listState);
-  const listFilter = getAdminUsersListFilter(listState);
   const offset = (page - 1) * ADMIN_USERS_PAGE_SIZE;
   const requestHeaders = await headers();
 
@@ -46,32 +43,10 @@ export default async function AdminUsersPage({
     redirect(canonicalHref);
   }
 
-  const users = await auth.api.listUsers({
-    query: {
-      limit: ADMIN_USERS_PAGE_SIZE,
-      offset,
-
-      sortBy: listState.sortBy,
-      sortDirection: listState.sortDirection,
-
-      ...(listState.query
-        ? {
-            searchValue: listState.query,
-            searchField: getAdminUsersSearchField(listState),
-            searchOperator: listState.searchOperator,
-          }
-        : {}),
-
-      ...(listFilter
-        ? {
-            filterField: listFilter.filterField,
-            filterValue: listFilter.filterValue,
-            filterOperator: listFilter.filterOperator,
-          }
-        : {}),
-    },
-
-    headers: requestHeaders,
+  const users = await listAdminUsers({
+    limit: ADMIN_USERS_PAGE_SIZE,
+    offset,
+    state: listState,
   });
 
   const totalPages = Math.max(

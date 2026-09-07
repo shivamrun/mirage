@@ -150,9 +150,14 @@ export type AdminUserListItem = {
   id: string;
   name: string;
   email: string;
+  emailVerified: boolean;
   image?: null | string;
   role?: RoleValue;
+  banned?: boolean | null;
+  banReason?: null | string;
+  banExpires?: Date | string | null;
   createdAt: Date | string;
+  updatedAt?: Date | string;
 };
 
 export type UsersHrefOptions = {
@@ -167,12 +172,6 @@ export type UsersHrefOptions = {
 
   sortBy?: SortField;
   sortDirection?: SortDirection;
-};
-
-export type AdminUsersListFilter = {
-  filterField: FilterField;
-  filterValue: string | boolean | string[];
-  filterOperator: FilterOperator;
 };
 
 const textFilterOperators = [
@@ -503,72 +502,6 @@ export function parseAdminUsersSearchParams(
     sortBy: parseSortBy(params.sortBy),
     sortDirection: parseSortDirection(params.sortDirection),
   };
-}
-
-function normalizeScalarFilterValue(field: FilterField, value: string) {
-  const trimmedValue = value.trim();
-
-  if (field === "banned" || field === "emailVerified") {
-    if (trimmedValue === "true") {
-      return true;
-    }
-
-    if (trimmedValue === "false") {
-      return false;
-    }
-  }
-
-  return trimmedValue;
-}
-
-export function normalizeFilterValue(
-  field: FilterField,
-  value: string,
-  operator: FilterOperator,
-) {
-  if (operator === "in" || operator === "not_in") {
-    return value
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-
-  return normalizeScalarFilterValue(field, value);
-}
-
-export function getAdminUsersListFilter({
-  filterField,
-  filterOperator,
-  filterValue,
-}: AdminUsersQueryState): AdminUsersListFilter | undefined {
-  if (!filterValue) {
-    return;
-  }
-
-  if (filterField === "role") {
-    return {
-      filterField,
-      filterOperator: "contains",
-      filterValue,
-    };
-  }
-
-  return {
-    filterField,
-    filterOperator,
-    filterValue: normalizeFilterValue(filterField, filterValue, filterOperator),
-  };
-}
-
-export function getAdminUsersSearchField({
-  query,
-  searchField,
-}: AdminUsersQueryState): Exclude<SearchField, "auto"> {
-  if (searchField !== DEFAULT_SEARCH_FIELD) {
-    return searchField;
-  }
-
-  return query.includes("@") ? "email" : "name";
 }
 
 export function getAdminUsersFilterStatus({

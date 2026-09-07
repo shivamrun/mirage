@@ -22,10 +22,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { applyAdminUsersListState } from "./actions";
 import { AdminUsersFilterControls } from "./filter-controls";
 import type { AdminUsersFilterStatus, AdminUsersQueryState } from "./query";
 import {
+  ADMIN_USERS_PAGE_PATH,
   ADMIN_USERS_SEARCH_FIELDS,
   ADMIN_USERS_SEARCH_OPERATORS,
   ADMIN_USERS_SORT_FIELDS,
@@ -60,7 +60,7 @@ export function AdminUsersFilterDialog({
       </AlertDialogTrigger>
 
       <AlertDialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-xl">
-        <form action={applyAdminUsersListState}>
+        <form action={ADMIN_USERS_PAGE_PATH} method="get">
           <AlertDialogHeader>
             <AlertDialogTitle>Filter users</AlertDialogTitle>
 

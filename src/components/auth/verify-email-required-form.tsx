@@ -3,14 +3,9 @@
 import { MailCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
-import { useActionState } from "react";
 
 import { AuthStatusMessage } from "@/components/auth/auth-form-shell";
 import { Button } from "@/components/ui/button";
-import {
-  type ProtectedRouteVerificationState,
-  sendProtectedRouteVerificationEmail,
-} from "@/lib/auth/email-verification-actions";
 
 type VerifyEmailRequiredFormProps = {
   callbackURL: string;
@@ -18,8 +13,10 @@ type VerifyEmailRequiredFormProps = {
   sent?: boolean;
 };
 
-const initialState: ProtectedRouteVerificationState = {
-  sent: false,
+type VerificationResponse = {
+  message?: string;
+  redirectURL?: string;
+  status?: boolean;
 };
 
 function VerifyEmailRequiredForm({
@@ -28,19 +25,59 @@ function VerifyEmailRequiredForm({
   sent = false,
 }: VerifyEmailRequiredFormProps) {
   const router = useRouter();
-  const [state, formAction, isPending] = useActionState(
-    sendProtectedRouteVerificationEmail,
-    sent ? { sent: true } : initialState,
-  );
+  const [isPending, setIsPending] = React.useState(false);
+  const [state, setState] = React.useState({
+    message: "",
+    sent,
+  });
   const isSent = sent || state.sent;
 
-  React.useEffect(() => {
-    if (!state.sent || !state.message) {
-      return;
-    }
+  async function sendVerificationEmail(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+    setIsPending(true);
+    setState({ message: "", sent: false });
 
-    router.replace(state.message, { scroll: false });
-  }, [router, state.message, state.sent]);
+    try {
+      const response = await fetch(
+        "/api/auth-actions/protected-route-verification-email",
+        {
+          body: JSON.stringify({ callbackURL }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        },
+      );
+      const result = (await response.json().catch(() => ({}))) as
+        | VerificationResponse
+        | undefined;
+
+      if (!response.ok) {
+        setState({
+          message:
+            result?.message ||
+            "We could not send the verification link. Please try again.",
+          sent: false,
+        });
+        return;
+      }
+
+      if (result?.redirectURL) {
+        router.replace(result.redirectURL, { scroll: false });
+      }
+
+      setState({ message: "", sent: true });
+    } catch {
+      setState({
+        message: "We could not send the verification link. Please try again.",
+        sent: false,
+      });
+    } finally {
+      setIsPending(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -54,7 +91,7 @@ function VerifyEmailRequiredForm({
         <AuthStatusMessage tone="error">{state.message}</AuthStatusMessage>
       ) : null}
 
-      <form action={formAction}>
+      <form onSubmit={sendVerificationEmail}>
         <input name="callbackURL" type="hidden" value={callbackURL} />
         <Button className="w-full" disabled={isPending} type="submit">
           <MailCheck data-icon="inline-start" />

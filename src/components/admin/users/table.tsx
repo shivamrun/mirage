@@ -1,6 +1,12 @@
+import { Ban, CheckCircle2, MailWarning } from "lucide-react";
 import Link from "next/link";
-
+import { StatusBadge } from "@/components/admin/user-detail/primitives";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Table,
@@ -15,6 +21,7 @@ import {
   RoleBadges,
   UserAvatar,
 } from "../shared/user-display";
+import { formatDate, isFutureDate } from "../user-detail/formatters";
 import { ADMIN_USERS_PAGE_PATH, type AdminUserListItem } from "./query";
 
 type AdminUsersTableProps = {
@@ -30,10 +37,12 @@ export function AdminUsersTable({
   query,
   users,
 }: AdminUsersTableProps) {
+  const now = new Date();
+
   return (
     <section className="min-h-0 flex-1 overflow-hidden">
       <ScrollArea className="h-full rounded-xl border bg-card">
-        <Table className="min-w-[760px]">
+        <Table className="min-w-[920px]">
           <TableHeader className="sticky top-0 z-20 bg-muted/80 backdrop-blur">
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-14 px-4">
@@ -42,6 +51,7 @@ export function AdminUsersTable({
 
               <TableHead className="min-w-[180px] px-2">Name</TableHead>
               <TableHead>Email</TableHead>
+              <TableHead className="min-w-[190px]">Status</TableHead>
               <TableHead className="pl-1 text-end">Role</TableHead>
               <TableHead className="w-[190px] pr-6 text-end">Joined</TableHead>
             </TableRow>
@@ -51,6 +61,9 @@ export function AdminUsersTable({
             {users.length > 0 ? (
               users.map((user) => {
                 const userHref = `${ADMIN_USERS_PAGE_PATH}/${user.id}`;
+                const hasActiveBan =
+                  Boolean(user.banned) &&
+                  (!user.banExpires || isFutureDate(user.banExpires, now));
 
                 return (
                   <TableRow
@@ -77,8 +90,22 @@ export function AdminUsersTable({
                       </Link>
                     </TableCell>
 
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="max-w-[260px] whitespace-normal text-sm text-muted-foreground">
                       {user.email}
+                    </TableCell>
+
+                    <TableCell className="whitespace-normal">
+                      {hasActiveBan ? (
+                        <BannedStatusPopover user={user} />
+                      ) : user.emailVerified ? (
+                        <StatusBadge icon={CheckCircle2} tone="good">
+                          Verified
+                        </StatusBadge>
+                      ) : (
+                        <StatusBadge icon={MailWarning} tone="warning">
+                          Unverified
+                        </StatusBadge>
+                      )}
                     </TableCell>
 
                     <TableCell className="text-end">
@@ -95,7 +122,7 @@ export function AdminUsersTable({
               })
             ) : (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={5} className="h-72">
+                <TableCell colSpan={6} className="h-72">
                   <div className="flex flex-col items-center justify-center text-center">
                     <p className="font-medium">No users found</p>
 
@@ -125,5 +152,46 @@ export function AdminUsersTable({
         </Table>
       </ScrollArea>
     </section>
+  );
+}
+
+function BannedStatusPopover({ user }: { user: AdminUserListItem }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex w-fit rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <StatusBadge icon={Ban} interactive tone="danger">
+            Banned
+          </StatusBadge>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 p-0">
+        <div className="border-b px-4 py-3">
+          <p className="font-medium text-sm">Ban details</p>
+          <p className="mt-0.5 text-muted-foreground text-xs">
+            Information about this user's restriction
+          </p>
+        </div>
+
+        <div className="space-y-1 px-4 pb-3">
+          <p className="whitespace-normal break-words text-sm leading-relaxed">
+            {user.banReason?.trim() || (
+              <span className="italic text-muted-foreground">
+                No reason recorded
+              </span>
+            )}
+          </p>
+
+          <p className="text-sm text-muted-foreground">
+            {user.banExpires
+              ? `Banned until ${formatDate(user.banExpires)}.`
+              : "Banned permanently."}
+          </p>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

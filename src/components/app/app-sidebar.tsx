@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, Settings2, ShieldCheck, Users } from "lucide-react";
+import { LayoutDashboard, Settings2, ShieldAlert, Users } from "lucide-react";
 import type * as React from "react";
 
 import {
@@ -38,8 +38,20 @@ const data = {
       icon: Users,
       items: [
         {
-          title: "List Users",
+          title: "All Users",
           url: "/admin/users",
+        },
+        {
+          title: "Banned Users",
+          url: "/admin/users?filterField=banned&filterValue=true",
+        },
+        {
+          title: "Unverified Users",
+          url: "/admin/users?filterField=emailVerified&filterValue=false",
+        },
+        {
+          title: "Recently Joined",
+          url: "/admin/users/recently-joined",
         },
         {
           title: "Create User",
@@ -48,9 +60,15 @@ const data = {
       ],
     },
     {
-      title: "Roles & Permissions",
-      url: "/admin/roles",
-      icon: ShieldCheck,
+      title: "Security",
+      url: "/admin/security",
+      icon: ShieldAlert,
+      items: [
+        {
+          title: "Controls",
+          url: "/admin/security/controls",
+        },
+      ],
     },
     {
       title: "Settings",

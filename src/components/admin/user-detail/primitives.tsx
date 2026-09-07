@@ -8,16 +8,19 @@ import { cn } from "@/lib/utils";
 export function StatusBadge({
   children,
   icon: Icon,
+  interactive = false,
   tone = "neutral",
 }: {
   children: ReactNode;
   icon?: LucideIcon;
+  interactive?: boolean;
   tone?: "danger" | "good" | "neutral" | "warning";
 }) {
   return (
     <Badge
       className={cn(
         "p-1 min-w-0 rounded-md font-medium text-xs",
+        interactive && "cursor-pointer",
         tone === "good" &&
           "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
         tone === "warning" &&
