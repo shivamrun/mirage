@@ -10,6 +10,7 @@ import {
   Mail,
   Pencil,
   Save,
+  Trash2,
   UserRound,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -89,6 +90,13 @@ type AdminUserEmailUpdateDialogProps = {
   userId: string;
 };
 
+type AdminUserEmailVerificationDialogProps = {
+  className?: string;
+  currentEmail: string;
+  emailVerified: boolean;
+  userId: string;
+};
+
 type AdminUserImageUpdateDialogProps = {
   className?: string;
   currentImage?: null | string;
@@ -109,6 +117,13 @@ type AdminUserRoleUpdateDialogProps = {
 type AdminUserBanDialogProps = {
   className?: string;
   isBanned: boolean;
+  userId: string;
+  userName: string;
+};
+
+type AdminUserRemoveDialogProps = {
+  className?: string;
+  currentUserId: string;
   userId: string;
   userName: string;
 };
@@ -245,6 +260,106 @@ export function AdminUserBanDialog({
       userId={userId}
       userName={userName}
     />
+  );
+}
+
+export function AdminUserRemoveDialog({
+  className,
+  currentUserId,
+  userId,
+  userName,
+}: AdminUserRemoveDialogProps) {
+  const router = useRouter();
+  const [open, setOpen] = React.useState(false);
+  const [status, setStatus] = React.useState<StatusMessage>();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const isCurrentUser = currentUserId === userId;
+
+  async function removeUser() {
+    setStatus(undefined);
+    setIsSubmitting(true);
+
+    try {
+      const result = await authClient.admin.removeUser({
+        userId,
+      });
+
+      if (result.error) {
+        setStatus({
+          text: getAuthErrorMessage(result.error),
+          tone: "error",
+        });
+        return;
+      }
+
+      setOpen(false);
+      router.push("/admin/users");
+      router.refresh();
+    } catch (reason) {
+      setStatus({
+        text: getUnexpectedAuthErrorMessage(reason),
+        tone: "error",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  if (isCurrentUser) {
+    return (
+      <UpdateDialogButton
+        className={className}
+        disabled
+        icon={Trash2}
+        variant="destructive"
+      >
+        Current admin
+      </UpdateDialogButton>
+    );
+  }
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <UpdateDialogButton
+          className={className}
+          icon={Trash2}
+          variant="destructive"
+        >
+          Remove
+        </UpdateDialogButton>
+      </AlertDialogTrigger>
+
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remove user</AlertDialogTitle>
+          <AlertDialogDescription>
+            Permanently remove {userName}, including their sessions and linked
+            auth records.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        {status ? (
+          <AuthStatusMessage className="text-left" tone={status.tone}>
+            {status.text}
+          </AuthStatusMessage>
+        ) : null}
+
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+
+          <Button
+            disabled={isSubmitting}
+            onClick={removeUser}
+            type="button"
+            variant="destructive"
+          >
+            <Trash2 data-icon="inline-start" />
+            {isSubmitting ? "Removing..." : "Remove user"}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
@@ -707,6 +822,98 @@ export function AdminUserEmailUpdateDialog({
             </Button>
           </AlertDialogFooter>
         </form>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+export function AdminUserEmailVerificationDialog({
+  className,
+  currentEmail,
+  emailVerified,
+  userId,
+}: AdminUserEmailVerificationDialogProps) {
+  const router = useRouter();
+  const [open, setOpen] = React.useState(false);
+  const [status, setStatus] = React.useState<StatusMessage>();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const nextEmailVerified = !emailVerified;
+
+  async function updateEmailVerification() {
+    setStatus(undefined);
+    setIsSubmitting(true);
+
+    try {
+      const result = await authClient.admin.updateUser({
+        userId,
+        data: {
+          emailVerified: nextEmailVerified,
+        },
+      });
+
+      if (result.error) {
+        setStatus({
+          text: getAuthErrorMessage(result.error),
+          tone: "error",
+        });
+        return;
+      }
+
+      setOpen(false);
+      router.refresh();
+    } catch (reason) {
+      setStatus({
+        text: getUnexpectedAuthErrorMessage(reason),
+        tone: "error",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <UpdateDialogButton
+          className={className}
+          icon={emailVerified ? Ban : CheckCircle2}
+        >
+          {emailVerified ? "Unverify" : "Verify"}
+        </UpdateDialogButton>
+      </AlertDialogTrigger>
+
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {emailVerified ? "Mark email unverified" : "Mark email verified"}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Update the verification state for {currentEmail}.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        {status ? (
+          <AuthStatusMessage className="text-left" tone={status.tone}>
+            {status.text}
+          </AuthStatusMessage>
+        ) : null}
+
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+
+          <Button
+            disabled={isSubmitting}
+            onClick={updateEmailVerification}
+            type="button"
+          >
+            <CheckCircle2 data-icon="inline-start" />
+            {isSubmitting
+              ? "Saving..."
+              : emailVerified
+                ? "Mark unverified"
+                : "Mark verified"}
+          </Button>
+        </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   );

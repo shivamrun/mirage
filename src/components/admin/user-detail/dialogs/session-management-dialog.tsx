@@ -1,11 +1,14 @@
 "use client";
 
-import { XCircle } from "lucide-react";
+import { LogOut, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
 import { AuthStatusMessage } from "@/components/auth";
-import { getUnexpectedAuthErrorMessage } from "@/components/auth/auth-errors";
+import {
+  getAuthErrorMessage,
+  getUnexpectedAuthErrorMessage,
+} from "@/components/auth/auth-errors";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -17,6 +20,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { authClient } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
 
 type StatusMessage = {
@@ -38,6 +42,100 @@ type AdminUserSessionManageDialogProps = {
   session: AdminUserManagedSession;
   userId: string;
 };
+
+type AdminUserSessionsRevokeDialogProps = {
+  className?: string;
+  sessionCount: number;
+  userId: string;
+};
+
+export function AdminUserSessionsRevokeDialog({
+  className,
+  sessionCount,
+  userId,
+}: AdminUserSessionsRevokeDialogProps) {
+  const router = useRouter();
+  const [open, setOpen] = React.useState(false);
+  const [status, setStatus] = React.useState<StatusMessage>();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  async function revokeSessions() {
+    setStatus(undefined);
+    setIsSubmitting(true);
+
+    try {
+      const result = await authClient.admin.revokeUserSessions({
+        userId,
+      });
+
+      if (result.error) {
+        setStatus({
+          text: getAuthErrorMessage(result.error),
+          tone: "error",
+        });
+        return;
+      }
+
+      setOpen(false);
+      router.refresh();
+    } catch (reason) {
+      setStatus({
+        text: getUnexpectedAuthErrorMessage(reason),
+        tone: "error",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button
+          aria-haspopup="dialog"
+          className={cn("min-w-0 gap-2", className)}
+          disabled={sessionCount === 0}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          <LogOut className="size-4 shrink-0" />
+          <span className="min-w-0 truncate">Revoke all</span>
+        </Button>
+      </AlertDialogTrigger>
+
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Revoke all sessions</AlertDialogTitle>
+          <AlertDialogDescription>
+            Revoke every session for this user and require them to sign in
+            again.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        {status ? (
+          <AuthStatusMessage className="text-left" tone={status.tone}>
+            {status.text}
+          </AuthStatusMessage>
+        ) : null}
+
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+
+          <Button
+            disabled={isSubmitting}
+            onClick={revokeSessions}
+            type="button"
+            variant="destructive"
+          >
+            <LogOut data-icon="inline-start" />
+            {isSubmitting ? "Revoking..." : "Revoke sessions"}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
 
 export function AdminUserSessionManageDialog({
   className,

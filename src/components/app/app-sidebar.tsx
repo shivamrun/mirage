@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  LayoutDashboard,
-  Settings2,
-  ShieldCheck,
-  Users,
-} from "lucide-react";
+import { LayoutDashboard, Settings2, ShieldCheck, Users } from "lucide-react";
 import type * as React from "react";
 
 import {
@@ -80,19 +75,8 @@ function SidebarBrand() {
 
   return (
     <div className="flex h-10 items-center gap-2 px-2">
-      <a
-        href="/admin"
-        className="flex min-w-0 flex-1 items-center gap-2"
-      >
-        <div className="min-w-0 flex-1 leading-tight">
-          <div className="truncate font-medium">
-            {siteConfig.name}
-          </div>
-
-          <div className="truncate text-xs text-muted-foreground">
-            Admin
-          </div>
-        </div>
+      <a href="/admin" className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="truncate font-medium">{siteConfig.name}</div>
       </a>
 
       <SidebarTrigger className="size-8 shrink-0" />
@@ -100,15 +84,11 @@ function SidebarBrand() {
   );
 }
 
-type AppSidebarProps =
-  React.ComponentProps<typeof Sidebar> & {
-    showRail?: boolean;
-  };
+type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
+  showRail?: boolean;
+};
 
-export function AppSidebar({
-  showRail = true,
-  ...props
-}: AppSidebarProps) {
+export function AppSidebar({ showRail = true, ...props }: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="p-2">

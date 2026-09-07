@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { authRoles } from "@/lib/auth/roles";
+
 import { emailSchema } from "./helpers";
 
 export const passwordSchema = z
@@ -130,8 +132,21 @@ export const adminUserPasswordUpdateSchema = z
     path: ["confirmPassword"],
   });
 
+const authRoleSchema = z.enum(authRoles);
+
+export const adminUserCreateSchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required.")
+    .max(100, "Name must be 100 characters or fewer."),
+  roles: z.array(authRoleSchema).min(1, "Select at least one role."),
+});
+
 export const adminUserRoleUpdateSchema = z.object({
-  roles: z.array(z.enum(["user", "admin"])).min(1, "Select at least one role."),
+  roles: z.array(authRoleSchema).min(1, "Select at least one role."),
 });
 
 export const changePasswordSchema = z
@@ -182,6 +197,8 @@ export type AccountProfileInput = z.input<typeof accountProfileSchema>;
 export type AccountProfileValues = z.output<typeof accountProfileSchema>;
 export type AdminUserBanInput = z.input<typeof adminUserBanSchema>;
 export type AdminUserBanValues = z.output<typeof adminUserBanSchema>;
+export type AdminUserCreateInput = z.input<typeof adminUserCreateSchema>;
+export type AdminUserCreateValues = z.output<typeof adminUserCreateSchema>;
 export type AdminUserEmailUpdateInput = z.input<
   typeof adminUserEmailUpdateSchema
 >;

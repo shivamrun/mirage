@@ -6,10 +6,12 @@ import { AdminUserImpersonateDialog } from "./dialogs/impersonation-dialog";
 import {
   AdminUserBanDialog,
   AdminUserEmailUpdateDialog,
+  AdminUserEmailVerificationDialog,
   AdminUserImageUpdateDialog,
   AdminUserNameUpdateDialog,
   AdminUserPasswordResetDialog,
   AdminUserPasswordUpdateDialog,
+  AdminUserRemoveDialog,
   AdminUserRoleUpdateDialog,
 } from "./dialogs/user-management-dialogs";
 import { formatDate, formatValue } from "./formatters";
@@ -92,7 +94,16 @@ export function AdminUserDetailOverview({
       </DetailSection>
 
       <DetailSection title="Status">
-        <DetailRow label="Email verified">
+        <DetailRow
+          action={
+            <AdminUserEmailVerificationDialog
+              currentEmail={user.email}
+              emailVerified={user.emailVerified}
+              userId={user.id}
+            />
+          }
+          label="Email verified"
+        >
           <StatusBadge
             icon={user.emailVerified ? CheckCircle2 : CircleOff}
             tone={user.emailVerified ? "good" : "warning"}
@@ -155,6 +166,21 @@ export function AdminUserDetailOverview({
       <DetailSection title="Timestamps">
         <DetailRow label="Created">{formatDate(user.createdAt)}</DetailRow>
         <DetailRow label="Updated">{formatDate(user.updatedAt)}</DetailRow>
+      </DetailSection>
+
+      <DetailSection title="Danger Zone">
+        <DetailRow
+          action={
+            <AdminUserRemoveDialog
+              currentUserId={currentUserId}
+              userId={user.id}
+              userName={user.name}
+            />
+          }
+          label="Remove user"
+        >
+          Permanently delete this account.
+        </DetailRow>
       </DetailSection>
     </DetailPanel>
   );

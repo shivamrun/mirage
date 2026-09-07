@@ -9,6 +9,7 @@ import {
 import {
   type AdminUserManagedSession,
   AdminUserSessionManageDialog,
+  AdminUserSessionsRevokeDialog,
 } from "./dialogs/session-management-dialog";
 import {
   formatDate,
@@ -56,6 +57,12 @@ export function AdminUserSessionsTab({
 }) {
   return (
     <DetailPanel
+      actions={
+        <AdminUserSessionsRevokeDialog
+          sessionCount={sessions.length}
+          userId={userId}
+        />
+      }
       description="Devices, expiry, and impersonation metadata."
       title="Sessions"
     >

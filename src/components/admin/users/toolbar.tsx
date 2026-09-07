@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { Search, UserPlus } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -107,6 +107,13 @@ export function AdminUsersToolbar({
           state={state}
           status={status}
         />
+
+        <Button asChild className="h-9" variant="outline">
+          <Link href="/admin/users/new">
+            <UserPlus data-icon="inline-start" />
+            Create
+          </Link>
+        </Button>
       </div>
     </div>
   );

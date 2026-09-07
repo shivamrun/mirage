@@ -1,4 +1,4 @@
-import type { RoleValue } from "@/lib/auth/roles";
+import { authRoles, type RoleValue } from "@/lib/auth/roles";
 
 export const ADMIN_USERS_PAGE_PATH = "/admin/users";
 export const ADMIN_USERS_PAGE_SIZE = 10;
@@ -48,10 +48,12 @@ export const ADMIN_USERS_FILTER_OPERATORS = [
   { label: "Ends with", value: "ends_with" },
 ] as const;
 
-export const ADMIN_USERS_ROLE_FILTER_VALUES = [
-  { label: "User", value: "user" },
-  { label: "Admin", value: "admin" },
-] as const;
+export const ADMIN_USERS_ROLE_FILTER_VALUES = authRoles.map((role) => ({
+  label: role
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase()),
+  value: role,
+}));
 
 export const ADMIN_USERS_BOOLEAN_FILTER_VALUES = [
   { label: "True", value: "true" },
