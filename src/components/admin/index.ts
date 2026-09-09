@@ -1,3 +1,4 @@
+export * from "./contact-submission";
 export * from "./security";
 export {
   formatJoinedDate,

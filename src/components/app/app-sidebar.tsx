@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   Home,
+  Inbox,
   LayoutDashboard,
   Settings2,
   ShieldAlert,
@@ -91,6 +92,29 @@ const adminData = {
         {
           title: "Create User",
           url: "/admin/users/new",
+        },
+      ],
+    },
+    {
+      title: "Contact Submission",
+      url: "/admin/contact-submission",
+      icon: Inbox,
+      items: [
+        {
+          title: "All",
+          url: "/admin/contact-submission/all",
+        },
+        {
+          title: "Read",
+          url: "/admin/contact-submission/read",
+        },
+        {
+          title: "Unread",
+          url: "/admin/contact-submission/unread",
+        },
+        {
+          title: "Archived",
+          url: "/admin/contact-submission/archived",
         },
       ],
     },
