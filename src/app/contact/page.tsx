@@ -100,6 +100,23 @@ export default function ContactPage() {
           </div>
         </aside>
       </section>
+
+      <footer className="border-border border-t">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap gap-x-5 gap-y-2 px-6 py-6 text-sm">
+          <Link className="link-text" href="/privacy">
+            Privacy
+          </Link>
+          <Link className="link-text" href="/terms">
+            Terms
+          </Link>
+          <Link className="link-text" href="/cookies">
+            Cookies
+          </Link>
+          <Link className="link-text" href="/acceptable-use">
+            Acceptable use
+          </Link>
+        </div>
+      </footer>
     </main>
   );
 }

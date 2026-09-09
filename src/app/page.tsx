@@ -46,6 +46,25 @@ const workspaceLinks = [
   },
 ] as const;
 
+const legalLinks = [
+  {
+    href: "/privacy",
+    label: "Privacy",
+  },
+  {
+    href: "/terms",
+    label: "Terms",
+  },
+  {
+    href: "/cookies",
+    label: "Cookies",
+  },
+  {
+    href: "/acceptable-use",
+    label: "Acceptable use",
+  },
+] as const;
+
 const Page = () => {
   return (
     <main className="min-h-dvh bg-background">
@@ -154,6 +173,19 @@ const Page = () => {
           </div>
         </aside>
       </section>
+
+      <footer className="border-border border-t">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 py-6 text-muted-foreground text-sm sm:flex-row sm:items-center sm:justify-between">
+          <p>{siteConfig.name}</p>
+          <nav className="flex flex-wrap gap-x-5 gap-y-2" aria-label="Legal">
+            {legalLinks.map((link) => (
+              <Link className="link-text" href={link.href} key={link.href}>
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+      </footer>
     </main>
   );
 };

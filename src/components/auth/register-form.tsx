@@ -148,11 +148,11 @@ function RegisterForm({
                       htmlFor="agree-to-terms"
                     >
                       By proceeding, you agree to the{" "}
-                      <Link href="/#" className="link-text">
+                      <Link href="/terms" className="link-text">
                         Terms of Service
                       </Link>{" "}
                       and{" "}
-                      <Link href="/#" className="link-text">
+                      <Link href="/privacy" className="link-text">
                         Privacy Policy
                       </Link>{" "}
                     </label>
