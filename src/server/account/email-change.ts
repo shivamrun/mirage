@@ -34,6 +34,7 @@ type AccountEmailState = {
     email: string;
     emailVerified: boolean;
     pendingEmail: string | null;
+    pendingEmailStep: "approve-current" | "verify-new" | null;
     pendingEmailExpiresAt: string | null;
   };
 };
@@ -46,6 +47,7 @@ type AccountEmailMutationResult =
         email: string;
         emailVerified: boolean;
         pendingEmail: string | null;
+        pendingEmailStep: "approve-current" | "verify-new" | null;
         pendingEmailExpiresAt: string | null;
       };
     };
@@ -123,6 +125,11 @@ async function getPendingEmailChange(userId: string) {
   return {
     ...parsed,
     expiresAt: pendingChange.expiresAt,
+    step: pendingChange.identifier.startsWith(
+      getApprovalIdentifierPrefix(userId),
+    )
+      ? ("approve-current" as const)
+      : ("verify-new" as const),
   };
 }
 
@@ -170,25 +177,31 @@ async function createPendingEmailChange({
     expiresAt,
   });
 
-  const confirmationURL = new URL(
-    "/api/account/confirm-email-change",
-    env.NEXT_PUBLIC_BASE_URL,
-  );
-  confirmationURL.searchParams.set("token", token);
-
-  await sendVerificationEmail({
-    actionLabel: "Confirm email change",
-    email: newEmail,
-    heading: "Confirm your new email",
-    intro:
-      "Use this link to confirm the email address for your Mirage account.",
-    verificationUrl: confirmationURL.toString(),
-  });
+  await sendPendingEmailChangeConfirmation(pendingChange);
 
   return {
     ...pendingChange,
     expiresAt,
   };
+}
+
+async function sendPendingEmailChangeConfirmation(
+  pendingChange: PendingEmailChange,
+) {
+  const confirmationURL = new URL(
+    "/api/account/confirm-email-change",
+    env.NEXT_PUBLIC_BASE_URL,
+  );
+  confirmationURL.searchParams.set("token", pendingChange.token);
+
+  await sendVerificationEmail({
+    actionLabel: "Confirm email change",
+    email: pendingChange.newEmail,
+    heading: "Confirm your new email",
+    intro:
+      "Use this link to confirm the email address for your Mirage account.",
+    verificationUrl: confirmationURL.toString(),
+  });
 }
 
 async function createPendingEmailChangeApproval({
@@ -259,6 +272,7 @@ export async function getAccountEmailState({
       email: authSession.user.email,
       emailVerified: authSession.user.emailVerified,
       pendingEmail: pendingChange?.newEmail ?? null,
+      pendingEmailStep: pendingChange?.step ?? null,
       pendingEmailExpiresAt: pendingChange?.expiresAt.toISOString() ?? null,
     },
   };
@@ -304,6 +318,9 @@ export async function changeAccountEmail({
       email: authSession.user.email,
       emailVerified: authSession.user.emailVerified,
       pendingEmail: pendingChange.newEmail,
+      pendingEmailStep: authSession.user.emailVerified
+        ? "approve-current"
+        : "verify-new",
       pendingEmailExpiresAt: pendingChange.expiresAt.toISOString(),
     },
   };
@@ -388,7 +405,37 @@ export async function cancelPendingEmailChange({
       email: authSession.user.email,
       emailVerified: authSession.user.emailVerified,
       pendingEmail: null,
+      pendingEmailStep: null,
       pendingEmailExpiresAt: null,
+    },
+  };
+}
+
+export async function resendPendingEmailChangeVerification({
+  authSession,
+}: {
+  authSession: AuthSession;
+}): Promise<AccountEmailMutationResult> {
+  const pendingChange = await getPendingEmailChange(authSession.user.id);
+
+  if (!pendingChange || pendingChange.step !== "verify-new") {
+    return {
+      kind: "error",
+      message: "No pending email verification is ready to resend.",
+      statusCode: 400,
+    };
+  }
+
+  await sendPendingEmailChangeConfirmation(pendingChange);
+
+  return {
+    kind: "success",
+    value: {
+      email: authSession.user.email,
+      emailVerified: authSession.user.emailVerified,
+      pendingEmail: pendingChange.newEmail,
+      pendingEmailStep: pendingChange.step,
+      pendingEmailExpiresAt: pendingChange.expiresAt.toISOString(),
     },
   };
 }
@@ -422,6 +469,7 @@ export async function resendAccountVerification({
       email: authSession.user.email,
       emailVerified: authSession.user.emailVerified,
       pendingEmail: null,
+      pendingEmailStep: null,
       pendingEmailExpiresAt: null,
     },
   };

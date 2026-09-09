@@ -9,7 +9,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <VerifiedRoleGate requiredRole="admin">
       <SidebarProvider className="h-svh max-h-svh min-h-0 overflow-hidden">
-        <AppSidebar />
+        <AppSidebar mode="admin" />
 
         <SidebarInset className="h-svh min-h-0 min-w-0 flex-1 overflow-hidden">
           <ScrollArea className="h-full min-h-0 w-full min-w-0 overflow-hidden">

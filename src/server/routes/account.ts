@@ -6,6 +6,7 @@ import {
   changeAccountEmail,
   getAccountEmailState,
   resendAccountVerification,
+  resendPendingEmailChangeVerification,
   resolveEmailChangeApprovalRedirectURL,
   resolveEmailChangeConfirmationRedirectURL,
 } from "@/server/account/email-change";
@@ -265,6 +266,35 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       const result = await resendAccountVerification({
         authSession,
         headers: request.headers,
+      });
+
+      if (result.kind === "error") {
+        return Response.json(
+          { message: result.message },
+          { status: result.statusCode },
+        );
+      }
+
+      return {
+        status: true,
+        ...result.value,
+      };
+    },
+    {
+      auth: true,
+    },
+  )
+  .post(
+    "/resend-email-change-verification",
+    async ({ authSession, request }) => {
+      const invalidMutationResponse = validateMutationRequest(request);
+
+      if (invalidMutationResponse) {
+        return invalidMutationResponse;
+      }
+
+      const result = await resendPendingEmailChangeVerification({
+        authSession,
       });
 
       if (result.kind === "error") {

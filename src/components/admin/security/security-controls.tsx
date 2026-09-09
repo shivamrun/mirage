@@ -4,6 +4,7 @@ import { KeyRound, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
+import { AccountSection } from "@/components/account/account-section";
 import { AuthStatusMessage, EmailField } from "@/components/auth";
 import { getUnexpectedAuthErrorMessage } from "@/components/auth/auth-errors";
 import {
@@ -37,23 +38,32 @@ export function SecurityControls({
   summary: SecurityControlSummary;
 }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-      <div className="grid gap-4">
-        <ForcePasswordResetPanel />
-        <GlobalSessionRevokePanel activeSessions={summary.activeSessions} />
-      </div>
-
-      <aside className="h-fit rounded-lg border bg-card">
-        <div className="border-b px-4 py-3">
-          <h2 className="font-semibold text-base">Security Snapshot</h2>
-        </div>
-        <dl className="divide-y">
+    <div>
+      <AccountSection
+        description="Review the current session and ban counts before taking broader security action."
+        title="Security snapshot"
+      >
+        <dl className="divide-y divide-border/70 border-border/70 border-y">
           <SummaryRow label="Active sessions" value={summary.activeSessions} />
           <SummaryRow label="Stored sessions" value={summary.totalSessions} />
           <SummaryRow label="Active bans" value={summary.activeBans} />
           <SummaryRow label="Banned users" value={summary.bannedUsers} />
         </dl>
-      </aside>
+      </AccountSection>
+
+      <AccountSection
+        description="Revoke a user's sessions and send them a password reset link."
+        title="Force password reset"
+      >
+        <ForcePasswordResetPanel />
+      </AccountSection>
+
+      <AccountSection
+        description="Sign everyone out across the application, including this admin session."
+        title="Revoke all sessions"
+      >
+        <GlobalSessionRevokePanel activeSessions={summary.activeSessions} />
+      </AccountSection>
     </div>
   );
 }
@@ -108,40 +118,29 @@ function ForcePasswordResetPanel() {
   }
 
   return (
-    <section className="rounded-lg border bg-card">
-      <div className="border-b px-4 py-3">
-        <h2 className="font-semibold text-base">Force Password Reset</h2>
-        <p className="mt-0.5 text-muted-foreground text-sm">
-          Revoke a user's sessions and send a password reset link.
-        </p>
-      </div>
+    <form onSubmit={onSubmit}>
+      <FieldGroup>
+        {status ? (
+          <AuthStatusMessage className="text-left" tone={status.tone}>
+            {status.text}
+          </AuthStatusMessage>
+        ) : null}
 
-      <form onSubmit={onSubmit} className="p-4">
-        <FieldGroup>
-          {status ? (
-            <AuthStatusMessage className="text-left" tone={status.tone}>
-              {status.text}
-            </AuthStatusMessage>
-          ) : null}
+        <EmailField
+          disabled={isSubmitting}
+          id="security-force-reset-email"
+          label="User email"
+          onChange={(event) => setEmail(event.target.value)}
+          required
+          value={email}
+        />
 
-          <EmailField
-            disabled={isSubmitting}
-            id="security-force-reset-email"
-            label="User email"
-            onChange={(event) => setEmail(event.target.value)}
-            required
-            value={email}
-          />
-
-          <div className="flex justify-end">
-            <Button disabled={isSubmitting} type="submit">
-              <KeyRound data-icon="inline-start" />
-              {isSubmitting ? "Sending..." : "Force reset"}
-            </Button>
-          </div>
-        </FieldGroup>
-      </form>
-    </section>
+        <Button className="w-full" disabled={isSubmitting} type="submit">
+          <KeyRound data-icon="inline-start" />
+          {isSubmitting ? "Sending..." : "Force reset"}
+        </Button>
+      </FieldGroup>
+    </form>
   );
 }
 
@@ -194,70 +193,58 @@ function GlobalSessionRevokePanel({
   }
 
   return (
-    <section className="rounded-lg border bg-card">
-      <div className="border-b px-4 py-3">
-        <h2 className="font-semibold text-base">Revoke All Sessions</h2>
-        <p className="mt-0.5 text-muted-foreground text-sm">
-          Sign everyone out across the application.
-        </p>
+    <div className="space-y-4">
+      {status ? (
+        <AuthStatusMessage className="text-left" tone={status.tone}>
+          {status.text}
+        </AuthStatusMessage>
+      ) : null}
+
+      <div className="border-border/70 border-y py-3 text-sm">
+        <span className="font-medium">{activeSessions}</span>{" "}
+        <span className="text-muted-foreground">active sessions now</span>
       </div>
 
-      <div className="space-y-4 p-4">
-        {status ? (
-          <AuthStatusMessage className="text-left" tone={status.tone}>
-            {status.text}
-          </AuthStatusMessage>
-        ) : null}
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogTrigger asChild>
+          <Button className="w-full" type="button" variant="destructive">
+            <LogOut data-icon="inline-start" />
+            Revoke globally
+          </Button>
+        </AlertDialogTrigger>
 
-        <div className="rounded-lg border bg-muted/20 px-3 py-2 text-sm">
-          <span className="font-medium">{activeSessions}</span>{" "}
-          <span className="text-muted-foreground">active sessions now</span>
-        </div>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke every session?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This signs out every user, including the current admin session.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
 
-        <div className="flex justify-end">
-          <AlertDialog open={open} onOpenChange={setOpen}>
-            <AlertDialogTrigger asChild>
-              <Button type="button" variant="destructive">
-                <LogOut data-icon="inline-start" />
-                Revoke globally
-              </Button>
-            </AlertDialogTrigger>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSubmitting}>
+              Cancel
+            </AlertDialogCancel>
 
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Revoke every session?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This signs out every user, including the current admin
-                  session.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={isSubmitting}>
-                  Cancel
-                </AlertDialogCancel>
-
-                <Button
-                  disabled={isSubmitting}
-                  onClick={revokeAllSessions}
-                  type="button"
-                  variant="destructive"
-                >
-                  <LogOut data-icon="inline-start" />
-                  {isSubmitting ? "Revoking..." : "Revoke sessions"}
-                </Button>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </div>
-    </section>
+            <Button
+              disabled={isSubmitting}
+              onClick={revokeAllSessions}
+              type="button"
+              variant="destructive"
+            >
+              <LogOut data-icon="inline-start" />
+              {isSubmitting ? "Revoking..." : "Revoke sessions"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
 
 function SummaryRow({ label, value }: { label: string; value: number }) {
   return (
-    <div className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
+    <div className="flex items-center justify-between gap-4 py-3 text-sm">
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="font-medium">{value.toLocaleString()}</dd>
     </div>

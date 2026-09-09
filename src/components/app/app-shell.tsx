@@ -14,7 +14,7 @@ type AppShellProps = {
 };
 
 function AppShell({ children }: AppShellProps) {
-  const sidebar = <AppSidebar side="left" />;
+  const sidebar = <AppSidebar mode="user" side="left" />;
   const content = (
     <SidebarInset className="mx-auto w-full max-w-6xl px-4 py-4 sm:px-6">
       <SidebarTrigger className="mb-2 text-muted-foreground hover:text-foreground md:hidden" />

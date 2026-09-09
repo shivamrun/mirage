@@ -36,9 +36,11 @@ function cleanCallbackURL(callbackURL: string) {
 
 async function VerifiedRoleGate({
   children,
+  gateUnverifiedUsers = true,
   requiredRole,
 }: {
   children: React.ReactNode;
+  gateUnverifiedUsers?: boolean;
   requiredRole: AuthRole;
 }) {
   const headers = await requestHeaders();
@@ -54,7 +56,7 @@ async function VerifiedRoleGate({
     notFound();
   }
 
-  if (!user.emailVerified) {
+  if (gateUnverifiedUsers && !user.emailVerified) {
     return (
       <AuthContainer
         authForm={

@@ -1,7 +1,6 @@
 "use client";
 
-import { LockKeyhole, LogOut, MailCheck, Plug, User } from "lucide-react";
-import Link from "next/link";
+import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
@@ -13,7 +12,6 @@ import { AccountProfileForm } from "@/components/account/account-profile-form";
 import { AccountSection } from "@/components/account/account-section";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth/client";
-import { siteConfig } from "@/lib/metadata";
 
 type ImpersonatedSessionData = {
   session?: {
@@ -21,27 +19,110 @@ type ImpersonatedSessionData = {
   };
 };
 
-function AccountPage({
-  emailChangeStatus,
-  googleAuthEnabled,
-  googleAccountStatus,
-}: {
-  emailChangeStatus?: string;
-  googleAuthEnabled?: boolean;
-  googleAccountStatus?: string;
-}) {
+type AccountUser = NonNullable<
+  ReturnType<typeof authClient.useSession>["data"]
+>["user"];
+
+type AccountPageShellProps = {
+  children: (context: {
+    onSessionRefresh: () => Promise<void>;
+    user: AccountUser;
+  }) => React.ReactNode;
+  description: string;
+  title: string;
+};
+
+function AccountPageShell({
+  children,
+  description,
+  title,
+}: AccountPageShellProps) {
   const router = useRouter();
   const session = authClient.useSession();
   const user = session.data?.user;
   const impersonatedBy = (session.data as ImpersonatedSessionData | null)
     ?.session?.impersonatedBy;
-  const [isSigningOut, setIsSigningOut] = React.useState(false);
 
   React.useEffect(() => {
     if (!session.isPending && !user) {
       router.replace("/login");
     }
   }, [router, session.isPending, user]);
+
+  if (session.isPending || !user) {
+    return <main className="h-full min-h-0 px-6" aria-busy="true" />;
+  }
+
+  return (
+    <main className="w-full">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+        <header className="max-w-2xl space-y-2">
+          <h1 className="font-semibold text-2xl tracking-normal sm:text-3xl">
+            {title}
+          </h1>
+          <p className="text-muted-foreground text-sm leading-6">
+            {description}
+          </p>
+        </header>
+
+        <AccountImpersonationNotice impersonatedBy={impersonatedBy} />
+
+        {children({
+          onSessionRefresh: session.refetch,
+          user,
+        })}
+      </div>
+    </main>
+  );
+}
+
+function AccountProfilePage({
+  emailChangeStatus,
+}: {
+  emailChangeStatus?: string;
+}) {
+  return (
+    <AccountPageShell
+      description="Manage your profile details and email preferences."
+      title="Profile"
+    >
+      {({ onSessionRefresh, user }) => (
+        <div>
+          <AccountSection
+            description="Update the name and profile image shown on your account."
+            title="Personal details"
+          >
+            <AccountProfileForm
+              onSessionRefresh={onSessionRefresh}
+              user={user}
+            />
+          </AccountSection>
+
+          <AccountSection
+            description="Verify or change the address used for account notifications."
+            title="Email"
+          >
+            <AccountEmailManager
+              emailChangeStatus={emailChangeStatus}
+              onSessionRefresh={onSessionRefresh}
+              user={user}
+            />
+          </AccountSection>
+        </div>
+      )}
+    </AccountPageShell>
+  );
+}
+
+function AccountSecurityPage({
+  googleAccountStatus,
+  googleAuthEnabled,
+}: {
+  googleAccountStatus?: string;
+  googleAuthEnabled?: boolean;
+}) {
+  const router = useRouter();
+  const [isSigningOut, setIsSigningOut] = React.useState(false);
 
   async function signOut() {
     setIsSigningOut(true);
@@ -54,91 +135,49 @@ function AccountPage({
     }
   }
 
-  if (session.isPending || !user) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center px-6">
-        <p className="text-muted-foreground text-sm">Loading account...</p>
-      </main>
-    );
-  }
-
   return (
-    <main className="min-h-dvh px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-            <Link
-              href={siteConfig.links.home}
-              className="link-text font-semibold text-lg"
-            >
-              {siteConfig.name}
-            </Link>
-            <h1 className="font-semibold text-3xl">Account</h1>
-            <p className="text-muted-foreground text-sm">{user.email}</p>
-          </div>
-          <Button
-            disabled={isSigningOut}
-            onClick={signOut}
-            type="button"
-            variant="outline"
+    <AccountPageShell
+      description="Keep your sign-in methods current and control this browser session."
+      title="Security"
+    >
+      {() => (
+        <div>
+          <AccountSection
+            description="Update your password while keeping this session active."
+            title="Password"
           >
-            <LogOut data-icon="inline-start" />
-            {isSigningOut ? "Signing out..." : "Sign out"}
-          </Button>
-        </header>
+            <AccountPasswordForm />
+          </AccountSection>
 
-        <AccountImpersonationNotice impersonatedBy={impersonatedBy} />
+          <AccountSection
+            description="Manage Google as an additional sign-in method."
+            title="Google sign-in"
+          >
+            <AccountConnectedAccounts
+              googleAuthEnabled={googleAuthEnabled}
+              googleAccountStatus={googleAccountStatus}
+            />
+          </AccountSection>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <div className="flex flex-col gap-6">
-            <AccountSection
-              description={`Update the public details tied to your ${siteConfig.name} account.`}
-              icon={<User />}
-              title="Profile"
+          <AccountSection
+            description="End this browser session and return to sign in."
+            title="Log out"
+          >
+            <Button
+              className="w-full"
+              disabled={isSigningOut}
+              onClick={signOut}
+              type="button"
+              variant="outline"
             >
-              <AccountProfileForm
-                onSessionRefresh={session.refetch}
-                user={user}
-              />
-            </AccountSection>
-
-            <AccountSection
-              description="Change your password and keep this session active."
-              icon={<LockKeyhole />}
-              title="Security"
-            >
-              <AccountPasswordForm />
-            </AccountSection>
-          </div>
-
-          <aside className="flex flex-col gap-6">
-            <AccountSection
-              description="View your current address, send a verification link, or change it."
-              icon={<MailCheck />}
-              title="Email"
-            >
-              <AccountEmailManager
-                emailChangeStatus={emailChangeStatus}
-                onSessionRefresh={session.refetch}
-                user={user}
-              />
-            </AccountSection>
-
-            <AccountSection
-              description="Connect a Google account for sign-in, or disconnect it when needed."
-              icon={<Plug />}
-              title="Connected accounts"
-            >
-              <AccountConnectedAccounts
-                googleAuthEnabled={googleAuthEnabled}
-                googleAccountStatus={googleAccountStatus}
-              />
-            </AccountSection>
-          </aside>
+              <LogOut data-icon="inline-start" />
+              {isSigningOut ? "Signing out..." : "Log out"}
+            </Button>
+          </AccountSection>
         </div>
-      </div>
-    </main>
+      )}
+    </AccountPageShell>
   );
 }
 
-export { AccountPage };
+export { AccountProfilePage, AccountSecurityPage };

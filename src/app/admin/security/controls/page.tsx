@@ -19,12 +19,12 @@ export default async function AdminSecurityControlsPage() {
   const summary = await getSecurityControlSummary();
 
   return (
-    <div className="flex min-h-0 flex-col">
-      <header className="shrink-0 pb-5">
-        <h1 className="text-2xl font-semibold tracking-tight">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+      <header className="max-w-2xl space-y-2">
+        <h1 className="font-semibold text-2xl tracking-normal sm:text-3xl">
           Security Controls
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm leading-6">
           Force password resets and respond to account-wide session incidents.
         </p>
       </header>

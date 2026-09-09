@@ -1,14 +1,26 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { RefreshCw, Save, X } from "lucide-react";
+import { CheckCircle2, RefreshCw } from "lucide-react";
 import * as React from "react";
 import { useForm } from "react-hook-form";
 
-import { AuthInputField, AuthStatusMessage } from "@/components/auth";
+import { AuthStatusMessage } from "@/components/auth";
 import { getUnexpectedAuthErrorMessage } from "@/components/auth/auth-errors";
 import { Button } from "@/components/ui/button";
-import { FieldDescription, FieldGroup, FieldSet } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  FieldSet,
+} from "@/components/ui/field";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { api } from "@/lib/api/client";
 import {
   type ChangeEmailInput,
@@ -30,6 +42,7 @@ type AccountEmailResponse = {
   email: string;
   emailVerified: boolean;
   pendingEmail: string | null;
+  pendingEmailStep: "approve-current" | "verify-new" | null;
   pendingEmailExpiresAt: string | null;
 };
 
@@ -55,11 +68,10 @@ function AccountEmailManager({
     email: user.email,
     emailVerified: user.emailVerified,
     pendingEmail: null,
+    pendingEmailStep: null,
     pendingEmailExpiresAt: null,
   });
   const [isSendingVerification, setIsSendingVerification] =
-    React.useState(false);
-  const [isCancellingEmailChange, setIsCancellingEmailChange] =
     React.useState(false);
   const form = useForm<ChangeEmailInput, undefined, ChangeEmailValues>({
     resolver: zodResolver(changeEmailSchema),
@@ -124,7 +136,15 @@ function AccountEmailManager({
       }
 
       if (isMounted) {
-        setEmailState(data as AccountEmailResponse);
+        const accountEmailState = data as AccountEmailResponse;
+
+        setEmailState(accountEmailState);
+        form.reset({
+          newEmail:
+            accountEmailState.pendingEmailStep === "verify-new"
+              ? (accountEmailState.pendingEmail ?? accountEmailState.email)
+              : accountEmailState.email,
+        });
       }
     }
 
@@ -133,10 +153,13 @@ function AccountEmailManager({
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [form]);
 
   async function sendVerificationEmail() {
-    if (emailState.emailVerified) {
+    const isPendingNewEmailVerification =
+      emailState.pendingEmailStep === "verify-new" && emailState.pendingEmail;
+
+    if (emailState.emailVerified && !isPendingNewEmailVerification) {
       return;
     }
 
@@ -144,8 +167,9 @@ function AccountEmailManager({
     setIsSendingVerification(true);
 
     try {
-      const { data, error } =
-        await api.api.account["resend-verification"].post();
+      const { data, error } = isPendingNewEmailVerification
+        ? await api.api.account["resend-email-change-verification"].post()
+        : await api.api.account["resend-verification"].post();
 
       if (error) {
         setStatus({
@@ -157,7 +181,11 @@ function AccountEmailManager({
 
       setEmailState(data as AccountEmailResponse);
       setStatus({
-        text: "Verification link sent.",
+        text: `Verification link has been sent to ${
+          isPendingNewEmailVerification
+            ? emailState.pendingEmail
+            : emailState.email
+        }.`,
         tone: "success",
       });
     } catch (reason) {
@@ -196,12 +224,17 @@ function AccountEmailManager({
       setEmailState(data as AccountEmailResponse);
       await onSessionRefresh();
       form.reset({
-        newEmail: (data as AccountEmailResponse).email,
+        newEmail:
+          (data as AccountEmailResponse).pendingEmailStep === "verify-new"
+            ? ((data as AccountEmailResponse).pendingEmail ??
+              (data as AccountEmailResponse).email)
+            : (data as AccountEmailResponse).email,
       });
       setStatus({
-        text: emailState.emailVerified
-          ? "Check your current email to approve this change."
-          : "Check the new email address to confirm this change.",
+        text:
+          (data as AccountEmailResponse).pendingEmailStep === "approve-current"
+            ? "Approve the request sent to your current email to change email."
+            : `Verification link has been sent to ${values.newEmail}.`,
         tone: "success",
       });
     } catch (reason) {
@@ -212,116 +245,96 @@ function AccountEmailManager({
     }
   }
 
-  async function cancelEmailChange() {
-    setStatus(undefined);
-    setIsCancellingEmailChange(true);
-
-    try {
-      const { data, error } =
-        await api.api.account["cancel-email-change"].post();
-
-      if (error) {
-        setStatus({
-          text: readAccountError(error),
-          tone: "error",
-        });
-        return;
-      }
-
-      setEmailState(data as AccountEmailResponse);
-      form.reset({
-        newEmail: (data as AccountEmailResponse).email,
-      });
-      setStatus({
-        text: "Pending email change canceled.",
-        tone: "success",
-      });
-    } catch (reason) {
-      setStatus({
-        text: getUnexpectedAuthErrorMessage(reason),
-        tone: "error",
-      });
-    } finally {
-      setIsCancellingEmailChange(false);
-    }
-  }
-
-  const pendingEmailExpiresAt = emailState.pendingEmailExpiresAt
-    ? new Date(emailState.pendingEmailExpiresAt)
-    : null;
+  const enteredEmail = form.watch("newEmail");
+  const displayedEmail =
+    emailState.pendingEmailStep === "verify-new"
+      ? (emailState.pendingEmail ?? emailState.email)
+      : emailState.email;
+  const displayedEmailVerified =
+    emailState.pendingEmailStep !== "verify-new" && emailState.emailVerified;
+  const hasEmailChange = enteredEmail !== displayedEmail;
+  const error = form.formState.errors.newEmail?.message;
+  const emailTone = error
+    ? "error"
+    : displayedEmailVerified
+      ? "verified"
+      : emailState.pendingEmailStep === "approve-current"
+        ? "pending"
+        : "needs-verification";
+  const note = emailState.pendingEmail
+    ? emailState.pendingEmailStep === "approve-current"
+      ? `Approve the request sent to your current email to change email to ${emailState.pendingEmail}.`
+      : `Verification link has been sent to ${emailState.pendingEmail}.`
+    : status && status.tone !== "error"
+      ? status.text
+      : null;
+  const noteClassName =
+    emailTone === "verified"
+      ? "text-emerald-700 dark:text-emerald-300"
+      : emailTone === "pending"
+        ? "text-sky-700 dark:text-sky-300"
+        : emailTone === "needs-verification"
+          ? "text-amber-700 dark:text-amber-300"
+          : undefined;
 
   return (
-    <FieldSet>
-      <div className="flex flex-col gap-2 rounded-lg border bg-background px-3 py-2.5">
-        <div className="flex items-start justify-between gap-4">
-          <p className="font-medium text-sm">Email</p>
-          <span
-            className={
-              emailState.emailVerified
-                ? "font-medium text-emerald-700 text-sm dark:text-emerald-300"
-                : "text-muted-foreground text-sm"
-            }
-          >
-            {emailState.emailVerified ? "Verified" : "Not verified"}
-          </span>
-        </div>
-        {emailState.pendingEmail ? (
-          <FieldDescription>
-            Pending change to {emailState.pendingEmail}
-            {pendingEmailExpiresAt
-              ? `, expires ${pendingEmailExpiresAt.toLocaleString()}`
-              : ""}
-          </FieldDescription>
-        ) : null}
-      </div>
-
-      {status ? (
+    <FieldSet className="gap-3">
+      {status?.tone === "error" ? (
         <AuthStatusMessage tone={status.tone}>{status.text}</AuthStatusMessage>
       ) : null}
 
-      <Button
-        disabled={emailState.emailVerified || isSendingVerification}
-        onClick={sendVerificationEmail}
-        type="button"
-        variant="outline"
-      >
-        <RefreshCw data-icon="inline-start" />
-        {isSendingVerification ? "Sending..." : "Send verification link"}
-      </Button>
-
-      {emailState.pendingEmail ? (
-        <Button
-          disabled={isCancellingEmailChange}
-          onClick={cancelEmailChange}
-          type="button"
-          variant="outline"
-        >
-          <X data-icon="inline-start" />
-          {isCancellingEmailChange ? "Canceling..." : "Cancel email change"}
-        </Button>
-      ) : null}
-
       <form
-        className="flex flex-col gap-5"
+        className="flex flex-col gap-2"
         onSubmit={form.handleSubmit(onSubmit)}
       >
-        <FieldGroup>
-          <AuthInputField
-            id="newEmail"
-            label="Current email"
-            error={form.formState.errors.newEmail?.message}
-            required
-            type="email"
-            {...form.register("newEmail")}
-          />
-        </FieldGroup>
+        <Field data-invalid={Boolean(error)}>
+          <FieldLabel htmlFor="newEmail">Email</FieldLabel>
+          <InputGroup className="h-10 pr-2">
+            <InputGroupInput
+              id="newEmail"
+              autoCapitalize="none"
+              autoComplete="email"
+              autoCorrect="off"
+              inputMode="email"
+              placeholder="name@example.com"
+              type="email"
+              aria-invalid={Boolean(error) || undefined}
+              {...form.register("newEmail")}
+            />
+            <InputGroupAddon align="inline-end" className="pr-1">
+              {displayedEmailVerified ? (
+                <span className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 font-medium text-emerald-700 text-sm dark:text-emerald-300">
+                  <CheckCircle2 className="size-4" />
+                  Verified
+                </span>
+              ) : (
+                <InputGroupButton
+                  className="text-amber-700 hover:bg-amber-100 hover:text-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/50 dark:hover:text-amber-200"
+                  disabled={isSendingVerification}
+                  onClick={sendVerificationEmail}
+                  type="button"
+                  variant="ghost"
+                >
+                  <RefreshCw data-icon="inline-start" />
+                  {isSendingVerification ? "Sending..." : "Verify email"}
+                </InputGroupButton>
+              )}
+            </InputGroupAddon>
+          </InputGroup>
+          {note ? (
+            <FieldDescription className={noteClassName}>
+              {note}
+            </FieldDescription>
+          ) : null}
+          {error ? <FieldError>{error}</FieldError> : null}
+        </Field>
+
         <Button
           className="w-full"
-          disabled={form.formState.isSubmitting}
+          disabled={!hasEmailChange || form.formState.isSubmitting}
           type="submit"
         >
-          <Save data-icon="inline-start" />
-          {form.formState.isSubmitting ? "Changing..." : "Change email"}
+          {form.formState.isSubmitting ? "Updating..." : "Update email"}
         </Button>
       </form>
     </FieldSet>

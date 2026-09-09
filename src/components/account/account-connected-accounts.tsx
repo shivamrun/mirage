@@ -124,8 +124,8 @@ function AccountConnectedAccounts({
     try {
       const result = await authClient.linkSocial({
         provider: "google",
-        callbackURL: "/account?googleAccount=linked",
-        errorCallbackURL: "/account?googleAccount=error",
+        callbackURL: "/account/security?googleAccount=linked",
+        errorCallbackURL: "/account/security?googleAccount=error",
       });
 
       if (result.error) {
@@ -199,7 +199,7 @@ function AccountConnectedAccounts({
       ) : null}
 
       {!isLoading && !googleAccount ? (
-        <div className="rounded-lg border bg-background px-3 py-2.5">
+        <div className="border-border/70 border-y py-3">
           <p className="font-medium text-sm">No Google account connected</p>
           <FieldDescription>
             {googleAuthEnabled
@@ -210,9 +210,9 @@ function AccountConnectedAccounts({
       ) : null}
 
       {googleAccount ? (
-        <div className="flex items-start justify-between gap-3 rounded-lg border bg-background px-3 py-2.5">
+        <div className="flex items-start justify-between gap-3 border-border/70 border-y py-3">
           <div className="flex min-w-0 items-start gap-3">
-            <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg border">
+            <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-border/70">
               <GoogleIcon />
             </div>
             <div className="min-w-0">
