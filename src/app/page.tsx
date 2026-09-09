@@ -67,6 +67,9 @@ const Page = () => {
           </Link>
           <nav className="flex items-center gap-2" aria-label="Primary">
             <Button asChild className="hidden sm:inline-flex" variant="ghost">
+              <Link href="/contact">Contact</Link>
+            </Button>
+            <Button asChild className="hidden sm:inline-flex" variant="ghost">
               <Link href="/login">Sign in</Link>
             </Button>
             <Button asChild size="sm">

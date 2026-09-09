@@ -43,6 +43,13 @@
       "when": 1788110298229,
       "tag": "0005_soft_norman_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788938927755,
+      "tag": "0006_robust_warhawk",
+      "breakpoints": true
     }
   ]
 }

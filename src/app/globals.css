@@ -175,4 +175,8 @@
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+
+  .contact-entry-r8n4 {
+    display: none;
+  }
 }
