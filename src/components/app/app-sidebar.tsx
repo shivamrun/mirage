@@ -106,7 +106,7 @@ const adminData = {
         },
         {
           title: "Read",
-          url: "/admin/contact-submission/read",
+          url: "/admin/contact-submission/all?filterField=status&filterValue=read",
         },
         {
           title: "Unread",
@@ -114,7 +114,7 @@ const adminData = {
         },
         {
           title: "Archived",
-          url: "/admin/contact-submission/archived",
+          url: "/admin/contact-submission/all?filterField=status&filterValue=archived",
         },
       ],
     },

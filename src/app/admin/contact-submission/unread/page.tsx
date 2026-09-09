@@ -1,24 +1,23 @@
-import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
-import { AdminContactSubmissionPlaceholderPage } from "@/components/admin";
-import { requireAdmin } from "@/lib/auth/access";
+import {
+  type AdminContactSubmissionPageSearchParams,
+  adminContactSubmissionStatusHrefFromSearchParams,
+} from "@/components/admin";
 import { getPageMetadata } from "@/lib/metadata";
 
 export const metadata = getPageMetadata("Unread Contact Submissions", {
   path: "/admin/contact-submission/unread",
 });
 
-export default async function AdminContactSubmissionUnreadPage() {
-  const requestHeaders = await headers();
+type AdminContactSubmissionUnreadPageProps = {
+  searchParams: Promise<AdminContactSubmissionPageSearchParams>;
+};
 
-  await requireAdmin({
-    headers: requestHeaders,
-  });
+export default async function AdminContactSubmissionUnreadPage({
+  searchParams,
+}: AdminContactSubmissionUnreadPageProps) {
+  const params = await searchParams;
 
-  return (
-    <AdminContactSubmissionPlaceholderPage
-      description="Unread contact submissions will be organized here."
-      title="Unread Contact Submissions"
-    />
-  );
+  redirect(adminContactSubmissionStatusHrefFromSearchParams(params, "new"));
 }

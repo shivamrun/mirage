@@ -6,12 +6,17 @@ export type ContactSubmissionSearchParamValue = string | string[] | undefined;
 export type AdminContactSubmissionPageSearchParams = {
   [key: string]: ContactSubmissionSearchParamValue;
 
+  filterField?: ContactSubmissionSearchParamValue;
+  filterValue?: ContactSubmissionSearchParamValue;
   q?: ContactSubmissionSearchParamValue;
 };
 
 export type ContactSubmissionStatus = "new" | "read" | "archived";
+export type ContactSubmissionFilterField = "status";
 
 export type AdminContactSubmissionQueryState = {
+  filterField: ContactSubmissionFilterField;
+  filterValue: ContactSubmissionStatus | "";
   query: string;
 };
 
@@ -26,6 +31,8 @@ export type AdminContactSubmissionListItem = {
 };
 
 export type ContactSubmissionHrefOptions = {
+  filterField?: ContactSubmissionFilterField;
+  filterValue?: ContactSubmissionStatus | "";
   query?: string;
 };
 
@@ -44,18 +51,35 @@ function allParamValues(value?: ContactSubmissionSearchParamValue) {
 export function parseAdminContactSubmissionSearchParams(
   params: AdminContactSubmissionPageSearchParams,
 ): AdminContactSubmissionQueryState {
+  const filterValue = firstParamValue(params.filterValue);
+
   return {
+    filterField: "status",
+    filterValue:
+      firstParamValue(params.filterField) === "status" &&
+      (filterValue === "new" ||
+        filterValue === "read" ||
+        filterValue === "archived")
+        ? filterValue
+        : "",
     query: firstParamValue(params.q)?.trim() ?? "",
   };
 }
 
 export function contactSubmissionsPageHref({
+  filterField,
+  filterValue,
   query,
 }: ContactSubmissionHrefOptions = {}) {
   const params = new URLSearchParams();
 
   if (query) {
     params.set("q", query);
+  }
+
+  if (filterField && filterValue) {
+    params.set("filterField", filterField);
+    params.set("filterValue", filterValue);
   }
 
   const search = params.toString();
@@ -89,4 +113,17 @@ export function adminContactSubmissionHrefFromSearchParams(
   return contactSubmissionsPageHref(
     parseAdminContactSubmissionSearchParams(params),
   );
+}
+
+export function adminContactSubmissionStatusHrefFromSearchParams(
+  params: AdminContactSubmissionPageSearchParams,
+  status: ContactSubmissionStatus,
+) {
+  const state = parseAdminContactSubmissionSearchParams(params);
+
+  return contactSubmissionsPageHref({
+    filterField: "status",
+    filterValue: status,
+    query: state.query,
+  });
 }

@@ -14,6 +14,11 @@ import { requireAdmin } from "@/lib/auth/access";
 import { getPageMetadata } from "@/lib/metadata";
 import { listContactSubmissions } from "@/server/db/dal/contact-submission";
 
+import {
+  bulkUpdateContactSubmissionStatusAction,
+  updateContactSubmissionStatusAction,
+} from "./actions";
+
 export const metadata = getPageMetadata("Contact Submissions", {
   path: "/admin/contact-submission/all",
 });
@@ -38,6 +43,10 @@ export default async function AdminContactSubmissionAllPage({
     redirect(canonicalHref);
   }
 
+  const clearSearchHref = contactSubmissionsPageHref({
+    filterField: state.filterField,
+    filterValue: state.filterValue,
+  });
   const submissions = await listContactSubmissions({
     state,
   });
@@ -55,13 +64,17 @@ export default async function AdminContactSubmissionAllPage({
       </header>
 
       <AdminContactSubmissionToolbar
-        clearSearchHref={contactSubmissionsPageHref()}
+        bulkAction={bulkUpdateContactSubmissionStatusAction}
+        clearSearchHref={clearSearchHref}
+        hasSubmissions={submissions.length > 0}
         state={state}
       />
 
       <AdminContactSubmissionTable
+        clearSearchHref={clearSearchHref}
         hasSearch={Boolean(state.query)}
         query={state.query}
+        rowAction={updateContactSubmissionStatusAction}
         submissions={submissions}
       />
     </div>

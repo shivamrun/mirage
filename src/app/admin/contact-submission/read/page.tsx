@@ -1,24 +1,23 @@
-import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
-import { AdminContactSubmissionPlaceholderPage } from "@/components/admin";
-import { requireAdmin } from "@/lib/auth/access";
+import {
+  type AdminContactSubmissionPageSearchParams,
+  adminContactSubmissionStatusHrefFromSearchParams,
+} from "@/components/admin";
 import { getPageMetadata } from "@/lib/metadata";
 
 export const metadata = getPageMetadata("Read Contact Submissions", {
   path: "/admin/contact-submission/read",
 });
 
-export default async function AdminContactSubmissionReadPage() {
-  const requestHeaders = await headers();
+type AdminContactSubmissionReadPageProps = {
+  searchParams: Promise<AdminContactSubmissionPageSearchParams>;
+};
 
-  await requireAdmin({
-    headers: requestHeaders,
-  });
+export default async function AdminContactSubmissionReadPage({
+  searchParams,
+}: AdminContactSubmissionReadPageProps) {
+  const params = await searchParams;
 
-  return (
-    <AdminContactSubmissionPlaceholderPage
-      description="Read contact submissions will be organized here."
-      title="Read Contact Submissions"
-    />
-  );
+  redirect(adminContactSubmissionStatusHrefFromSearchParams(params, "read"));
 }
