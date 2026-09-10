@@ -1,0 +1,1 @@
+ALTER TABLE "mirage_email_list" ADD COLUMN "email_verification_required" boolean DEFAULT false NOT NULL;

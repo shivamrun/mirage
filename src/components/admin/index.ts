@@ -1,4 +1,5 @@
 export * from "./contact-submission";
+export * from "./email-list";
 export * from "./security";
 export {
   formatJoinedDate,

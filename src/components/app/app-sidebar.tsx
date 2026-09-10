@@ -5,6 +5,7 @@ import {
   Home,
   Inbox,
   LayoutDashboard,
+  Mail,
   Settings2,
   ShieldAlert,
   UserRound,
@@ -115,6 +116,21 @@ const adminData = {
         {
           title: "Archived",
           url: "/admin/contact-submission/all?filterField=status&filterValue=archived",
+        },
+      ],
+    },
+    {
+      title: "Email Lists",
+      url: "/admin/email-list",
+      icon: Mail,
+      items: [
+        {
+          title: "All Lists",
+          url: "/admin/email-list/all",
+        },
+        {
+          title: "Submissions",
+          url: "/admin/email-list/submissions",
         },
       ],
     },

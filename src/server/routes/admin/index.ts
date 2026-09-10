@@ -6,6 +6,12 @@ import { auth } from "@/lib/auth";
 import { env } from "@/lib/env";
 import db from "@/server/db";
 import {
+  createEmailList,
+  deleteEmailList,
+  updateEmailList,
+  updateEmailListStatus,
+} from "@/server/db/dal/email-list";
+import {
   getUserForPasswordReset,
   revokeAllSessions,
   revokeUserSessions,
@@ -14,11 +20,20 @@ import {
   account as accountTable,
   session as sessionTable,
 } from "@/server/db/schema";
+import {
+  adminCreateEmailListSchema,
+  emailListKeySchema,
+  emailListStatusSchema,
+} from "@/zod";
 import { emailSchema } from "@/zod/helpers";
 import { elysiaAuth } from "../auth";
 
 const forcePasswordResetSchema = z.object({
   email: emailSchema,
+});
+const emailListStatusUpdateSchema = z.object({
+  key: emailListKeySchema,
+  status: emailListStatusSchema,
 });
 
 function jsonResponse(message: string, status: number) {
@@ -169,6 +184,134 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
 
       return {
         session: userSession,
+        status: true,
+      };
+    },
+    {
+      admin: true,
+    },
+  )
+  .post(
+    "/email-list",
+    async ({ request }) => {
+      const invalidMutationResponse = validateMutationRequest(request);
+
+      if (invalidMutationResponse) {
+        return invalidMutationResponse;
+      }
+
+      const parsed = adminCreateEmailListSchema.safeParse(
+        await parseJsonRequest(request),
+      );
+
+      if (!parsed.success) {
+        return jsonResponse(
+          parsed.error.issues[0]?.message ?? "Invalid email list request.",
+          400,
+        );
+      }
+
+      const list = await createEmailList(parsed.data);
+
+      return {
+        list,
+        status: true,
+      };
+    },
+    {
+      admin: true,
+    },
+  )
+  .patch(
+    "/email-list/:key",
+    async ({ params, request }) => {
+      const invalidMutationResponse = validateMutationRequest(request);
+
+      if (invalidMutationResponse) {
+        return invalidMutationResponse;
+      }
+
+      const body = await parseJsonRequest(request);
+      const parsed = adminCreateEmailListSchema.safeParse({
+        ...(body && typeof body === "object" ? body : {}),
+        key: params.key,
+      });
+
+      if (!parsed.success) {
+        return jsonResponse(
+          parsed.error.issues[0]?.message ?? "Invalid email list request.",
+          400,
+        );
+      }
+
+      const list = await updateEmailList(parsed.data);
+
+      if (!list) {
+        return jsonResponse("Email list not found.", 404);
+      }
+
+      return {
+        list,
+        status: true,
+      };
+    },
+    {
+      admin: true,
+    },
+  )
+  .patch(
+    "/email-list/:key/status",
+    async ({ params, request }) => {
+      const invalidMutationResponse = validateMutationRequest(request);
+
+      if (invalidMutationResponse) {
+        return invalidMutationResponse;
+      }
+
+      const body = await parseJsonRequest(request);
+      const parsedStatus = emailListStatusUpdateSchema.safeParse({
+        ...(body && typeof body === "object" ? body : {}),
+        key: params.key,
+      });
+
+      if (!parsedStatus.success) {
+        return jsonResponse("Invalid email list status.", 400);
+      }
+
+      const list = await updateEmailListStatus(parsedStatus.data);
+
+      if (!list) {
+        return jsonResponse("Email list not found.", 404);
+      }
+
+      return {
+        status: true,
+      };
+    },
+    {
+      admin: true,
+    },
+  )
+  .delete(
+    "/email-list/:key",
+    async ({ params, request }) => {
+      const invalidMutationResponse = validateMutationRequest(request);
+
+      if (invalidMutationResponse) {
+        return invalidMutationResponse;
+      }
+
+      const result = await deleteEmailList(params.key);
+
+      if (result.status === "protected") {
+        return jsonResponse("Built-in email lists cannot be deleted.", 400);
+      }
+
+      if (result.status === "not-found") {
+        return jsonResponse("Email list not found.", 404);
+      }
+
+      return {
         status: true,
       };
     },

@@ -8,6 +8,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 
+import { EmailSignupForm } from "@/components/email-list";
 import { Button } from "@/components/ui/button";
 import { siteConfig } from "@/lib/metadata";
 
@@ -127,6 +128,39 @@ const Page = () => {
             <Button asChild variant="outline">
               <Link href="/login">Open existing account</Link>
             </Button>
+          </div>
+
+          <div className="grid max-w-3xl gap-3 md:grid-cols-2">
+            <section className="rounded-lg border border-border bg-card p-5">
+              <div className="mb-4 space-y-1">
+                <h2 className="font-semibold text-lg">Join the waitlist</h2>
+                <p className="text-muted-foreground text-sm leading-6">
+                  Get early access and launch updates.
+                </p>
+              </div>
+              <EmailSignupForm
+                inputId="home-waitlist-email"
+                listKey="waitlist"
+                source="home-hero"
+                submitLabel="Join waitlist"
+              />
+            </section>
+
+            <section className="rounded-lg border border-border bg-card p-5">
+              <div className="mb-4 space-y-1">
+                <h2 className="font-semibold text-lg">Get the newsletter</h2>
+                <p className="text-muted-foreground text-sm leading-6">
+                  Receive product notes and occasional behind-the-scenes
+                  updates.
+                </p>
+              </div>
+              <EmailSignupForm
+                inputId="home-newsletter-email"
+                listKey="newsletter"
+                source="home-newsletter"
+                submitLabel="Subscribe"
+              />
+            </section>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
