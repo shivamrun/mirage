@@ -28,7 +28,7 @@ type TwoFactorUser = {
 
 type StatusMessage = {
   text: string;
-  tone: "success" | "error" | "info";
+  tone: "error";
 };
 
 type TwoFactorAction = "enable" | "disable";
@@ -118,11 +118,6 @@ function AccountTwoFactorForm({
 
         setTotpURI((data as { totpURI: string }).totpURI);
         setEmailCode("");
-        setDialogOpen(false);
-        setStatus({
-          text: "Scan the QR code, then confirm the first code from your app.",
-          tone: "info",
-        });
         return;
       }
 
@@ -142,10 +137,7 @@ function AccountTwoFactorForm({
         Boolean((data as { twoFactorEnabled: boolean }).twoFactorEnabled),
       );
       await onSessionRefresh();
-      setStatus({
-        text: "Authenticator app sign-in is disabled.",
-        tone: "success",
-      });
+      setStatus(undefined);
     } catch (reason) {
       setStatus({
         text: getUnexpectedAuthErrorMessage(reason),
@@ -174,14 +166,12 @@ function AccountTwoFactorForm({
       setTotpCode("");
       setTotpURI(undefined);
       setPendingAction(undefined);
+      setDialogOpen(false);
       setIsEnabled(
         Boolean((data as { twoFactorEnabled: boolean }).twoFactorEnabled),
       );
       await onSessionRefresh();
-      setStatus({
-        text: "Authenticator app sign-in is enabled.",
-        tone: "success",
-      });
+      setStatus(undefined);
     } catch (reason) {
       setStatus({
         text: getUnexpectedAuthErrorMessage(reason),
@@ -192,57 +182,20 @@ function AccountTwoFactorForm({
     }
   }
 
-  if (totpURI) {
-    return (
-      <div className="flex flex-col gap-5">
-        {status ? (
-          <AuthStatusMessage tone={status.tone}>
-            {status.text}
-          </AuthStatusMessage>
-        ) : null}
-        <div className="flex flex-col gap-5 md:flex-row">
-          <div className="grid size-48 shrink-0 place-items-center rounded-lg border bg-white p-4">
-            <QRCode value={totpURI} size={160} />
-          </div>
-          <div className="min-w-0 flex-1 space-y-3">
-            <p className="text-muted-foreground text-sm leading-6">
-              Add this account in Google Authenticator, Microsoft Authenticator,
-              1Password, Bitwarden, or any compatible authenticator app.
-            </p>
-            <p className="break-all rounded-lg border bg-muted/40 p-3 font-mono text-xs">
-              {totpURI}
-            </p>
-          </div>
-        </div>
-
-        <form className="flex flex-col gap-5" onSubmit={verifySetup}>
-          <FieldGroup>
-            <AuthInputField
-              autoComplete="one-time-code"
-              id="setup-totp-code"
-              inputMode="numeric"
-              label="Authenticator code"
-              maxLength={8}
-              minLength={6}
-              onChange={(event) => setTotpCode(event.target.value)}
-              pattern="[0-9 ]*"
-              placeholder="123456"
-              required
-              value={totpCode}
-            />
-          </FieldGroup>
-          <Button
-            className="w-full sm:w-fit"
-            disabled={isVerifying}
-            type="submit"
-          >
-            <ShieldCheck data-icon="inline-start" />
-            {isVerifying ? "Verifying..." : "Finish setup"}
-          </Button>
-        </form>
-      </div>
-    );
-  }
+  const dialogTitle = totpURI
+    ? "Scan QR code"
+    : pendingAction
+      ? "Enter email code"
+      : isEnabled
+        ? "Disable authenticator app?"
+        : "Enable authenticator app?";
+  const dialogDescription = totpURI
+    ? "Scan this QR code with your authenticator app, then enter the 6-digit code it shows."
+    : pendingAction
+      ? `Enter the 6-digit code sent to ${user.email}.`
+      : isEnabled
+        ? `We will send a 6-digit code to ${user.email}. Enter it here to remove authenticator app sign-in from your account.`
+        : `We will send a 6-digit code to ${user.email}. Enter it here before scanning a QR code with your authenticator app.`;
 
   return (
     <div className="flex flex-col gap-4">
@@ -251,9 +204,16 @@ function AccountTwoFactorForm({
         onOpenChange={(open) => {
           setDialogOpen(open);
 
-          if (!open && !isSendingCode && !isContinuing) {
+          if (open) {
+            setStatus(undefined);
+          }
+
+          if (!open && !isSendingCode && !isContinuing && !isVerifying) {
             setPendingAction(undefined);
             setEmailCode("");
+            setTotpCode("");
+            setTotpURI(undefined);
+            setStatus(undefined);
           }
         }}
       >
@@ -299,29 +259,51 @@ function AccountTwoFactorForm({
 
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {pendingAction
-                ? "Enter email code"
-                : isEnabled
-                  ? "Disable authenticator app?"
-                  : "Enable authenticator app?"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingAction
-                ? `Enter the 6-digit code sent to ${user.email}.`
-                : isEnabled
-                  ? `We will send a 6-digit code to ${user.email}. Enter it here to remove authenticator app sign-in from your account.`
-                  : `We will send a 6-digit code to ${user.email}. Enter it here before scanning a QR code with your authenticator app.`}
-            </AlertDialogDescription>
+            <AlertDialogTitle>{dialogTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{dialogDescription}</AlertDialogDescription>
           </AlertDialogHeader>
 
-          {status ? (
+          {status?.tone === "error" ? (
             <AuthStatusMessage className="text-left" tone={status.tone}>
               {status.text}
             </AuthStatusMessage>
           ) : null}
 
-          {pendingAction ? (
+          {totpURI ? (
+            <form className="flex flex-col gap-5" onSubmit={verifySetup}>
+              <div className="grid place-items-center">
+                <div className="grid size-56 place-items-center rounded-lg border bg-white p-4">
+                  <QRCode value={totpURI} size={192} />
+                </div>
+              </div>
+
+              <FieldGroup>
+                <AuthInputField
+                  autoComplete="one-time-code"
+                  id="setup-totp-code"
+                  inputMode="numeric"
+                  label="Authenticator code"
+                  maxLength={8}
+                  minLength={6}
+                  onChange={(event) => setTotpCode(event.target.value)}
+                  pattern="[0-9 ]*"
+                  placeholder="123456"
+                  required
+                  value={totpCode}
+                />
+              </FieldGroup>
+
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isVerifying}>
+                  Cancel
+                </AlertDialogCancel>
+                <Button disabled={isVerifying} type="submit">
+                  <ShieldCheck data-icon="inline-start" />
+                  {isVerifying ? "Verifying..." : "Finish setup"}
+                </Button>
+              </AlertDialogFooter>
+            </form>
+          ) : pendingAction ? (
             <form
               className="flex flex-col gap-5"
               onSubmit={continueWithEmailCode}

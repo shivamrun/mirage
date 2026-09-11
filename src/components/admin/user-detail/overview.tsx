@@ -1,4 +1,10 @@
-import { Ban, CheckCircle2, CircleOff } from "lucide-react";
+import {
+  Ban,
+  CheckCircle2,
+  CircleOff,
+  ShieldCheck,
+  ShieldOff,
+} from "lucide-react";
 import { normalizeRoles } from "@/lib/auth/roles";
 import type { AdminUserDetail } from "@/server/db/dal/admin-user-detail";
 import { formatRoleName } from "../shared/user-display";
@@ -135,6 +141,14 @@ export function AdminUserDetailOverview({
           {formatValue(user.banReason, "None")}
         </DetailRow>
         <DetailRow label="Ban expires">{formatDate(user.banExpires)}</DetailRow>
+        <DetailRow label="Two-factor authentication">
+          <StatusBadge
+            icon={user.twoFactorEnabled ? ShieldCheck : ShieldOff}
+            tone={user.twoFactorEnabled ? "good" : "neutral"}
+          >
+            {user.twoFactorEnabled ? "Enabled" : "Disabled"}
+          </StatusBadge>
+        </DetailRow>
         <DetailRow
           action={
             <div className="flex flex-wrap gap-2">
