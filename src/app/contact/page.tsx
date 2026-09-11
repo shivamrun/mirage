@@ -48,12 +48,20 @@ export default function ContactPage() {
             />
             <span className="font-semibold text-lg">{siteConfig.name}</span>
           </Link>
-          <Button asChild variant="ghost">
-            <Link href="/">
-              <ArrowLeft data-icon="inline-start" />
-              Home
-            </Link>
-          </Button>
+          <nav className="flex items-center gap-2" aria-label="Contact actions">
+            <Button asChild className="hidden md:inline-flex" variant="ghost">
+              <Link href="/guides">Guides</Link>
+            </Button>
+            <Button asChild className="hidden md:inline-flex" variant="ghost">
+              <Link href="/articles">Articles</Link>
+            </Button>
+            <Button asChild variant="ghost">
+              <Link href="/">
+                <ArrowLeft data-icon="inline-start" />
+                Home
+              </Link>
+            </Button>
+          </nav>
         </div>
       </header>
 

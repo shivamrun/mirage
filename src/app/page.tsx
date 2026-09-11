@@ -86,6 +86,12 @@ const Page = () => {
             <span className="font-semibold text-lg">{siteConfig.name}</span>
           </Link>
           <nav className="flex items-center gap-2" aria-label="Primary">
+            <Button asChild className="hidden md:inline-flex" variant="ghost">
+              <Link href="/guides">Guides</Link>
+            </Button>
+            <Button asChild className="hidden md:inline-flex" variant="ghost">
+              <Link href="/articles">Articles</Link>
+            </Button>
             <Button asChild className="hidden sm:inline-flex" variant="ghost">
               <Link href="/contact">Contact</Link>
             </Button>
