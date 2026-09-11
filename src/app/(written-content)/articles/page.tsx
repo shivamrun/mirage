@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
 
 import { ContentCard } from "@/components/content/content-card";
+import {
+  getContentCardMeta,
+  getContentShortDate,
+} from "@/components/content/content-meta";
 import { getArticles } from "@/lib/content-source";
+import { getPageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "Articles",
+export const metadata: Metadata = getPageMetadata("Articles", {
   description: "Evergreen industry articles and SEO-focused explainers.",
-  alternates: {
-    canonical: "/articles",
-  },
-};
+  path: "/articles",
+});
 
 export default function ArticlesPage() {
   const articles = getArticles();
@@ -31,14 +33,17 @@ export default function ArticlesPage() {
           {articles.map((article) => (
             <ContentCard
               description={article.data.description}
+              flags={[
+                ...(article.data.featured ? ["Featured"] : []),
+                ...(article.data.draft ? ["Draft"] : []),
+              ]}
               href={article.url}
               key={article.url}
-              meta={`${article.data.category} / ${new Date(
-                article.data.date,
-              ).toLocaleDateString("en", {
-                month: "short",
-                year: "numeric",
-              })}`}
+              meta={getContentCardMeta([
+                article.data.category,
+                article.data.author.name,
+                getContentShortDate(article.data.publishedAt),
+              ])}
               title={article.data.title}
             />
           ))}

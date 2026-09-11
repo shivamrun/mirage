@@ -3,6 +3,7 @@ import Link from "next/link";
 
 type ContentCardProps = {
   description?: string;
+  flags?: string[];
   href: string;
   meta?: string;
   title: string;
@@ -10,6 +11,7 @@ type ContentCardProps = {
 
 export function ContentCard({
   description,
+  flags = [],
   href,
   meta,
   title,
@@ -30,6 +32,18 @@ export function ContentCard({
       </div>
       {description ? (
         <p className="text-muted-foreground text-sm leading-6">{description}</p>
+      ) : null}
+      {flags.length > 0 ? (
+        <div className="flex flex-wrap gap-2 pt-1">
+          {flags.map((topic) => (
+            <span
+              className="rounded-md border border-border bg-background px-2 py-0.5 text-muted-foreground text-xs"
+              key={topic}
+            >
+              {topic}
+            </span>
+          ))}
+        </div>
       ) : null}
     </Link>
   );

@@ -13,13 +13,22 @@ export const articleSource = loader({
 });
 
 export function getArticles() {
-  return articleSource.getPages().sort((a, b) => {
-    return new Date(b.data.date).getTime() - new Date(a.data.date).getTime();
-  });
+  return articleSource
+    .getPages()
+    .filter((page) => !page.data.draft)
+    .sort((a, b) => {
+      return (
+        new Date(b.data.publishedAt).getTime() -
+        new Date(a.data.publishedAt).getTime()
+      );
+    });
 }
 
 export function getGuides() {
-  return guideSource.getPages().sort((a, b) => {
-    return a.data.title.localeCompare(b.data.title);
-  });
+  return guideSource
+    .getPages()
+    .filter((page) => !page.data.draft)
+    .sort((a, b) => {
+      return a.data.title.localeCompare(b.data.title);
+    });
 }

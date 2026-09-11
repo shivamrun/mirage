@@ -2,8 +2,20 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { ContentCard } from "@/components/content/content-card";
+import {
+  ContentMetaGrid,
+  ContentMetaHeader,
+  getContentCardMeta,
+  getContentShortDate,
+} from "@/components/content/content-meta";
 import { getMDXComponents } from "@/components/content/mdx-components";
+import {
+  getContentJsonLd,
+  getContentMetadata,
+  getJsonLdScriptContent,
+} from "@/lib/content-seo";
 import { getGuides, guideSource } from "@/lib/content-source";
+import { getPageMetadata } from "@/lib/metadata";
 
 type GuidePageProps = {
   params: Promise<{
@@ -11,13 +23,10 @@ type GuidePageProps = {
   }>;
 };
 
-const guidesMetadata: Metadata = {
-  title: "Guides",
-  description: "Platform-specific guides for Mirage.",
-  alternates: {
-    canonical: "/guides",
-  },
-};
+const guidesMetadata: Metadata = getPageMetadata("Guides", {
+  description: "Practical guides, references, and playbooks.",
+  path: "/guides",
+});
 
 export default async function GuidesPage({ params }: GuidePageProps) {
   const { slug } = await params;
@@ -30,10 +39,10 @@ export default async function GuidesPage({ params }: GuidePageProps) {
         <div className="max-w-2xl space-y-4">
           <p className="font-medium text-primary text-sm uppercase">Guides</p>
           <h1 className="font-semibold text-4xl leading-tight">
-            Platform-specific playbooks.
+            Practical guides and playbooks.
           </h1>
           <p className="text-lg text-muted-foreground leading-8">
-            Practical implementation notes for using and extending the platform.
+            Focused references for learning, setup, workflows, and decisions.
           </p>
         </div>
         {guides.length > 0 ? (
@@ -41,9 +50,17 @@ export default async function GuidesPage({ params }: GuidePageProps) {
             {guides.map((guide) => (
               <ContentCard
                 description={guide.data.description}
+                flags={[
+                  ...(guide.data.featured ? ["Featured"] : []),
+                  ...(guide.data.draft ? ["Draft"] : []),
+                ]}
                 href={guide.url}
                 key={guide.url}
-                meta={guide.data.platform}
+                meta={getContentCardMeta([
+                  guide.data.platform,
+                  guide.data.difficulty,
+                  getContentShortDate(guide.data.updatedAt),
+                ])}
                 title={guide.data.title}
               />
             ))}
@@ -52,8 +69,7 @@ export default async function GuidesPage({ params }: GuidePageProps) {
           <div className="mt-10 rounded-lg border border-border bg-card p-6">
             <p className="font-medium">No guides published yet.</p>
             <p className="mt-2 text-muted-foreground text-sm leading-6">
-              Platform-specific guides will appear here once they are added to
-              the content folder.
+              Guides will appear here once they are added to the content folder.
             </p>
           </div>
         )}
@@ -63,15 +79,26 @@ export default async function GuidesPage({ params }: GuidePageProps) {
 
   const page = guideSource.getPage(slug);
 
-  if (!page) {
+  if (!page || page.data.draft) {
     notFound();
   }
 
   const MDX = page.data.body;
+  const jsonLd = getContentJsonLd(page.data, {
+    collectionName: "Guides",
+    path: page.url,
+    type: "guide",
+  });
 
   return (
     <article className="mx-auto w-full max-w-3xl px-6 py-12">
-      <div className="mb-10 space-y-4 border-border border-b pb-8">
+      <script
+        id={`guide-json-ld-${page.slugs.join("-")}`}
+        type="application/ld+json"
+      >
+        {getJsonLdScriptContent(jsonLd)}
+      </script>
+      <div className="mb-10 space-y-6">
         <p className="font-medium text-primary text-sm uppercase">
           {page.data.platform ?? "Guide"}
         </p>
@@ -83,6 +110,22 @@ export default async function GuidesPage({ params }: GuidePageProps) {
             {page.data.description}
           </p>
         ) : null}
+        <ContentMetaHeader
+          author={page.data.author}
+          draft={page.data.draft}
+          featured={page.data.featured}
+          publishedAt={page.data.publishedAt}
+          updatedAt={page.data.updatedAt}
+          verifiedAt={page.data.verifiedAt}
+        />
+        <ContentMetaGrid
+          items={[
+            { label: "Difficulty", value: page.data.difficulty },
+            { label: "Audience", value: page.data.audience },
+            { label: "Requirements", value: page.data.requirements },
+            { label: "Resources", value: page.data.resources },
+          ]}
+        />
       </div>
       <div className="content-prose">
         <MDX components={getMDXComponents()} />
@@ -92,7 +135,9 @@ export default async function GuidesPage({ params }: GuidePageProps) {
 }
 
 export function generateStaticParams() {
-  return guideSource.generateParams();
+  return getGuides().map((page) => ({
+    slug: page.slugs,
+  }));
 }
 
 export async function generateMetadata({
@@ -106,15 +151,13 @@ export async function generateMetadata({
 
   const page = guideSource.getPage(slug);
 
-  if (!page) {
+  if (!page || page.data.draft) {
     notFound();
   }
 
-  return {
-    title: page.data.title,
-    description: page.data.description,
-    alternates: {
-      canonical: page.url,
-    },
-  };
+  return getContentMetadata(page.data, {
+    collectionName: "Guides",
+    path: page.url,
+    type: "guide",
+  });
 }

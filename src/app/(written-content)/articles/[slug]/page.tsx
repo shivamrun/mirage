@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { ContentMetaHeader } from "@/components/content/content-meta";
 import { getMDXComponents } from "@/components/content/mdx-components";
-import { articleSource } from "@/lib/content-source";
+import {
+  getContentJsonLd,
+  getContentMetadata,
+  getJsonLdScriptContent,
+} from "@/lib/content-seo";
+import { articleSource, getArticles } from "@/lib/content-source";
 
 type ArticlePageProps = {
   params: Promise<{
@@ -14,15 +20,23 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const { slug } = await params;
   const page = articleSource.getPage([slug]);
 
-  if (!page) {
+  if (!page || page.data.draft) {
     notFound();
   }
 
   const MDX = page.data.body;
+  const jsonLd = getContentJsonLd(page.data, {
+    collectionName: "Articles",
+    path: page.url,
+    type: "article",
+  });
 
   return (
     <article className="mx-auto w-full max-w-3xl px-6 py-12">
-      <div className="mb-10 space-y-4 border-border border-b pb-8">
+      <script id={`article-json-ld-${slug}`} type="application/ld+json">
+        {getJsonLdScriptContent(jsonLd)}
+      </script>
+      <div className="mb-10 space-y-6">
         <p className="font-medium text-primary text-sm uppercase">
           {page.data.category}
         </p>
@@ -34,14 +48,13 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             {page.data.description}
           </p>
         ) : null}
-        <p className="text-muted-foreground text-sm">
-          {page.data.author} /{" "}
-          {new Date(page.data.date).toLocaleDateString("en", {
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-          })}
-        </p>
+        <ContentMetaHeader
+          author={page.data.author}
+          draft={page.data.draft}
+          featured={page.data.featured}
+          publishedAt={page.data.publishedAt}
+          updatedAt={page.data.updatedAt}
+        />
       </div>
       <div className="content-prose">
         <MDX components={getMDXComponents()} />
@@ -51,7 +64,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 }
 
 export function generateStaticParams() {
-  return articleSource.getPages().map((page) => ({
+  return getArticles().map((page) => ({
     slug: page.slugs[0],
   }));
 }
@@ -62,15 +75,13 @@ export async function generateMetadata({
   const { slug } = await params;
   const page = articleSource.getPage([slug]);
 
-  if (!page) {
+  if (!page || page.data.draft) {
     notFound();
   }
 
-  return {
-    title: page.data.title,
-    description: page.data.description,
-    alternates: {
-      canonical: page.url,
-    },
-  };
+  return getContentMetadata(page.data, {
+    collectionName: "Articles",
+    path: page.url,
+    type: "article",
+  });
 }
