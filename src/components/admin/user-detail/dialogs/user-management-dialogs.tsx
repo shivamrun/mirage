@@ -989,7 +989,7 @@ export function AdminUserImageUpdateDialog({
           <AlertDialogHeader>
             <AlertDialogTitle>Update profile image</AlertDialogTitle>
             <AlertDialogDescription>
-              Change or clear this user's profile image URL.
+              Change or clear this user's stored profile image key.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -1004,9 +1004,8 @@ export function AdminUserImageUpdateDialog({
               <AuthInputField
                 error={form.formState.errors.image?.message}
                 id="admin-user-image"
-                label="Image URL"
-                placeholder="https://example.com/avatar.png"
-                type="url"
+                label="Image key"
+                placeholder="avatars/example.jpg"
                 {...form.register("image")}
               />
             </FieldGroup>

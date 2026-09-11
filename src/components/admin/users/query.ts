@@ -245,7 +245,7 @@ export const ADMIN_USERS_FILTER_FIELD_CONFIGS = {
     operators: textFilterOperators,
     defaultOperator: "contains",
     inputType: "text",
-    placeholder: "https://example.com/avatar.png",
+    placeholder: "avatars/example.jpg",
   },
   role: {
     value: "role",

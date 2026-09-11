@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { normalizeRoles, type RoleValue } from "@/lib/auth/roles";
+import { resolveUploadPublicUrl } from "@/lib/uploads";
 import { cn } from "@/lib/utils";
 
 export type UserRole = RoleValue;
@@ -72,10 +73,15 @@ export function UserAvatar({
   image?: null | string;
   name: string;
 }) {
+  const imageUrl = resolveUploadPublicUrl(
+    image,
+    process.env.NEXT_PUBLIC_UPLOAD_BASE_URL,
+  );
+
   return (
     <Avatar>
-      {image ? (
-        <AvatarImage src={image} alt={name} className="object-cover" />
+      {imageUrl ? (
+        <AvatarImage src={imageUrl} alt={name} className="object-cover" />
       ) : null}
 
       <AvatarFallback>{getInitials(name)}</AvatarFallback>

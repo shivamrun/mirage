@@ -3,6 +3,7 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import {
   authResetPasswordSchema,
   changeEmailSchema,
+  imageKeySchema,
   loginSchema,
   registerSchema,
   requestPasswordResetSchema,
@@ -24,18 +25,24 @@ const authInputSchemas = {
 type ValidationError = {
   flatten: () => {
     formErrors: string[];
-    fieldErrors: Record<string, string[] | undefined>;
+    fieldErrors: unknown;
   };
 };
 
 function getFirstValidationMessage(error: ValidationError) {
   const flattened = error.flatten();
+  const fieldErrors =
+    flattened.fieldErrors &&
+    typeof flattened.fieldErrors === "object" &&
+    !Array.isArray(flattened.fieldErrors)
+      ? Object.values(
+          flattened.fieldErrors as Record<string, string[] | undefined>,
+        )
+          .flat()
+          .find(Boolean)
+      : undefined;
 
-  return (
-    flattened.formErrors[0] ||
-    Object.values(flattened.fieldErrors).flat().find(Boolean) ||
-    "Invalid auth request."
-  );
+  return flattened.formErrors[0] || fieldErrors || "Invalid auth request.";
 }
 
 function throwValidationError(error: ValidationError): never {
@@ -44,8 +51,56 @@ function throwValidationError(error: ValidationError): never {
   });
 }
 
+function parseImageUpdateValue(value: unknown) {
+  return value === null
+    ? imageKeySchema.safeParse("")
+    : imageKeySchema.safeParse(value);
+}
+
 export const authHooks = {
   before: createAuthMiddleware(async (ctx) => {
+    if (ctx.path === "/update-user" && ctx.body && "image" in ctx.body) {
+      const parsed = parseImageUpdateValue(ctx.body.image);
+
+      if (!parsed.success) {
+        throwValidationError(parsed.error);
+      }
+
+      return {
+        context: {
+          body: {
+            ...ctx.body,
+            image: parsed.data,
+          },
+        },
+      };
+    }
+
+    if (
+      ctx.path === "/admin/update-user" &&
+      ctx.body?.data &&
+      typeof ctx.body.data === "object" &&
+      "image" in ctx.body.data
+    ) {
+      const parsed = parseImageUpdateValue(ctx.body.data.image);
+
+      if (!parsed.success) {
+        throwValidationError(parsed.error);
+      }
+
+      return {
+        context: {
+          body: {
+            ...ctx.body,
+            data: {
+              ...ctx.body.data,
+              image: parsed.data,
+            },
+          },
+        },
+      };
+    }
+
     if (ctx.path === "/reset-password") {
       const parsed = authInputSchemas["/reset-password"].safeParse({
         ...ctx.body,

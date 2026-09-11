@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { normalizeRoles } from "@/lib/auth/roles";
+import { resolveUploadPublicUrl } from "@/lib/uploads/server";
 import { cn } from "@/lib/utils";
 import type { AdminUserDetail } from "@/server/db/dal/admin-user-detail";
 import { getInitials } from "../shared/user-display";
@@ -26,6 +27,7 @@ export function AdminUserDetailHeader({
   user,
 }: AdminUserDetailHeaderProps) {
   const detailPath = `/admin/users/${user.id}`;
+  const imageUrl = resolveUploadPublicUrl(user.image);
   const navLinkClass = (section: AdminUserDetailSection) =>
     cn(
       "link-text",
@@ -46,9 +48,7 @@ export function AdminUserDetailHeader({
         <div className="flex min-w-0 flex-col gap-4 rounded-lg border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3 w-full">
             <Avatar shape="rounded" className="size-12 shrink-0">
-              {user.image ? (
-                <AvatarImage src={user.image} alt={user.name} />
-              ) : null}
+              {imageUrl ? <AvatarImage src={imageUrl} alt={user.name} /> : null}
 
               <AvatarFallback className="font-medium text-sm">
                 {getInitials(user.name)}

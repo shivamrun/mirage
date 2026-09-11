@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { authRoles } from "@/lib/auth/roles";
+import { isUploadKey } from "@/lib/uploads";
 
 import { emailSchema } from "./helpers";
 
@@ -62,18 +63,22 @@ export const emailChangeTokenSchema = z.object({
   token: z.string().min(1, "Email change token is required."),
 });
 
+export const imageKeySchema = z
+  .string()
+  .trim()
+  .max(2048, "Image key must be 2048 characters or fewer.")
+  .refine((value) => value === "" || isUploadKey(value), {
+    message: "Image must be a valid uploaded file key.",
+  })
+  .transform((value) => value || null);
+
 export const accountProfileSchema = z.object({
   name: z
     .string()
     .trim()
     .min(1, "Name is required.")
     .max(100, "Name must be 100 characters or fewer."),
-  image: z
-    .string()
-    .trim()
-    .max(2048, "Image URL must be 2048 characters or fewer.")
-    .transform((value) => value || null)
-    .pipe(z.url("Image must be a valid URL.").nullable()),
+  image: imageKeySchema,
 });
 
 export const adminUserNameUpdateSchema = z.object({
@@ -89,12 +94,7 @@ export const adminUserEmailUpdateSchema = z.object({
 });
 
 export const adminUserImageUpdateSchema = z.object({
-  image: z
-    .string()
-    .trim()
-    .max(2048, "Image URL must be 2048 characters or fewer.")
-    .transform((value) => value || null)
-    .pipe(z.url("Image must be a valid URL.").nullable()),
+  image: imageKeySchema,
 });
 
 export const adminUserBanSchema = z.object({
