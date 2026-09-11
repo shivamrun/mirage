@@ -1,4 +1,5 @@
 import { Elysia } from "elysia";
+import { z } from "zod";
 
 import { env } from "@/lib/env";
 import {
@@ -11,6 +12,12 @@ import {
   resolveEmailChangeConfirmationRedirectURL,
 } from "@/server/account/email-change";
 import { getConnectedGoogleAccount } from "@/server/account/google-account";
+import {
+  disableAccountTwoFactor,
+  sendAccountTwoFactorEmailCode,
+  startAccountTwoFactorSetup,
+  verifyAccountTwoFactorSetup,
+} from "@/server/account/two-factor";
 import { changeEmailSchema, emailChangeTokenSchema } from "@/zod";
 
 import { elysiaAuth } from "./auth";
@@ -47,6 +54,14 @@ function isTrustedOriginRequest(request: Request) {
 function validateMutationRequest(request: Request) {
   return isTrustedOriginRequest(request) ? null : forbiddenResponse();
 }
+
+const twoFactorEmailCodeActionSchema = z.object({
+  action: z.enum(["enable", "disable"]),
+});
+
+const twoFactorCodeSchema = z.object({
+  code: z.string().min(1),
+});
 
 // TODO(rate-limit): Throttle email delivery and email-change mutations when
 // application rate limiting is introduced.
@@ -87,6 +102,42 @@ function parseEmailChangeToken(body: unknown) {
   return { token: parsed.data.token };
 }
 
+function parseBody<T>(schema: z.ZodType<T>, body: unknown, fallback: string) {
+  const parsed = schema.safeParse(body && typeof body === "object" ? body : {});
+
+  if (!parsed.success) {
+    const fieldMessage = Object.values(parsed.error.flatten().fieldErrors)
+      .flat()
+      .find((value): value is string => typeof value === "string");
+    const message =
+      parsed.error.flatten().formErrors[0] || fieldMessage || fallback;
+
+    return { error: validationErrorResponse(message) };
+  }
+
+  return { data: parsed.data };
+}
+
+function accountMutationResponse<T extends Record<string, unknown>>(
+  result:
+    | { kind: "error"; message: string; statusCode: number }
+    | ({ kind: "success" } & T),
+) {
+  if (result.kind === "error") {
+    return Response.json(
+      { message: result.message },
+      { status: result.statusCode },
+    );
+  }
+
+  const { kind: _kind, ...data } = result;
+
+  return {
+    status: true,
+    ...data,
+  };
+}
+
 export const accountRoutes = new Elysia({ prefix: "/account" })
   .use(elysiaAuth)
   .get(
@@ -112,6 +163,126 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       return {
         account: connectedAccount,
       };
+    },
+    {
+      auth: true,
+    },
+  )
+  .post(
+    "/two-factor/send-code",
+    async ({ authSession, body, request }) => {
+      const invalidMutationResponse = validateMutationRequest(request);
+
+      if (invalidMutationResponse) {
+        return invalidMutationResponse;
+      }
+
+      const parsed = parseBody(
+        twoFactorEmailCodeActionSchema,
+        body,
+        "Two-factor action is required.",
+      );
+
+      if (parsed.error) {
+        return parsed.error;
+      }
+
+      return accountMutationResponse(
+        await sendAccountTwoFactorEmailCode({
+          action: parsed.data.action,
+          authSession,
+        }),
+      );
+    },
+    {
+      auth: true,
+    },
+  )
+  .post(
+    "/two-factor/start-setup",
+    async ({ authSession, body, request }) => {
+      const invalidMutationResponse = validateMutationRequest(request);
+
+      if (invalidMutationResponse) {
+        return invalidMutationResponse;
+      }
+
+      const parsed = parseBody(
+        twoFactorCodeSchema,
+        body,
+        "Email code is required.",
+      );
+
+      if (parsed.error) {
+        return parsed.error;
+      }
+
+      return accountMutationResponse(
+        await startAccountTwoFactorSetup({
+          authSession,
+          code: parsed.data.code,
+        }),
+      );
+    },
+    {
+      auth: true,
+    },
+  )
+  .post(
+    "/two-factor/verify-setup",
+    async ({ authSession, body, request }) => {
+      const invalidMutationResponse = validateMutationRequest(request);
+
+      if (invalidMutationResponse) {
+        return invalidMutationResponse;
+      }
+
+      const parsed = parseBody(
+        twoFactorCodeSchema,
+        body,
+        "Authenticator code is required.",
+      );
+
+      if (parsed.error) {
+        return parsed.error;
+      }
+
+      return accountMutationResponse(
+        await verifyAccountTwoFactorSetup({
+          authSession,
+          code: parsed.data.code,
+        }),
+      );
+    },
+    {
+      auth: true,
+    },
+  )
+  .post(
+    "/two-factor/disable",
+    async ({ authSession, body, request }) => {
+      const invalidMutationResponse = validateMutationRequest(request);
+
+      if (invalidMutationResponse) {
+        return invalidMutationResponse;
+      }
+
+      const parsed = parseBody(
+        twoFactorCodeSchema,
+        body,
+        "Email code is required.",
+      );
+
+      if (parsed.error) {
+        return parsed.error;
+      }
+
+      return accountMutationResponse(
+        await disableAccountTwoFactor({
+          authSession,
+          code: parsed.data.code,
+        }),
+      );
     },
     {
       auth: true,

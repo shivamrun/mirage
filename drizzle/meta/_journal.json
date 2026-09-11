@@ -71,6 +71,20 @@
       "when": 1789017091519,
       "tag": "0009_unknown_shinobi_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789114301519,
+      "tag": "0010_easy_lilith",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789118153421,
+      "tag": "0011_pale_night_thrasher",
+      "breakpoints": true
     }
   ]
 }

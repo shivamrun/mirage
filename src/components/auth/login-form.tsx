@@ -57,6 +57,18 @@ function LoginForm({
         return;
       }
 
+      if (
+        result.data &&
+        "twoFactorRedirect" in result.data &&
+        result.data.twoFactorRedirect
+      ) {
+        setIsRedirecting(true);
+        router.push(
+          `/two-factor?callbackURL=${encodeURIComponent(redirectTo)}`,
+        );
+        return;
+      }
+
       setIsRedirecting(true);
       router.push(result.data?.url ?? redirectTo);
       router.refresh();

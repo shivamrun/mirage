@@ -10,6 +10,7 @@ import { AccountImpersonationNotice } from "@/components/account/account-imperso
 import { AccountPasswordForm } from "@/components/account/account-password-form";
 import { AccountProfileForm } from "@/components/account/account-profile-form";
 import { AccountSection } from "@/components/account/account-section";
+import { AccountTwoFactorForm } from "@/components/account/account-two-factor-form";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth/client";
 
@@ -140,13 +141,23 @@ function AccountSecurityPage({
       description="Keep your sign-in methods current and control this browser session."
       title="Security"
     >
-      {() => (
+      {({ onSessionRefresh, user }) => (
         <div>
           <AccountSection
             description="Update your password while keeping this session active."
             title="Password"
           >
             <AccountPasswordForm />
+          </AccountSection>
+
+          <AccountSection
+            description="Require a time-based code from an authenticator app after password sign-in."
+            title="Authenticator app"
+          >
+            <AccountTwoFactorForm
+              onSessionRefresh={onSessionRefresh}
+              user={user}
+            />
           </AccountSection>
 
           <AccountSection

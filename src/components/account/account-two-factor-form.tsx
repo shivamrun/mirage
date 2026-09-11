@@ -1,0 +1,392 @@
+"use client";
+
+import { ShieldCheck, ShieldOff } from "lucide-react";
+import * as React from "react";
+import QRCode from "react-qr-code";
+
+import { AuthInputField, AuthStatusMessage } from "@/components/auth";
+import { getUnexpectedAuthErrorMessage } from "@/components/auth/auth-errors";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { FieldGroup } from "@/components/ui/field";
+import { api } from "@/lib/api/client";
+import { cn } from "@/lib/utils";
+
+type TwoFactorUser = {
+  email: string;
+  twoFactorEnabled?: boolean | null;
+};
+
+type StatusMessage = {
+  text: string;
+  tone: "success" | "error" | "info";
+};
+
+type TwoFactorAction = "enable" | "disable";
+
+type AccountTwoFactorFormProps = {
+  onSessionRefresh: () => Promise<void>;
+  user: TwoFactorUser;
+};
+
+function readAccountError(error: { value?: unknown } | null) {
+  const body = error?.value as {
+    message?: string;
+  } | null;
+
+  return body?.message || "Something went wrong. Please try again.";
+}
+
+function AccountTwoFactorForm({
+  onSessionRefresh,
+  user,
+}: AccountTwoFactorFormProps) {
+  const [emailCode, setEmailCode] = React.useState("");
+  const [totpCode, setTotpCode] = React.useState("");
+  const [totpURI, setTotpURI] = React.useState<string>();
+  const [pendingAction, setPendingAction] = React.useState<TwoFactorAction>();
+  const [status, setStatus] = React.useState<StatusMessage>();
+  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [isSendingCode, setIsSendingCode] = React.useState(false);
+  const [isContinuing, setIsContinuing] = React.useState(false);
+  const [isVerifying, setIsVerifying] = React.useState(false);
+  const [isEnabled, setIsEnabled] = React.useState(
+    Boolean(user.twoFactorEnabled),
+  );
+
+  React.useEffect(() => {
+    setIsEnabled(Boolean(user.twoFactorEnabled));
+  }, [user.twoFactorEnabled]);
+
+  async function sendEmailCode(action: TwoFactorAction) {
+    setStatus(undefined);
+    setIsSendingCode(true);
+
+    try {
+      const { error } = await api.api.account["two-factor"]["send-code"].post({
+        action,
+      });
+
+      if (error) {
+        setStatus({ text: readAccountError(error), tone: "error" });
+        return;
+      }
+
+      setEmailCode("");
+      setPendingAction(action);
+    } catch (reason) {
+      setStatus({
+        text: getUnexpectedAuthErrorMessage(reason),
+        tone: "error",
+      });
+    } finally {
+      setIsSendingCode(false);
+    }
+  }
+
+  async function continueWithEmailCode(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    if (!pendingAction) {
+      return;
+    }
+
+    setStatus(undefined);
+    setIsContinuing(true);
+
+    try {
+      if (pendingAction === "enable") {
+        const { data, error } = await api.api.account["two-factor"][
+          "start-setup"
+        ].post({ code: emailCode });
+
+        if (error) {
+          setStatus({ text: readAccountError(error), tone: "error" });
+          return;
+        }
+
+        setTotpURI((data as { totpURI: string }).totpURI);
+        setEmailCode("");
+        setDialogOpen(false);
+        setStatus({
+          text: "Scan the QR code, then confirm the first code from your app.",
+          tone: "info",
+        });
+        return;
+      }
+
+      const { data, error } = await api.api.account["two-factor"].disable.post({
+        code: emailCode,
+      });
+
+      if (error) {
+        setStatus({ text: readAccountError(error), tone: "error" });
+        return;
+      }
+
+      setEmailCode("");
+      setPendingAction(undefined);
+      setDialogOpen(false);
+      setIsEnabled(
+        Boolean((data as { twoFactorEnabled: boolean }).twoFactorEnabled),
+      );
+      await onSessionRefresh();
+      setStatus({
+        text: "Authenticator app sign-in is disabled.",
+        tone: "success",
+      });
+    } catch (reason) {
+      setStatus({
+        text: getUnexpectedAuthErrorMessage(reason),
+        tone: "error",
+      });
+    } finally {
+      setIsContinuing(false);
+    }
+  }
+
+  async function verifySetup(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setStatus(undefined);
+    setIsVerifying(true);
+
+    try {
+      const { data, error } = await api.api.account["two-factor"][
+        "verify-setup"
+      ].post({ code: totpCode });
+
+      if (error) {
+        setStatus({ text: readAccountError(error), tone: "error" });
+        return;
+      }
+
+      setTotpCode("");
+      setTotpURI(undefined);
+      setPendingAction(undefined);
+      setIsEnabled(
+        Boolean((data as { twoFactorEnabled: boolean }).twoFactorEnabled),
+      );
+      await onSessionRefresh();
+      setStatus({
+        text: "Authenticator app sign-in is enabled.",
+        tone: "success",
+      });
+    } catch (reason) {
+      setStatus({
+        text: getUnexpectedAuthErrorMessage(reason),
+        tone: "error",
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  }
+
+  if (totpURI) {
+    return (
+      <div className="flex flex-col gap-5">
+        {status ? (
+          <AuthStatusMessage tone={status.tone}>
+            {status.text}
+          </AuthStatusMessage>
+        ) : null}
+        <div className="flex flex-col gap-5 md:flex-row">
+          <div className="grid size-48 shrink-0 place-items-center rounded-lg border bg-white p-4">
+            <QRCode value={totpURI} size={160} />
+          </div>
+          <div className="min-w-0 flex-1 space-y-3">
+            <p className="text-muted-foreground text-sm leading-6">
+              Add this account in Google Authenticator, Microsoft Authenticator,
+              1Password, Bitwarden, or any compatible authenticator app.
+            </p>
+            <p className="break-all rounded-lg border bg-muted/40 p-3 font-mono text-xs">
+              {totpURI}
+            </p>
+          </div>
+        </div>
+
+        <form className="flex flex-col gap-5" onSubmit={verifySetup}>
+          <FieldGroup>
+            <AuthInputField
+              autoComplete="one-time-code"
+              id="setup-totp-code"
+              inputMode="numeric"
+              label="Authenticator code"
+              maxLength={8}
+              minLength={6}
+              onChange={(event) => setTotpCode(event.target.value)}
+              pattern="[0-9 ]*"
+              placeholder="123456"
+              required
+              value={totpCode}
+            />
+          </FieldGroup>
+          <Button
+            className="w-full sm:w-fit"
+            disabled={isVerifying}
+            type="submit"
+          >
+            <ShieldCheck data-icon="inline-start" />
+            {isVerifying ? "Verifying..." : "Finish setup"}
+          </Button>
+        </form>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <AlertDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+
+          if (!open && !isSendingCode && !isContinuing) {
+            setPendingAction(undefined);
+            setEmailCode("");
+          }
+        }}
+      >
+        <div className="flex items-center justify-between gap-4 border-border/70 border-y py-4">
+          <div className="min-w-0 space-y-1">
+            <p className="font-medium text-sm">
+              {isEnabled ? "Enabled" : "Disabled"}
+            </p>
+            <p className="text-muted-foreground text-sm leading-6">
+              {isEnabled
+                ? "Authenticator codes are required after password sign-in."
+                : "Password sign-in does not require an authenticator code."}
+            </p>
+          </div>
+
+          <AlertDialogTrigger asChild>
+            <button
+              aria-label={
+                isEnabled
+                  ? "Disable authenticator app sign-in"
+                  : "Enable authenticator app sign-in"
+              }
+              aria-checked={isEnabled}
+              className={cn(
+                "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+                isEnabled
+                  ? "border-primary bg-primary"
+                  : "border-input bg-muted",
+              )}
+              disabled={isSendingCode || isContinuing}
+              role="switch"
+              type="button"
+            >
+              <span
+                className={cn(
+                  "block size-5 rounded-full bg-background shadow-sm transition-transform",
+                  isEnabled ? "translate-x-5" : "translate-x-0.5",
+                )}
+              />
+            </button>
+          </AlertDialogTrigger>
+        </div>
+
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingAction
+                ? "Enter email code"
+                : isEnabled
+                  ? "Disable authenticator app?"
+                  : "Enable authenticator app?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingAction
+                ? `Enter the 6-digit code sent to ${user.email}.`
+                : isEnabled
+                  ? `We will send a 6-digit code to ${user.email}. Enter it here to remove authenticator app sign-in from your account.`
+                  : `We will send a 6-digit code to ${user.email}. Enter it here before scanning a QR code with your authenticator app.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {status ? (
+            <AuthStatusMessage className="text-left" tone={status.tone}>
+              {status.text}
+            </AuthStatusMessage>
+          ) : null}
+
+          {pendingAction ? (
+            <form
+              className="flex flex-col gap-5"
+              onSubmit={continueWithEmailCode}
+            >
+              <FieldGroup>
+                <AuthInputField
+                  autoComplete="one-time-code"
+                  id="two-factor-email-code"
+                  inputMode="numeric"
+                  label="Email code"
+                  maxLength={8}
+                  minLength={6}
+                  onChange={(event) => setEmailCode(event.target.value)}
+                  pattern="[0-9 ]*"
+                  placeholder="123456"
+                  required
+                  value={emailCode}
+                />
+              </FieldGroup>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isContinuing}>
+                  Cancel
+                </AlertDialogCancel>
+                <Button
+                  disabled={isContinuing}
+                  type="submit"
+                  variant={pendingAction === "disable" ? "outline" : "default"}
+                >
+                  {pendingAction === "disable" ? (
+                    <ShieldOff data-icon="inline-start" />
+                  ) : (
+                    <ShieldCheck data-icon="inline-start" />
+                  )}
+                  {isContinuing
+                    ? "Checking..."
+                    : pendingAction === "disable"
+                      ? "Disable authenticator"
+                      : "Continue setup"}
+                </Button>
+              </AlertDialogFooter>
+            </form>
+          ) : (
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isSendingCode}>
+                Cancel
+              </AlertDialogCancel>
+              <Button
+                disabled={isSendingCode}
+                onClick={() => sendEmailCode(isEnabled ? "disable" : "enable")}
+                type="button"
+                variant={isEnabled ? "outline" : "default"}
+              >
+                {isEnabled ? (
+                  <ShieldOff data-icon="inline-start" />
+                ) : (
+                  <ShieldCheck data-icon="inline-start" />
+                )}
+                {isSendingCode ? "Sending..." : "Send code"}
+              </Button>
+            </AlertDialogFooter>
+          )}
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+export { AccountTwoFactorForm };

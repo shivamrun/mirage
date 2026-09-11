@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { boolean, index, pgTable, text } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgTable, text } from "drizzle-orm/pg-core";
 
 import {
   auditTimestamps,
@@ -17,6 +17,7 @@ export const user = pgTable("user", {
   ...emailColumn({ unique: true }),
 
   emailVerified: boolean("email_verified").default(false).notNull(),
+  twoFactorEnabled: boolean("two_factor_enabled").default(false).notNull(),
 
   image: text("image"),
 
@@ -97,11 +98,38 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
+export const twoFactor = pgTable(
+  "twoFactor",
+  {
+    id: text("id").primaryKey(),
+
+    secret: text("secret").notNull(),
+    backupCodes: text("backup_codes").notNull(),
+
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, {
+        onDelete: "cascade",
+      }),
+
+    verified: boolean("verified").default(true).notNull(),
+    failedVerificationCount: integer("failed_verification_count")
+      .default(0)
+      .notNull(),
+    lockedUntil: eventTimestamp("locked_until"),
+  },
+  (table) => [
+    index("twoFactor_secret_idx").on(table.secret),
+    index("twoFactor_userId_idx").on(table.userId),
+  ],
+);
+
 // RELATIONS
 
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
+  twoFactors: many(twoFactor),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -114,6 +142,13 @@ export const sessionRelations = relations(session, ({ one }) => ({
 export const accountRelations = relations(account, ({ one }) => ({
   user: one(user, {
     fields: [account.userId],
+    references: [user.id],
+  }),
+}));
+
+export const twoFactorRelations = relations(twoFactor, ({ one }) => ({
+  user: one(user, {
+    fields: [twoFactor.userId],
     references: [user.id],
   }),
 }));

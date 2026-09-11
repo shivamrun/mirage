@@ -1,10 +1,11 @@
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
-import { admin } from "better-auth/plugins";
+import { admin, twoFactor } from "better-auth/plugins";
 
 import { authHooks } from "@/lib/auth/hooks";
 import { authAccessControl, authRolePermissions } from "@/lib/auth/roles";
 import { env } from "@/lib/env";
+import { siteConfig } from "@/lib/metadata";
 import { createAuthDatabaseAdapter } from "@/server/db/dal/auth";
 import {
   sendVerificationEmail as sendAuthVerificationEmail,
@@ -17,6 +18,7 @@ export const isGoogleAuthConfigured = Boolean(
 );
 
 export const auth = betterAuth({
+  appName: siteConfig.name,
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
   trustedOrigins: [env.NEXT_PUBLIC_BASE_URL],
@@ -78,6 +80,9 @@ export const auth = betterAuth({
       ac: authAccessControl,
       roles: authRolePermissions,
       defaultRole: "user",
+    }),
+    twoFactor({
+      issuer: siteConfig.name,
     }),
     nextCookies(),
   ],

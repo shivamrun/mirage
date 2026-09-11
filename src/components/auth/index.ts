@@ -12,3 +12,4 @@ export { LoginForm } from "./login-form";
 export { RegisterForm } from "./register-form";
 export { ResetPasswordForm } from "./reset-password-form";
 export { StopImpersonatingButton } from "./stop-impersonating-button";
+export { TwoFactorForm } from "./two-factor-form";

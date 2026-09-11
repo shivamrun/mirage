@@ -19,6 +19,7 @@ export const user = z.object({
   ...emailColumn(),
 
   emailVerified: z.boolean().default(false),
+  twoFactorEnabled: z.boolean().default(false),
 
   image: nullableText,
 
@@ -73,11 +74,25 @@ export const verification = z.object({
   ...auditTimestamps(),
 });
 
+export const twoFactor = z.object({
+  id: authId,
+
+  secret: z.string().min(1),
+  backupCodes: z.string().min(1),
+
+  userId: authId,
+
+  verified: z.boolean().default(true),
+  failedVerificationCount: z.number().int().default(0),
+  lockedUntil: eventTimestamp("locked_until"),
+});
+
 // RELATIONS
 
 export const userWithRelations = user.extend({
   sessions: z.array(session),
   accounts: z.array(account),
+  twoFactors: z.array(twoFactor),
 });
 
 export const sessionWithRelations = session.extend({
@@ -88,7 +103,12 @@ export const accountWithRelations = account.extend({
   user,
 });
 
+export const twoFactorWithRelations = twoFactor.extend({
+  user,
+});
+
 export type User = z.infer<typeof user>;
 export type Session = z.infer<typeof session>;
 export type Account = z.infer<typeof account>;
 export type Verification = z.infer<typeof verification>;
+export type TwoFactor = z.infer<typeof twoFactor>;
