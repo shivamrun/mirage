@@ -6,6 +6,7 @@ import QRCode from "react-qr-code";
 
 import { AuthInputField, AuthStatusMessage } from "@/components/auth";
 import { getUnexpectedAuthErrorMessage } from "@/components/auth/auth-errors";
+import { HeadingBlock } from "@/components/heading-block";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -217,17 +218,18 @@ function AccountTwoFactorForm({
           }
         }}
       >
-        <div className="flex items-center justify-between gap-4 border-border/70 border-y py-4">
-          <div className="min-w-0 space-y-1">
-            <p className="font-medium text-sm">
-              {isEnabled ? "Enabled" : "Disabled"}
-            </p>
-            <p className="text-muted-foreground text-sm leading-6">
-              {isEnabled
+        <div className="flex items-center justify-between gap-4">
+          <HeadingBlock
+            className="min-w-0"
+            description={
+              isEnabled
                 ? "Authenticator codes are required after password sign-in."
-                : "Password sign-in does not require an authenticator code."}
-            </p>
-          </div>
+                : "Password sign-in does not require an authenticator code."
+            }
+            size="sm"
+            title={isEnabled ? "Enabled" : "Disabled"}
+            titleAs="h3"
+          />
 
           <AlertDialogTrigger asChild>
             <button

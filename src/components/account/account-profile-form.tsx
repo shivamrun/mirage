@@ -6,14 +6,16 @@ import Image from "next/image";
 import * as React from "react";
 import { useForm } from "react-hook-form";
 
-import { AuthInputField, AuthStatusMessage } from "@/components/auth";
+import { AuthStatusMessage } from "@/components/auth";
 import {
   getAuthErrorMessage,
   getUnexpectedAuthErrorMessage,
 } from "@/components/auth/auth-errors";
+import { HeadingBlock } from "@/components/heading-block";
 import { Button } from "@/components/ui/button";
-import { FieldGroup } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { ImageCropper } from "@/components/ui/image-cropper";
+import { InputGroup, InputGroupInput } from "@/components/ui/input-group";
 import { authClient } from "@/lib/auth/client";
 import {
   avatarAcceptedMimeTypes,
@@ -107,6 +109,8 @@ function AccountProfileForm({
   const isCroppingAvatar = Boolean(cropFile);
   const isBusy =
     form.formState.isSubmitting || isUploadingAvatar || isCroppingAvatar;
+  const nameError = form.formState.errors.name?.message;
+  const imageError = form.formState.errors.image?.message;
 
   React.useEffect(() => {
     form.reset({
@@ -239,16 +243,28 @@ function AccountProfileForm({
   return (
     <>
       <form
-        className="flex flex-col gap-5"
+        className="flex flex-col gap-4"
         onSubmit={form.handleSubmit(onSubmit)}
       >
-        <FieldGroup>
-          {status ? (
-            <AuthStatusMessage tone={status.tone}>
-              {status.text}
-            </AuthStatusMessage>
-          ) : null}
-          <div className="flex items-center gap-4">
+        {status ? (
+          <AuthStatusMessage tone={status.tone}>
+            {status.text}
+          </AuthStatusMessage>
+        ) : null}
+
+        <div className="grid gap-4">
+          <HeadingBlock
+            description={
+              typeof uploadProgress === "number"
+                ? `Uploading ${Math.round(uploadProgress)}%`
+                : "Use a JPEG, PNG, or WebP image for your account."
+            }
+            size="sm"
+            title="Profile photo"
+            titleAs="h3"
+          />
+
+          <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 font-semibold text-primary text-xl">
               {shouldShowImage ? (
                 <Image
@@ -269,71 +285,78 @@ function AccountProfileForm({
                 </div>
               ) : null}
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium text-sm">{previewName}</p>
-              <p className="text-muted-foreground text-sm">
-                {typeof uploadProgress === "number"
-                  ? `Uploading ${Math.round(uploadProgress)}%`
-                  : "Profile picture"}
-              </p>
-            </div>
-          </div>
-          <input
-            accept="image/png,image/jpeg,image/webp"
-            className="sr-only"
-            disabled={isBusy}
-            onChange={onAvatarFileChange}
-            ref={fileInputRef}
-            type="file"
-          />
-          <input type="hidden" {...form.register("image")} />
-          <div className="flex flex-wrap gap-2">
-            <Button
-              disabled={isBusy}
-              onClick={() => fileInputRef.current?.click()}
-              type="button"
-              variant="outline"
-            >
-              <ImageUp data-icon="inline-start" />
-              Choose avatar
-            </Button>
-            {previewImage ? (
+
+            <div className="flex flex-wrap gap-2">
               <Button
                 disabled={isBusy}
-                onClick={clearAvatar}
+                onClick={() => fileInputRef.current?.click()}
                 type="button"
                 variant="outline"
               >
-                <Trash2 data-icon="inline-start" />
-                Clear
+                <ImageUp data-icon="inline-start" />
+                Update
               </Button>
-            ) : null}
-            {previewImage !== (user.image ?? "") ? (
-              <Button
-                disabled={isBusy}
-                onClick={resetAvatar}
-                type="button"
-                variant="ghost"
-              >
-                <RotateCcw data-icon="inline-start" />
-                Reset
-              </Button>
-            ) : null}
+              {previewImage ? (
+                <Button
+                  disabled={isBusy}
+                  onClick={clearAvatar}
+                  type="button"
+                  variant="outline"
+                >
+                  <Trash2 data-icon="inline-start" />
+                  Clear
+                </Button>
+              ) : null}
+              {previewImage !== (user.image ?? "") ? (
+                <Button
+                  disabled={isBusy}
+                  onClick={resetAvatar}
+                  type="button"
+                  variant="ghost"
+                >
+                  <RotateCcw data-icon="inline-start" />
+                  Reset
+                </Button>
+              ) : null}
+            </div>
           </div>
-          {form.formState.errors.image?.message ? (
-            <p className="text-destructive text-sm">
-              {form.formState.errors.image.message}
+        </div>
+
+        <input
+          accept="image/png,image/jpeg,image/webp"
+          className="sr-only"
+          disabled={isBusy}
+          onChange={onAvatarFileChange}
+          ref={fileInputRef}
+          type="file"
+        />
+        <input type="hidden" {...form.register("image")} />
+
+        {imageError ? <FieldError>{imageError}</FieldError> : null}
+
+        <Field className="grid gap-4 pt-4" data-invalid={Boolean(nameError)}>
+          <div>
+            <FieldLabel htmlFor="name" className="font-medium text-sm">
+              Name
+            </FieldLabel>
+            <p className="mt-0.5 text-muted-foreground text-sm leading-5">
+              This name appears on your account and profile.
             </p>
-          ) : null}
-          <AuthInputField
-            id="name"
-            label="Name"
-            error={form.formState.errors.name?.message}
-            placeholder="Your name"
-            required
-            {...form.register("name")}
-          />
-        </FieldGroup>
+          </div>
+          <div className="space-y-2">
+            <InputGroup>
+              <InputGroupInput
+                id="name"
+                aria-invalid={Boolean(nameError) || undefined}
+                placeholder="Your name"
+                required
+                {...form.register("name")}
+              />
+            </InputGroup>
+            {nameError ? <FieldError>{nameError}</FieldError> : null}
+          </div>
+        </Field>
+
         <Button className="w-full sm:w-fit" disabled={isBusy} type="submit">
           {form.formState.isSubmitting ? (
             <LoaderCircle data-icon="inline-start" className="animate-spin" />

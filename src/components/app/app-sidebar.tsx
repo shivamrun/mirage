@@ -44,7 +44,7 @@ const userData = {
       icon: UserRound,
       items: [
         {
-          title: "Update profile",
+          title: "Profile",
           url: "/account/profile",
         },
         {

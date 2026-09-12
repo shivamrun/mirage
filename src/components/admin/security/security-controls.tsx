@@ -4,7 +4,10 @@ import { KeyRound, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
-import { AccountSection } from "@/components/account/account-section";
+import {
+  AccountSection,
+  AccountSectionStack,
+} from "@/components/account/account-section";
 import { AuthStatusMessage, EmailField } from "@/components/auth";
 import { getUnexpectedAuthErrorMessage } from "@/components/auth/auth-errors";
 import {
@@ -38,12 +41,12 @@ export function SecurityControls({
   summary: SecurityControlSummary;
 }) {
   return (
-    <div>
+    <AccountSectionStack>
       <AccountSection
         description="Review the current session and ban counts before taking broader security action."
         title="Security snapshot"
       >
-        <dl className="divide-y divide-border/70 border-border/70 border-y">
+        <dl className="grid gap-3">
           <SummaryRow label="Active sessions" value={summary.activeSessions} />
           <SummaryRow label="Stored sessions" value={summary.totalSessions} />
           <SummaryRow label="Active bans" value={summary.activeBans} />
@@ -64,7 +67,7 @@ export function SecurityControls({
       >
         <GlobalSessionRevokePanel activeSessions={summary.activeSessions} />
       </AccountSection>
-    </div>
+    </AccountSectionStack>
   );
 }
 
@@ -200,51 +203,55 @@ function GlobalSessionRevokePanel({
         </AuthStatusMessage>
       ) : null}
 
-      <div className="border-border/70 border-y py-3 text-sm">
-        <span className="font-medium">{activeSessions}</span>{" "}
-        <span className="text-muted-foreground">active sessions now</span>
-      </div>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <span className="font-medium text-base">{activeSessions}</span>{" "}
+          <span className="text-muted-foreground text-sm">
+            active sessions now
+          </span>
+        </div>
 
-      <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogTrigger asChild>
-          <Button className="w-full" type="button" variant="destructive">
-            <LogOut data-icon="inline-start" />
-            Revoke globally
-          </Button>
-        </AlertDialogTrigger>
-
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Revoke every session?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This signs out every user, including the current admin session.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSubmitting}>
-              Cancel
-            </AlertDialogCancel>
-
-            <Button
-              disabled={isSubmitting}
-              onClick={revokeAllSessions}
-              type="button"
-              variant="destructive"
-            >
+        <AlertDialog open={open} onOpenChange={setOpen}>
+          <AlertDialogTrigger asChild>
+            <Button type="button" variant="destructive">
               <LogOut data-icon="inline-start" />
-              {isSubmitting ? "Revoking..." : "Revoke sessions"}
+              Revoke globally
             </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          </AlertDialogTrigger>
+
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Revoke every session?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This signs out every user, including the current admin session.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isSubmitting}>
+                Cancel
+              </AlertDialogCancel>
+
+              <Button
+                disabled={isSubmitting}
+                onClick={revokeAllSessions}
+                type="button"
+                variant="destructive"
+              >
+                <LogOut data-icon="inline-start" />
+                {isSubmitting ? "Revoking..." : "Revoke sessions"}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </div>
   );
 }
 
 function SummaryRow({ label, value }: { label: string; value: number }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-3 text-sm">
+    <div className="flex items-center justify-between gap-4 py-1.5 text-sm">
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="font-medium">{value.toLocaleString()}</dd>
     </div>

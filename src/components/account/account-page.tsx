@@ -9,8 +9,12 @@ import { AccountEmailManager } from "@/components/account/account-email-manager"
 import { AccountImpersonationNotice } from "@/components/account/account-impersonation-notice";
 import { AccountPasswordForm } from "@/components/account/account-password-form";
 import { AccountProfileForm } from "@/components/account/account-profile-form";
-import { AccountSection } from "@/components/account/account-section";
+import {
+  AccountSection,
+  AccountSectionStack,
+} from "@/components/account/account-section";
 import { AccountTwoFactorForm } from "@/components/account/account-two-factor-form";
+import { HeadingBlock } from "@/components/heading-block";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth/client";
 
@@ -56,15 +60,15 @@ function AccountPageShell({
 
   return (
     <main className="w-full">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-        <header className="max-w-2xl space-y-2">
-          <h1 className="font-semibold text-2xl tracking-normal sm:text-3xl">
-            {title}
-          </h1>
-          <p className="text-muted-foreground text-sm leading-6">
-            {description}
-          </p>
-        </header>
+      <div className="mx-auto flex w-full max-w-5xl pt-6 pb-14 flex-col gap-6">
+        <HeadingBlock
+          as="header"
+          className="px-6 py-4"
+          description={description}
+          size="xl"
+          title={title}
+          titleAs="h1"
+        />
 
         <AccountImpersonationNotice impersonatedBy={impersonatedBy} />
 
@@ -88,7 +92,7 @@ function AccountProfilePage({
       title="Profile"
     >
       {({ onSessionRefresh, user }) => (
-        <div>
+        <AccountSectionStack>
           <AccountSection
             description="Update the name and profile image shown on your account."
             title="Personal details"
@@ -109,7 +113,7 @@ function AccountProfilePage({
               user={user}
             />
           </AccountSection>
-        </div>
+        </AccountSectionStack>
       )}
     </AccountPageShell>
   );
@@ -138,14 +142,14 @@ function AccountSecurityPage({
 
   return (
     <AccountPageShell
-      description="Keep your sign-in methods current and control this browser session."
       title="Security"
+      description="Keep your sign-in methods current and control this browser session."
     >
       {({ onSessionRefresh, user }) => (
-        <div>
+        <AccountSectionStack>
           <AccountSection
+            title="Update Password"
             description="Update your password while keeping this session active."
-            title="Password"
           >
             <AccountPasswordForm />
           </AccountSection>
@@ -161,8 +165,8 @@ function AccountSecurityPage({
           </AccountSection>
 
           <AccountSection
+            title="Linked Accounts"
             description="Manage Google as an additional sign-in method."
-            title="Google sign-in"
           >
             <AccountConnectedAccounts
               googleAuthEnabled={googleAuthEnabled}
@@ -170,22 +174,27 @@ function AccountSecurityPage({
             />
           </AccountSection>
 
-          <AccountSection
-            description="End this browser session and return to sign in."
-            title="Log out"
-          >
-            <Button
-              className="w-full"
-              disabled={isSigningOut}
-              onClick={signOut}
-              type="button"
-              variant="outline"
-            >
-              <LogOut data-icon="inline-start" />
-              {isSigningOut ? "Signing out..." : "Log out"}
-            </Button>
+          <AccountSection title="Sessions">
+            <div className="flex items-center justify-between gap-4">
+              <HeadingBlock
+                className="min-w-0"
+                description="End this browser session and return to sign in."
+                size="sm"
+                title="Log Out"
+                titleAs="h3"
+              />
+              <Button
+                disabled={isSigningOut}
+                onClick={signOut}
+                type="button"
+                variant="outline"
+              >
+                <LogOut data-icon="inline-start" />
+                {isSigningOut ? "Signing out..." : "Log out"}
+              </Button>
+            </div>
           </AccountSection>
-        </div>
+        </AccountSectionStack>
       )}
     </AccountPageShell>
   );

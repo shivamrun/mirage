@@ -4,5 +4,5 @@ export { AccountImpersonationNotice } from "./account-impersonation-notice";
 export { AccountProfilePage, AccountSecurityPage } from "./account-page";
 export { AccountPasswordForm } from "./account-password-form";
 export { AccountProfileForm } from "./account-profile-form";
-export { AccountSection } from "./account-section";
+export { AccountSection, AccountSectionStack } from "./account-section";
 export { AccountTwoFactorForm } from "./account-two-factor-form";

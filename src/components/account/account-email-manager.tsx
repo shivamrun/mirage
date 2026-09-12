@@ -288,7 +288,9 @@ function AccountEmailManager({
         onSubmit={form.handleSubmit(onSubmit)}
       >
         <Field data-invalid={Boolean(error)}>
-          <FieldLabel htmlFor="newEmail">Email</FieldLabel>
+          <FieldLabel htmlFor="newEmail" className="sr-only">
+            Email
+          </FieldLabel>
           <InputGroup className="h-10 pr-2">
             <InputGroupInput
               id="newEmail"

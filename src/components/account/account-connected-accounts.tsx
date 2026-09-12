@@ -1,6 +1,6 @@
 "use client";
 
-import { Link2, RefreshCw, Unlink } from "lucide-react";
+import { RefreshCw, Unlink } from "lucide-react";
 import * as React from "react";
 import {
   getAuthErrorMessage,
@@ -8,8 +8,9 @@ import {
 } from "@/components/auth/auth-errors";
 import { AuthStatusMessage } from "@/components/auth/auth-form-shell";
 import { GoogleIcon } from "@/components/auth/google-auth-button";
+import { HeadingBlock } from "@/components/heading-block";
 import { Button } from "@/components/ui/button";
-import { FieldDescription, FieldSet } from "@/components/ui/field";
+import { FieldSet } from "@/components/ui/field";
 import { api } from "@/lib/api/client";
 import { authClient } from "@/lib/auth/client";
 
@@ -199,30 +200,45 @@ function AccountConnectedAccounts({
       ) : null}
 
       {!isLoading && !googleAccount ? (
-        <div className="border-border/70 border-y py-3">
-          <p className="font-medium text-sm">No Google account connected</p>
-          <FieldDescription>
-            {googleAuthEnabled
-              ? "Connect Google to sign in with that account."
-              : "Google sign-in is not configured yet."}
-          </FieldDescription>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <HeadingBlock
+            className="min-w-0"
+            description={
+              googleAuthEnabled
+                ? "Connect Google to sign in with that account."
+                : "Google sign-in is not configured yet."
+            }
+            size="sm"
+            title="No Google account connected"
+            titleAs="h3"
+          />
+          <Button
+            className="w-full sm:w-fit"
+            disabled={!googleAuthEnabled || isConnecting}
+            onClick={connectGoogleAccount}
+            type="button"
+            variant="outline"
+          >
+            <GoogleIcon />
+            {isConnecting ? "Opening Google..." : "Connect"}
+          </Button>
         </div>
       ) : null}
 
       {googleAccount ? (
-        <div className="flex items-start justify-between gap-3 border-border/70 border-y py-3">
-          <div className="flex min-w-0 items-start gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-border/70">
               <GoogleIcon />
             </div>
-            <div className="min-w-0">
-              <p className="truncate font-medium text-sm">
-                {formatAccountLabel(googleAccount)}
-              </p>
-              <FieldDescription>
-                {formatConnectedDate(googleAccount.createdAt)}
-              </FieldDescription>
-            </div>
+            <HeadingBlock
+              className="min-w-0"
+              description={formatConnectedDate(googleAccount.createdAt)}
+              size="sm"
+              title={formatAccountLabel(googleAccount)}
+              titleAs="p"
+              titleClassName="truncate"
+            />
           </div>
           <Button
             aria-label={`Disconnect ${formatAccountLabel(googleAccount)}`}
@@ -240,21 +256,6 @@ function AccountConnectedAccounts({
           </Button>
         </div>
       ) : null}
-
-      <Button
-        className="w-full"
-        disabled={!googleAuthEnabled || Boolean(googleAccount) || isConnecting}
-        onClick={connectGoogleAccount}
-        type="button"
-        variant="outline"
-      >
-        <Link2 data-icon="inline-start" />
-        {isConnecting
-          ? "Opening Google..."
-          : googleAccount
-            ? "Google account connected"
-            : "Connect Google account"}
-      </Button>
     </FieldSet>
   );
 }

@@ -1,23 +1,33 @@
 import type * as React from "react";
 
+import { HeadingBlock } from "@/components/heading-block";
+
+function AccountSectionStack({ children }: { children: React.ReactNode }) {
+  return <div className="grid gap-y-8">{children}</div>;
+}
+
 function AccountSection({
   children,
   description,
   title,
 }: {
   children: React.ReactNode;
-  description: string;
+  description?: string;
   title: string;
 }) {
   return (
-    <section className="grid gap-4 py-6 first:pt-0 md:gap-8 max-w-3xl">
-      <div className="min-w-0 space-y-1">
-        <h2 className="font-medium text-base">{title}</h2>
-        <p className="text-muted-foreground text-sm leading-6">{description}</p>
+    <section className="max-w-3xl overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+      <div className="border-border border-b bg-muted/45 px-6 py-4">
+        <HeadingBlock
+          description={description}
+          size="md"
+          title={title}
+          titleAs="h2"
+        />
       </div>
-      <div className="min-w-0">{children}</div>
+      <div className="bg-card px-6 py-5">{children}</div>
     </section>
   );
 }
 
-export { AccountSection };
+export { AccountSection, AccountSectionStack };

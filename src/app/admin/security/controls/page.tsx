@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 
 import { SecurityControls } from "@/components/admin";
+import { HeadingBlock } from "@/components/heading-block";
 import { requireAdmin } from "@/lib/auth/access";
 import { getPageMetadata } from "@/lib/metadata";
 import { getSecurityControlSummary } from "@/server/db/dal/security";
@@ -19,15 +20,15 @@ export default async function AdminSecurityControlsPage() {
   const summary = await getSecurityControlSummary();
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-      <header className="max-w-2xl space-y-2">
-        <h1 className="font-semibold text-2xl tracking-normal sm:text-3xl">
-          Security Controls
-        </h1>
-        <p className="text-muted-foreground text-sm leading-6">
-          Force password resets and respond to account-wide session incidents.
-        </p>
-      </header>
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 pt-6 pb-14 ">
+      <HeadingBlock
+        as="header"
+        className="px-6 py-4"
+        description="Force password resets and respond to account-wide session incidents."
+        size="xl"
+        title="Security Controls"
+        titleAs="h1"
+      />
 
       <SecurityControls summary={summary} />
     </div>
