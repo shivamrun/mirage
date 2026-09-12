@@ -39,7 +39,7 @@ The default test URL is `postgres://postgres:postgres@127.0.0.1:5433/mirage_test
    - [x] An email-list verification token cannot be used twice, including by simultaneous requests.
    - [x] A failed verification email has a clear retry path and does not remove another request's pending signup.
 
-   The local limits use a keyed digest of the submitted email and live in process memory. Add a shared edge limit based on a trusted client IP source when the hosting provider and proxy configuration are defined; the local limit alone does not cover requests distributed across instances or changing email addresses.
+   The application limits now use keyed digests and Postgres counters shared across instances. Per-destination budgets are supplemented by separate per-flow global ceilings while no trusted client IP source is available. Replace or supplement those ceilings with a trusted edge/client-IP budget when the hosting provider and proxy configuration are defined.
 
 5. **Admin account and session deletion** — `src/server/routes/admin/index.ts` and `src/server/db/dal/admin-user-detail.ts`.
    - [x] An admin cannot delete an account or session by pairing one user's ID with another user's row ID.

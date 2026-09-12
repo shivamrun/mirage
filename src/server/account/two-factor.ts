@@ -21,6 +21,7 @@ import {
   verifyAndConsumeEmailCode,
 } from "@/server/db/dal/two-factor";
 import { sendTwoFactorEmailCode } from "@/server/email";
+import { consumeAccountEmailSendLimit } from "@/server/rate-limit";
 import type { AuthSession } from "@/server/routes/auth";
 
 const EMAIL_CODE_PREFIX = "account-two-factor-email-code";
@@ -33,7 +34,12 @@ const TOTP_WINDOW_STEPS = 1;
 type TwoFactorAction = "enable" | "disable";
 
 type TwoFactorMutationResult<T extends object = object> =
-  | { kind: "error"; message: string; statusCode: number }
+  | {
+      kind: "error";
+      message: string;
+      retryAfterSeconds?: number;
+      statusCode: number;
+    }
   | ({ kind: "success" } & T);
 
 type EmailCodeValue = {
@@ -139,6 +145,21 @@ export async function sendAccountTwoFactorEmailCode({
       kind: "error",
       message: "Authenticator app sign-in is already disabled.",
       statusCode: 400,
+    };
+  }
+
+  const rateLimit = await consumeAccountEmailSendLimit({
+    accountId: authSession.user.id,
+    destination: authSession.user.email,
+    flow: "two-factor",
+    variant: action,
+  });
+  if (!rateLimit.allowed) {
+    return {
+      kind: "error",
+      message: "Please wait before requesting another two-factor email code.",
+      retryAfterSeconds: rateLimit.retryAfterSeconds,
+      statusCode: 429,
     };
   }
 

@@ -21,6 +21,7 @@ import {
 import { changeEmailSchema, emailChangeTokenSchema } from "@/zod";
 
 import { elysiaAuth } from "./auth";
+import { type MutationError, mutationErrorResponse } from "./responses";
 
 function validationErrorResponse(message: string) {
   return Response.json({ message }, { status: 400 });
@@ -62,9 +63,6 @@ const twoFactorEmailCodeActionSchema = z.object({
 const twoFactorCodeSchema = z.object({
   code: z.string().min(1),
 });
-
-// TODO(rate-limit): Throttle email delivery and email-change mutations when
-// application rate limiting is introduced.
 
 function emailChangePageURL({
   action,
@@ -119,15 +117,10 @@ function parseBody<T>(schema: z.ZodType<T>, body: unknown, fallback: string) {
 }
 
 function accountMutationResponse<T extends Record<string, unknown>>(
-  result:
-    | { kind: "error"; message: string; statusCode: number }
-    | ({ kind: "success" } & T),
+  result: ({ kind: "error" } & MutationError) | ({ kind: "success" } & T),
 ) {
   if (result.kind === "error") {
-    return Response.json(
-      { message: result.message },
-      { status: result.statusCode },
-    );
+    return mutationErrorResponse(result);
   }
 
   const { kind: _kind, ...data } = result;
@@ -345,6 +338,14 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       token: parsed.token,
     });
 
+    if (result.retryAfterSeconds) {
+      return mutationErrorResponse({
+        message: "Please wait before requesting another email change message.",
+        retryAfterSeconds: result.retryAfterSeconds,
+        statusCode: 429,
+      });
+    }
+
     return {
       status: true,
       redirectURL: result.redirectURL,
@@ -381,10 +382,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       });
 
       if (result.kind === "error") {
-        return Response.json(
-          { message: result.message },
-          { status: result.statusCode },
-        );
+        return mutationErrorResponse(result);
       }
 
       return {
@@ -410,10 +408,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       });
 
       if (result.kind === "error") {
-        return Response.json(
-          { message: result.message },
-          { status: result.statusCode },
-        );
+        return mutationErrorResponse(result);
       }
 
       return {
@@ -440,10 +435,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       });
 
       if (result.kind === "error") {
-        return Response.json(
-          { message: result.message },
-          { status: result.statusCode },
-        );
+        return mutationErrorResponse(result);
       }
 
       return {
@@ -469,10 +461,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       });
 
       if (result.kind === "error") {
-        return Response.json(
-          { message: result.message },
-          { status: result.statusCode },
-        );
+        return mutationErrorResponse(result);
       }
 
       return {

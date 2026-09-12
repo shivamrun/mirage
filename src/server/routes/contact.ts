@@ -2,12 +2,9 @@ import { Elysia } from "elysia";
 
 import { env } from "@/lib/env";
 import { createContactSubmission } from "@/server/db/dal/contact-submission";
+import { consumePublicWriteLimit } from "@/server/rate-limit";
 import { contactSubmissionSchema } from "@/zod";
-import { getPublicRateLimitKey } from "./public-rate-limit";
-
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
-const RATE_LIMIT_MAX_SUBMISSIONS = 5;
-const contactRateLimits = new Map<string, { count: number; resetAt: number }>();
+import { rateLimitResponse } from "./responses";
 
 function validationErrorResponse(message: string) {
   return Response.json({ message }, { status: 400 });
@@ -15,41 +12,6 @@ function validationErrorResponse(message: string) {
 
 function forbiddenResponse() {
   return Response.json({ message: "Invalid request origin." }, { status: 403 });
-}
-
-function rateLimitResponse() {
-  return Response.json(
-    { message: "Too many contact submissions. Please try again later." },
-    { status: 429 },
-  );
-}
-
-function checkRateLimit(email: string) {
-  const now = Date.now();
-  const identifier = getPublicRateLimitKey(email);
-
-  for (const [key, entry] of contactRateLimits) {
-    if (entry.resetAt <= now) {
-      contactRateLimits.delete(key);
-    }
-  }
-
-  const current = contactRateLimits.get(identifier);
-
-  if (!current || current.resetAt <= now) {
-    contactRateLimits.set(identifier, {
-      count: 1,
-      resetAt: now + RATE_LIMIT_WINDOW_MS,
-    });
-    return null;
-  }
-
-  if (current.count >= RATE_LIMIT_MAX_SUBMISSIONS) {
-    return rateLimitResponse();
-  }
-
-  current.count += 1;
-  return null;
 }
 
 function isTrustedOriginRequest(request: Request) {
@@ -105,9 +67,15 @@ export const contactRoutes = new Elysia({ prefix: "/contact" }).post(
       return { status: true };
     }
 
-    const rateLimitError = checkRateLimit(parsed.data.email);
-    if (rateLimitError) {
-      return rateLimitError;
+    const rateLimit = await consumePublicWriteLimit({
+      destination: parsed.data.email,
+      flow: "contact",
+    });
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(
+        "Too many contact submissions. Please try again later.",
+        rateLimit.retryAfterSeconds,
+      );
     }
 
     await createContactSubmission(parsed.data);

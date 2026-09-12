@@ -7,7 +7,12 @@ import { describe, expect, it } from "vitest";
 import { env } from "@/lib/env";
 import { siteConfig } from "@/lib/metadata";
 import db from "@/server/db";
-import { twoFactor, user, verification } from "@/server/db/schema";
+import {
+  applicationRateLimit,
+  twoFactor,
+  user,
+  verification,
+} from "@/server/db/schema";
 import { accountRoutes } from "@/server/routes/account";
 import { createTestActor } from "./infra/admin-actor";
 import { testEmailOutbox } from "./infra/email-fake";
@@ -25,6 +30,7 @@ async function post(path: string, body: object, cookie: string) {
   );
   return {
     status: response.status,
+    retryAfter: response.headers.get("retry-after"),
     body: (await response.json()) as Record<string, unknown>,
   };
 }
@@ -56,6 +62,27 @@ async function codeRecord(userId: string, action: "enable" | "disable") {
 }
 
 describe("two-factor authentication", () => {
+  it("throttles repeated email-code sends", async () => {
+    const actor = await createTestActor();
+    expect(
+      (await post("/send-code", { action: "enable" }, actor.cookie)).status,
+    ).toBe(200);
+
+    const limited = await post(
+      "/send-code",
+      { action: "enable" },
+      actor.cookie,
+    );
+    expect(limited.status).toBe(429);
+    expect(Number(limited.retryAfter)).toBeGreaterThan(0);
+    expect(
+      testEmailOutbox.filter(
+        (entry) =>
+          entry.to === actor.email && entry.text.includes("Your code is:"),
+      ),
+    ).toHaveLength(1);
+  });
+
   it("counts wrong email codes and locks out the fifth failure", async () => {
     const actor = await createTestActor();
     expect(
@@ -96,6 +123,9 @@ describe("two-factor authentication", () => {
     ).toBe(400);
     expect(await codeRecord(actor.id, "enable")).toBeUndefined();
 
+    await db
+      .update(applicationRateLimit)
+      .set({ resetAt: new Date(Date.now() - 1000) });
     await post("/send-code", { action: "enable" }, actor.cookie);
     const code = latestEmailCode(actor.email);
     expect((await post("/start-setup", { code }, actor.cookie)).status).toBe(

@@ -52,6 +52,8 @@ These are deployable slices, not a single rewrite. Fixes within a phase can be s
 
 ### 1B. Replace process-local limits and throttle email sends
 
+**Status (2026-09-13): Complete at the application layer.** Public contact and signup budgets are stored in Postgres and shared by all app instances. Account verification, both stages of email-change delivery, and 2FA sends have durable per-account and per-destination cooldowns. Better Auth's client-request limiter also uses database storage instead of process memory. All custom-route `429` responses include `Retry-After`, application limiter identifiers are keyed digests, and expired application counters are pruned in bounded batches. Because no host is selected yet, forwarded IP headers remain deliberately untrusted; each public flow also has a generous global ceiling until Phase 0 records a provider-verified client identity.
+
 **Why:** Public contact and signup limits are local Maps and use forwarded headers; custom 2FA/email-change sends have no application throttle (`src/server/routes/contact.ts`, `email-list.ts`, `account.ts`, `src/server/account/two-factor.ts`). Replicas or restarts make Map limits unreliable, and header spoofing depends on proxy behavior.
 
 **What:** Enforce a shared budget for public writes and a per-account/per-destination cooldown for email-sending actions. Define separate thresholds for contact, list signup and 2FA/account email to avoid one flow starving another.

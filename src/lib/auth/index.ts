@@ -22,6 +22,10 @@ export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
   trustedOrigins: [env.NEXT_PUBLIC_BASE_URL],
+  rateLimit: {
+    enabled: env.NODE_ENV !== "development",
+    storage: "database",
+  },
   account: {
     accountLinking: {
       allowDifferentEmails: true,

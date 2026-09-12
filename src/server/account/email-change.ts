@@ -14,6 +14,7 @@ import {
   replaceApprovalWithPending,
 } from "@/server/db/dal/email-change";
 import { sendVerificationEmail } from "@/server/email";
+import { consumeAccountEmailSendLimit } from "@/server/rate-limit";
 import type { AuthSession } from "@/server/routes/auth";
 import type { ChangeEmailValues } from "@/zod";
 
@@ -41,7 +42,12 @@ type AccountEmailState = {
 };
 
 type AccountEmailMutationResult =
-  | { kind: "error"; message: string; statusCode: number }
+  | {
+      kind: "error";
+      message: string;
+      retryAfterSeconds?: number;
+      statusCode: number;
+    }
   | {
       kind: "success";
       value: {
@@ -57,6 +63,7 @@ type EmailChangeConfirmationResult = {
   notificationEmail: string | null;
   notificationUserId: string | null;
   redirectURL: string;
+  retryAfterSeconds?: number;
 };
 
 function createToken() {
@@ -304,6 +311,24 @@ export async function changeAccountEmail({
     };
   }
 
+  const deliveryDestination = authSession.user.emailVerified
+    ? authSession.user.email
+    : body.newEmail;
+  const rateLimit = await consumeAccountEmailSendLimit({
+    accountId: authSession.user.id,
+    destination: deliveryDestination,
+    flow: "email-change",
+    variant: authSession.user.emailVerified ? "approval" : "confirmation",
+  });
+  if (!rateLimit.allowed) {
+    return {
+      kind: "error",
+      message: "Please wait before requesting another email change message.",
+      retryAfterSeconds: rateLimit.retryAfterSeconds,
+      statusCode: 429,
+    };
+  }
+
   const createPendingChange = authSession.user.emailVerified
     ? createPendingEmailChangeApproval
     : createPendingEmailChange;
@@ -373,6 +398,21 @@ export async function resolveEmailChangeApprovalRedirectURL({
       notificationEmail: null,
       notificationUserId: null,
       redirectURL: createAccountRedirectURL("invalid"),
+    };
+  }
+
+  const rateLimit = await consumeAccountEmailSendLimit({
+    accountId: pendingChange.userId,
+    destination: pendingChange.newEmail,
+    flow: "email-change",
+    variant: "confirmation",
+  });
+  if (!rateLimit.allowed) {
+    return {
+      notificationEmail: null,
+      notificationUserId: null,
+      redirectURL: createAccountRedirectURL("pending"),
+      retryAfterSeconds: rateLimit.retryAfterSeconds,
     };
   }
 
@@ -446,6 +486,21 @@ export async function resendPendingEmailChangeVerification({
     };
   }
 
+  const rateLimit = await consumeAccountEmailSendLimit({
+    accountId: authSession.user.id,
+    destination: pendingChange.newEmail,
+    flow: "email-change",
+    variant: "confirmation",
+  });
+  if (!rateLimit.allowed) {
+    return {
+      kind: "error",
+      message: "Please wait before requesting another email change message.",
+      retryAfterSeconds: rateLimit.retryAfterSeconds,
+      statusCode: 429,
+    };
+  }
+
   await sendPendingEmailChangeConfirmation(pendingChange);
 
   return {
@@ -472,6 +527,20 @@ export async function resendAccountVerification({
       kind: "error",
       message: "Email is already verified.",
       statusCode: 400,
+    };
+  }
+
+  const rateLimit = await consumeAccountEmailSendLimit({
+    accountId: authSession.user.id,
+    destination: authSession.user.email,
+    flow: "email-verification",
+  });
+  if (!rateLimit.allowed) {
+    return {
+      kind: "error",
+      message: "Please wait before requesting another verification email.",
+      retryAfterSeconds: rateLimit.retryAfterSeconds,
+      statusCode: 429,
     };
   }
 

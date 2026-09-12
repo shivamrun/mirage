@@ -1,0 +1,1 @@
+CREATE INDEX "rate_limit_reset_at_idx" ON "mirage_rate_limit" USING btree ("reset_at");

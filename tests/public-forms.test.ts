@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import db from "@/server/db";
 import {
+  applicationRateLimit,
   contactSubmission,
   emailContact,
   emailSubscription,
@@ -17,9 +18,13 @@ import { emailListRoutes } from "@/server/routes/email-list";
 import { setTestEmailDeliveryHook, testEmailOutbox } from "./infra/email-fake";
 
 const origin = "http://localhost:3000";
-const app = new Elysia({ adapter: node(), prefix: "/api" })
-  .use(contactRoutes)
-  .use(emailListRoutes);
+function createApp() {
+  return new Elysia({ adapter: node(), prefix: "/api" })
+    .use(contactRoutes)
+    .use(emailListRoutes);
+}
+
+const app = createApp();
 
 function email() {
   return `test-${randomUUID()}@example.com`;
@@ -29,8 +34,9 @@ function formRequest(
   path: string,
   body: object,
   extraHeaders: Record<string, string> = {},
+  target = app,
 ) {
-  return app.fetch(
+  return target.fetch(
     new Request(`${origin}/api${path}`, {
       method: "POST",
       headers: { "content-type": "application/json", origin, ...extraHeaders },
@@ -114,23 +120,29 @@ describe("public contact and email signup", () => {
   });
 
   it("rate-limits repeated requests despite changing client IP headers", async () => {
+    const secondAppInstance = createApp();
     const contactEmail = email();
     for (let index = 0; index < 5; index++) {
-      expect(
-        (
-          await formRequest("/contact/", contactBody(contactEmail), {
-            "x-forwarded-for": `192.0.2.${index}`,
-          })
-        ).status,
-      ).toBe(200);
+      const response = await formRequest(
+        "/contact/",
+        contactBody(contactEmail),
+        {
+          "x-forwarded-for": `192.0.2.${index}`,
+        },
+        index % 2 === 0 ? app : secondAppInstance,
+      );
+      expect(response.status, await response.clone().text()).toBe(200);
     }
-    expect(
-      (
-        await formRequest("/contact/", contactBody(contactEmail), {
-          "x-real-ip": "198.51.100.1",
-        })
-      ).status,
-    ).toBe(429);
+    const limitedContact = await formRequest(
+      "/contact/",
+      contactBody(contactEmail),
+      { "x-real-ip": "198.51.100.1" },
+      secondAppInstance,
+    );
+    expect(limitedContact.status).toBe(429);
+    expect(Number(limitedContact.headers.get("retry-after"))).toBeGreaterThan(
+      0,
+    );
     const signupEmail = email();
     for (let index = 0; index < 8; index++) {
       expect(
@@ -143,11 +155,59 @@ describe("public contact and email signup", () => {
     }
     expect(
       (
-        await formRequest("/email-list/", signupBody(signupEmail), {
-          "cf-connecting-ip": "198.51.100.2",
-        })
+        await formRequest(
+          "/email-list/",
+          signupBody(signupEmail),
+          { "cf-connecting-ip": "198.51.100.2" },
+          secondAppInstance,
+        )
       ).status,
     ).toBe(429);
+  });
+
+  it("enforces one shared budget for parallel requests", async () => {
+    const address = email();
+    const secondAppInstance = createApp();
+    const responses = await Promise.all(
+      Array.from({ length: 8 }, (_, index) =>
+        formRequest(
+          "/contact/",
+          contactBody(address),
+          { "x-forwarded-for": `203.0.113.${index}` },
+          index % 2 === 0 ? app : secondAppInstance,
+        ),
+      ),
+    );
+
+    expect(responses.filter(({ status }) => status === 200)).toHaveLength(5);
+    expect(responses.filter(({ status }) => status === 429)).toHaveLength(3);
+  });
+
+  it("prunes expired limiter rows without removing active rows", async () => {
+    await db.insert(applicationRateLimit).values([
+      {
+        count: 1,
+        identifierHash: "expired",
+        resetAt: new Date(Date.now() - 1000),
+        scope: "cleanup-test",
+      },
+      {
+        count: 1,
+        identifierHash: "active",
+        resetAt: new Date(Date.now() + 60_000),
+        scope: "cleanup-test",
+      },
+    ]);
+
+    expect((await formRequest("/contact/", contactBody(email()))).status).toBe(
+      200,
+    );
+
+    const remaining = await db
+      .select({ identifierHash: applicationRateLimit.identifierHash })
+      .from(applicationRateLimit)
+      .where(eq(applicationRateLimit.scope, "cleanup-test"));
+    expect(remaining).toEqual([{ identifierHash: "active" }]);
   });
 
   it("consumes a verification token once, including simultaneous requests", async () => {

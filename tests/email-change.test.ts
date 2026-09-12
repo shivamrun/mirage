@@ -13,7 +13,16 @@ const origin = "http://localhost:3000";
 const app = new Elysia({ adapter: node(), prefix: "/api" }).use(accountRoutes);
 
 async function post(path: string, body: object, cookie?: string) {
-  const response = await app.fetch(
+  const response = await postResponse(path, body, cookie);
+  expect(response.status).toBe(200);
+  return response.json() as Promise<{
+    redirectURL?: string;
+    pendingEmailStep?: string;
+  }>;
+}
+
+function postResponse(path: string, body: object, cookie?: string) {
+  return app.fetch(
     new Request(`${origin}/api/account${path}`, {
       method: "POST",
       headers: {
@@ -24,11 +33,6 @@ async function post(path: string, body: object, cookie?: string) {
       body: JSON.stringify(body),
     }),
   );
-  expect(response.status).toBe(200);
-  return response.json() as Promise<{
-    redirectURL?: string;
-    pendingEmailStep?: string;
-  }>;
 }
 
 function tokenFromEmail(recipient: string, path: string) {
@@ -52,6 +56,54 @@ function redirectStatus(redirectURL?: string) {
 }
 
 describe("email-change tokens", () => {
+  it("throttles a destination across accounts and returns a retry hint", async () => {
+    const firstActor = await createTestActor();
+    const secondActor = await createTestActor();
+    const newEmail = "shared-destination@example.com";
+
+    const responses = await Promise.all([
+      postResponse("/change-email", { newEmail }, firstActor.cookie),
+      postResponse("/change-email", { newEmail }, secondActor.cookie),
+    ]);
+    expect(responses.map(({ status }) => status).sort()).toEqual([200, 429]);
+    const limited = responses.find(({ status }) => status === 429);
+    expect(Number(limited?.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(
+      testEmailOutbox.filter((entry) => entry.to === newEmail),
+    ).toHaveLength(1);
+  });
+
+  it("throttles confirmation delivery from verified accounts to one destination", async () => {
+    const firstActor = await createTestActor({ emailVerified: true });
+    const secondActor = await createTestActor({ emailVerified: true });
+    const newEmail = "shared-verified-destination@example.com";
+
+    await post("/change-email", { newEmail }, firstActor.cookie);
+    await post("/change-email", { newEmail }, secondActor.cookie);
+    const firstToken = tokenFromEmail(
+      firstActor.email,
+      "/approve-email-change",
+    );
+    const secondToken = tokenFromEmail(
+      secondActor.email,
+      "/approve-email-change",
+    );
+
+    const responses = await Promise.all([
+      postResponse("/approve-email-change", { token: firstToken }),
+      postResponse("/approve-email-change", { token: secondToken }),
+    ]);
+    expect(responses.map(({ status }) => status).sort()).toEqual([200, 429]);
+    const limited = responses.find(({ status }) => status === 429);
+    expect(Number(limited?.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(
+      testEmailOutbox.filter(
+        (entry) =>
+          entry.to === newEmail && entry.text.includes("/confirm-email-change"),
+      ),
+    ).toHaveLength(1);
+  });
+
   it("rejects malformed and expired approval tokens without issuing a confirmation", async () => {
     const actor = await createTestActor({ emailVerified: true });
     const newEmail = "expired-approval@example.com";
@@ -151,13 +203,14 @@ describe("email-change tokens", () => {
     await post("/change-email", { newEmail }, actor.cookie);
     const token = tokenFromEmail(actor.email, "/approve-email-change");
 
-    const results = await Promise.all([
-      post("/approve-email-change", { token }),
-      post("/approve-email-change", { token }),
+    const responses = await Promise.all([
+      postResponse("/approve-email-change", { token }),
+      postResponse("/approve-email-change", { token }),
     ]);
-    expect(
-      results.map((result) => redirectStatus(result.redirectURL)).sort(),
-    ).toEqual(["invalid", "pending"]);
+    expect(responses.map(({ status }) => status).sort()).toEqual([200, 429]);
+    const successful = responses.find(({ status }) => status === 200);
+    const result = (await successful?.json()) as { redirectURL?: string };
+    expect(redirectStatus(result.redirectURL)).toBe("pending");
     expect((await storedUser(actor.id))?.email).toBe(actor.email);
     const pending = await db
       .select()

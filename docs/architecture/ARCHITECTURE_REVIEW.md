@@ -9,36 +9,36 @@ This is a coherent single-deployable starter, not an overengineered system. App 
 | Dimension | Score / 10 | Basis |
 |---|---:|---|
 | Maintainability | 7 | Clear feature folders and Zod contracts; some large mixed modules and reversed DAL-to-UI type dependencies. |
-| Scalability | 5 | Direct S3 upload and bounded DB pools help; unbounded admin reads, per-request upserts and in-process limits do not. |
-| Security | 7 | Verified-admin checks and atomic security transitions are covered by integration tests; process-local, caller-controlled rate-limit identity and unthrottled account email sends remain. |
+| Scalability | 6 | Direct S3 upload, bounded DB pools, and shared rate limits help; unbounded admin reads and per-request upserts remain. |
+| Security | 8 | Verified-admin checks, atomic security transitions, shared public budgets, and account email-send cooldowns are covered by integration tests; trusted client-IP configuration remains deployment-dependent. |
 | Developer experience | 7 | Local Compose, migrations, typed APIs, and focused Vitest coverage are present; local lint/build/dependency checks pass, while production operations remain undocumented. |
 | Separation of concerns | 7 | Direct Drizzle imports moved behind focused DAL functions; email-list workflow and DAL-to-UI query-type dependencies remain. |
 
 ## Findings
 
-### 1. Public rate limits do not hold across instances
+### 1. Public rate limits need a deployment-trusted client identity
 
-**Problem:** Contact and email signup use process-local counters keyed only by a digest of the submitted email.
+**Problem:** Contact and email signup now use durable per-destination and global counters, but no host-selected client identity is available yet.
 
-**Evidence / affected files:** `src/server/routes/contact.ts` and `src/server/routes/email-list.ts` define module-level `Map`s. `src/server/routes/public-rate-limit.ts` derives the key from the caller-supplied email. `src/proxy.ts` does not cover `/api`.
+**Evidence / affected files:** `src/server/rate-limit.ts` defines atomic Postgres-backed per-destination and per-flow budgets. It deliberately does not trust forwarding headers. Better Auth uses database rate-limit storage, but its IP header must still be configured for the selected proxy.
 
-**Why it matters:** Changing the submitted email bypasses the current limit. Restarts and horizontal replicas also reset or partition it. A scripted client can supply origin/referrer headers, exposing DB writes and email delivery to abuse. A trustworthy client-IP source remains **Unknown / needs verification** until hosting is selected.
+**Why it matters:** Changing the submitted email bypasses the per-destination limit, although the separate global budget still bounds each flow. A scripted client can supply origin/referrer headers, exposing DB writes and email delivery to abuse. A trustworthy client-IP source remains **Unknown / needs verification** until hosting is selected.
 
-**Recommended change:** Enforce a rate limit at a trusted edge or use a small shared/durable limiter, derive client identity only from trusted proxy metadata, and include per-email throttles on email-sending paths. Keep the existing Zod/honeypot checks as secondary controls.
+**Recommended change:** At deployment, configure a verified proxy/edge client identity and test spoofed headers and shared NAT behavior. Keep the durable destination/global budgets and existing Zod/honeypot checks as layered controls.
 
 **Priority: High**
 
-### 2. Email-code delivery has no application throttle
+### 2. Email-code delivery throttle — resolved 2026-09-13
 
-**Problem:** Authenticated users can repeatedly request enable/disable 2FA codes; account email-change/resend paths also lack application rate limits.
+**Status:** Resolved with durable per-account and per-destination cooldowns for custom 2FA, email-change, and account-verification sends.
 
-**Evidence / affected files:** `src/server/account/two-factor.ts` `sendAccountTwoFactorEmailCode` deletes old codes, creates a new row and calls `sendTwoFactorEmailCode` on each request. `src/server/routes/account.ts` has a TODO for rate limiting email delivery and email-change mutations. Better Auth may have its own limits for its own endpoints, but these custom Elysia paths do not show a shared limiter.
+**Evidence / affected files:** `src/server/account/two-factor.ts` and `src/server/account/email-change.ts` consume budgets from `src/server/rate-limit.ts` before sending. `src/server/routes/account.ts` returns `429` with `Retry-After`.
 
 **Why it matters:** Repeated requests cause provider cost, mail flooding and contention; concurrently replacing codes can invalidate legitimate messages.
 
-**Recommended change:** Add per-account and per-destination cooldowns and a global abuse ceiling at the same trusted boundary as public forms; return a stable retry response.
+**Follow-up:** Revisit the one-minute cooldown only if measured support or delivery behavior shows it is too strict or too permissive.
 
-**Priority: High**
+**Priority: Resolved**
 
 ### 3. Admin API verified-email rule — resolved 2026-09-13
 

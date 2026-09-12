@@ -8,15 +8,9 @@ import {
   subscribeEmailToList,
 } from "@/server/db/dal/email-list";
 import { sendEmailListVerificationEmail } from "@/server/email";
+import { consumePublicWriteLimit } from "@/server/rate-limit";
 import { emailSubscriptionSchema } from "@/zod";
-import { getPublicRateLimitKey } from "./public-rate-limit";
-
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
-const RATE_LIMIT_MAX_SUBMISSIONS = 8;
-const emailListRateLimits = new Map<
-  string,
-  { count: number; resetAt: number }
->();
+import { rateLimitResponse } from "./responses";
 
 function validationErrorResponse(message: string) {
   return Response.json({ message }, { status: 400 });
@@ -24,41 +18,6 @@ function validationErrorResponse(message: string) {
 
 function forbiddenResponse() {
   return Response.json({ message: "Invalid request origin." }, { status: 403 });
-}
-
-function rateLimitResponse() {
-  return Response.json(
-    { message: "Too many email signups. Please try again later." },
-    { status: 429 },
-  );
-}
-
-function checkRateLimit(email: string) {
-  const now = Date.now();
-  const identifier = getPublicRateLimitKey(email);
-
-  for (const [key, entry] of emailListRateLimits) {
-    if (entry.resetAt <= now) {
-      emailListRateLimits.delete(key);
-    }
-  }
-
-  const current = emailListRateLimits.get(identifier);
-
-  if (!current || current.resetAt <= now) {
-    emailListRateLimits.set(identifier, {
-      count: 1,
-      resetAt: now + RATE_LIMIT_WINDOW_MS,
-    });
-    return null;
-  }
-
-  if (current.count >= RATE_LIMIT_MAX_SUBMISSIONS) {
-    return rateLimitResponse();
-  }
-
-  current.count += 1;
-  return null;
 }
 
 function isTrustedOriginRequest(request: Request) {
@@ -127,9 +86,15 @@ export const emailListRoutes = new Elysia({ prefix: "/email-list" })
       return { status: true };
     }
 
-    const rateLimitError = checkRateLimit(parsed.data.email);
-    if (rateLimitError) {
-      return rateLimitError;
+    const rateLimit = await consumePublicWriteLimit({
+      destination: parsed.data.email,
+      flow: "email-list",
+    });
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(
+        "Too many email signups. Please try again later.",
+        rateLimit.retryAfterSeconds,
+      );
     }
 
     try {
