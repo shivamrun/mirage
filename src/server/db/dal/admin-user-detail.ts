@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 import db from "@/server/db";
 import {
@@ -65,3 +65,62 @@ export async function getAdminUserDetail(userId: string) {
 export type AdminUserDetail = NonNullable<
   Awaited<ReturnType<typeof getAdminUserDetail>>
 >;
+
+export async function deleteAdminLinkedAccount(
+  userId: string,
+  accountRowId: string,
+) {
+  const [account] = await db
+    .select({
+      accountId: accountTable.accountId,
+      id: accountTable.id,
+      providerId: accountTable.providerId,
+    })
+    .from(accountTable)
+    .where(
+      and(eq(accountTable.id, accountRowId), eq(accountTable.userId, userId)),
+    )
+    .limit(1);
+
+  if (!account) {
+    return { status: "not-found" } as const;
+  }
+
+  if (account.providerId === "credential") {
+    return { status: "credential" } as const;
+  }
+
+  await db
+    .delete(accountTable)
+    .where(
+      and(eq(accountTable.id, account.id), eq(accountTable.userId, userId)),
+    );
+
+  return { account, status: "deleted" } as const;
+}
+
+export async function deleteAdminUserSession(
+  userId: string,
+  sessionId: string,
+) {
+  const [session] = await db
+    .select({
+      id: sessionTable.id,
+      userId: sessionTable.userId,
+    })
+    .from(sessionTable)
+    .where(and(eq(sessionTable.id, sessionId), eq(sessionTable.userId, userId)))
+    .limit(1);
+
+  if (!session) {
+    return null;
+  }
+
+  await db
+    .delete(sessionTable)
+    .where(
+      and(eq(sessionTable.id, session.id), eq(sessionTable.userId, userId)),
+    );
+
+  return session;
+}

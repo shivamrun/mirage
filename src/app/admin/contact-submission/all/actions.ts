@@ -7,8 +7,8 @@ import {
   type AdminContactSubmissionPageSearchParams,
   type ContactSubmissionStatus,
   parseAdminContactSubmissionSearchParams,
-} from "@/components/admin";
-import { requireAdmin } from "@/lib/auth/access";
+} from "@/components/admin/contact-submission/query";
+import { requireVerifiedAdmin } from "@/lib/auth/access";
 import {
   bulkUpdateContactSubmissionStatus,
   updateContactSubmissionStatus,
@@ -49,7 +49,7 @@ function formQueryState(formData: FormData) {
 }
 
 export async function updateContactSubmissionStatusAction(formData: FormData) {
-  await requireAdmin();
+  await requireVerifiedAdmin();
 
   const id = formString(formData, "id");
   const status = formStatus(formData);
@@ -65,7 +65,7 @@ export async function updateContactSubmissionStatusAction(formData: FormData) {
 export async function bulkUpdateContactSubmissionStatusAction(
   formData: FormData,
 ) {
-  await requireAdmin();
+  await requireVerifiedAdmin();
 
   const status = formStatus(formData);
 

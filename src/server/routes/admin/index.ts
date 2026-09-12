@@ -1,10 +1,12 @@
-import { and, eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { env } from "@/lib/env";
-import db from "@/server/db";
+import {
+  deleteAdminLinkedAccount,
+  deleteAdminUserSession,
+} from "@/server/db/dal/admin-user-detail";
 import {
   createEmailList,
   deleteEmailList,
@@ -16,10 +18,6 @@ import {
   revokeAllSessions,
   revokeUserSessions,
 } from "@/server/db/dal/security";
-import {
-  account as accountTable,
-  session as sessionTable,
-} from "@/server/db/schema";
 import {
   adminCreateEmailListSchema,
   emailListKeySchema,
@@ -102,43 +100,24 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
         return invalidMutationResponse;
       }
 
-      const [linkedAccount] = await db
-        .select({
-          accountId: accountTable.accountId,
-          id: accountTable.id,
-          providerId: accountTable.providerId,
-        })
-        .from(accountTable)
-        .where(
-          and(
-            eq(accountTable.id, params.accountRowId),
-            eq(accountTable.userId, params.userId),
-          ),
-        )
-        .limit(1);
+      const result = await deleteAdminLinkedAccount(
+        params.userId,
+        params.accountRowId,
+      );
 
-      if (!linkedAccount) {
+      if (result.status === "not-found") {
         return jsonResponse("Linked account not found.", 404);
       }
 
-      if (linkedAccount.providerId === "credential") {
+      if (result.status === "credential") {
         return jsonResponse(
           "Password credentials cannot be unlinked here.",
           400,
         );
       }
 
-      await db
-        .delete(accountTable)
-        .where(
-          and(
-            eq(accountTable.id, linkedAccount.id),
-            eq(accountTable.userId, params.userId),
-          ),
-        );
-
       return {
-        account: linkedAccount,
+        account: result.account,
         status: true,
       };
     },
@@ -155,32 +134,14 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
         return invalidMutationResponse;
       }
 
-      const [userSession] = await db
-        .select({
-          id: sessionTable.id,
-          userId: sessionTable.userId,
-        })
-        .from(sessionTable)
-        .where(
-          and(
-            eq(sessionTable.id, params.sessionId),
-            eq(sessionTable.userId, params.userId),
-          ),
-        )
-        .limit(1);
+      const userSession = await deleteAdminUserSession(
+        params.userId,
+        params.sessionId,
+      );
 
       if (!userSession) {
         return jsonResponse("Session not found.", 404);
       }
-
-      await db
-        .delete(sessionTable)
-        .where(
-          and(
-            eq(sessionTable.id, userSession.id),
-            eq(sessionTable.userId, params.userId),
-          ),
-        );
 
       return {
         session: userSession,

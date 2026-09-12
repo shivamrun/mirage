@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { auth } from "@/lib/auth";
 import { env } from "@/lib/env";
 import {
+  consumePendingAndUpdateUserEmail,
   createVerification,
   deleteExpiredVerifications,
   deleteVerification,
@@ -10,7 +11,7 @@ import {
   findActiveVerification,
   findUserByEmail,
   findVerificationByIdentifierPattern,
-  updateUserEmail,
+  replaceApprovalWithPending,
 } from "@/server/db/dal/email-change";
 import { sendVerificationEmail } from "@/server/email";
 import type { AuthSession } from "@/server/routes/auth";
@@ -339,8 +340,6 @@ export async function resolveEmailChangeApprovalRedirectURL({
     };
   }
 
-  await cleanupStaleEmailChanges();
-
   const approvalRecord = await findVerificationByIdentifierPattern(
     `${EMAIL_CHANGE_APPROVAL_PREFIX}:%:${token}`,
   );
@@ -377,13 +376,34 @@ export async function resolveEmailChangeApprovalRedirectURL({
     };
   }
 
-  await deleteVerification(approvalRecord.id);
-
-  const newEmailChange = await createPendingEmailChange({
+  const newEmailChange: PendingEmailChange = {
     currentEmail: pendingChange.currentEmail,
     newEmail: pendingChange.newEmail,
     userId: pendingChange.userId,
+    token: createToken(),
+  };
+  const claimed = await replaceApprovalWithPending({
+    approvalId: approvalRecord.id,
+    pending: {
+      id: randomUUID(),
+      identifier: getPendingIdentifier(
+        newEmailChange.userId,
+        newEmailChange.token,
+      ),
+      value: JSON.stringify(newEmailChange),
+      expiresAt: new Date(Date.now() + EMAIL_CHANGE_EXPIRES_IN_MS),
+    },
   });
+
+  if (!claimed) {
+    return {
+      notificationEmail: null,
+      notificationUserId: null,
+      redirectURL: createAccountRedirectURL("invalid"),
+    };
+  }
+
+  await sendPendingEmailChangeConfirmation(newEmailChange);
 
   return {
     notificationEmail: newEmailChange.newEmail,
@@ -488,8 +508,6 @@ export async function resolveEmailChangeConfirmationRedirectURL({
     };
   }
 
-  await cleanupStaleEmailChanges();
-
   const pendingChangeRecord = await findVerificationByIdentifierPattern(
     `${EMAIL_CHANGE_PREFIX}:%:${token}`,
   );
@@ -528,11 +546,24 @@ export async function resolveEmailChangeConfirmationRedirectURL({
     };
   }
 
-  await updateUserEmail({
-    email: pendingChange.newEmail,
+  const updated = await consumePendingAndUpdateUserEmail({
+    currentEmail: pendingChange.currentEmail,
+    identifierPatterns: [
+      `${getPendingIdentifierPrefix(pendingChange.userId)}%`,
+      `${getApprovalIdentifierPrefix(pendingChange.userId)}%`,
+    ],
+    newEmail: pendingChange.newEmail,
+    pendingId: pendingChangeRecord.id,
     userId: pendingChange.userId,
   });
-  await clearPendingEmailChanges(pendingChange.userId);
+
+  if (!updated) {
+    return {
+      notificationEmail: null,
+      notificationUserId: null,
+      redirectURL: createAccountRedirectURL("invalid"),
+    };
+  }
 
   return {
     notificationEmail: pendingChange.newEmail,

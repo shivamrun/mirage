@@ -40,6 +40,10 @@ export const elysiaAuth = new Elysia({ name: "better-auth" }).macro({
         return status(404, { message: "Not Found" });
       }
 
+      if (!authUser.emailVerified) {
+        return status(403, { message: "Email verification required" });
+      }
+
       return { authUser };
     },
   },

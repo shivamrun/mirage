@@ -78,3 +78,13 @@ export async function requireRole(
 export async function requireAdmin(options: AccessOptions = {}) {
   return requireRole("admin", options);
 }
+
+export async function requireVerifiedAdmin(options: AccessOptions = {}) {
+  const user = await requireAdmin(options);
+
+  if (!user.emailVerified) {
+    notFound();
+  }
+
+  return user;
+}

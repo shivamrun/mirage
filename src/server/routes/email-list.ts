@@ -5,11 +5,11 @@ import {
   confirmEmailListVerification,
   createEmailListVerification,
   deleteEmailListVerification,
-  deletePendingEmailSubscription,
   subscribeEmailToList,
 } from "@/server/db/dal/email-list";
 import { sendEmailListVerificationEmail } from "@/server/email";
 import { emailSubscriptionSchema } from "@/zod";
+import { getPublicRateLimitKey } from "./public-rate-limit";
 
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const RATE_LIMIT_MAX_SUBMISSIONS = 8;
@@ -33,23 +33,9 @@ function rateLimitResponse() {
   );
 }
 
-function getRequestIdentifier(request: Request) {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-
-  if (forwardedFor) {
-    return forwardedFor.split(",")[0]?.trim() || "unknown";
-  }
-
-  return (
-    request.headers.get("x-real-ip") ||
-    request.headers.get("cf-connecting-ip") ||
-    "unknown"
-  );
-}
-
-function checkRateLimit(request: Request) {
+function checkRateLimit(email: string) {
   const now = Date.now();
-  const identifier = getRequestIdentifier(request);
+  const identifier = getPublicRateLimitKey(email);
 
   for (const [key, entry] of emailListRateLimits) {
     if (entry.resetAt <= now) {
@@ -122,12 +108,6 @@ export const emailListRoutes = new Elysia({ prefix: "/email-list" })
       return invalidMutationResponse;
     }
 
-    const rateLimitError = checkRateLimit(request);
-
-    if (rateLimitError) {
-      return rateLimitError;
-    }
-
     const parsed = emailSubscriptionSchema.safeParse(
       body && typeof body === "object" ? body : {},
     );
@@ -147,6 +127,11 @@ export const emailListRoutes = new Elysia({ prefix: "/email-list" })
       return { status: true };
     }
 
+    const rateLimitError = checkRateLimit(parsed.data.email);
+    if (rateLimitError) {
+      return rateLimitError;
+    }
+
     try {
       const subscription = await subscribeEmailToList(parsed.data);
       const verificationRequired =
@@ -159,20 +144,23 @@ export const emailListRoutes = new Elysia({ prefix: "/email-list" })
           subscriptionId: subscription.subscription.id,
         });
 
-        await sendEmailListVerificationEmail({
-          email: subscription.contact.email,
-          listKey: subscription.subscription.listKey,
-          listName: subscription.list.name,
-          verificationUrl: createEmailListVerificationUrl(verification.token),
-        }).catch(async (error: unknown) => {
+        try {
+          await sendEmailListVerificationEmail({
+            email: subscription.contact.email,
+            listKey: subscription.subscription.listKey,
+            listName: subscription.list.name,
+            verificationUrl: createEmailListVerificationUrl(verification.token),
+          });
+        } catch {
           await deleteEmailListVerification(verification.token);
-
-          if (!subscription.subscriptionExisted) {
-            await deletePendingEmailSubscription(subscription.subscription.id);
-          }
-
-          throw error;
-        });
+          return Response.json(
+            {
+              message:
+                "Verification email could not be sent. Please try signing up again.",
+            },
+            { status: 503 },
+          );
+        }
       }
 
       return {

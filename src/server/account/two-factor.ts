@@ -1,9 +1,4 @@
-import {
-  createHmac,
-  randomInt,
-  randomUUID,
-  timingSafeEqual,
-} from "node:crypto";
+import { createHmac, randomInt, randomUUID } from "node:crypto";
 
 import { createOTP } from "@better-auth/utils/otp";
 import {
@@ -11,22 +6,20 @@ import {
   symmetricDecrypt,
   symmetricEncrypt,
 } from "better-auth/crypto";
-import { and, eq } from "drizzle-orm";
-
 import { env } from "@/lib/env";
 import { siteConfig } from "@/lib/metadata";
-import db from "@/server/db";
 import {
   createVerification,
-  deleteExpiredVerifications,
-  deleteVerification,
   deleteVerificationsByIdentifierPatterns,
 } from "@/server/db/dal/email-change";
 import {
-  twoFactor as twoFactorTable,
-  user as userTable,
-  verification,
-} from "@/server/db/schema";
+  completeTwoFactorSetup,
+  createTwoFactorSetup,
+  deleteTwoFactorRows,
+  disableTwoFactorForUser,
+  findPendingTwoFactorSetup,
+  verifyAndConsumeEmailCode,
+} from "@/server/db/dal/two-factor";
 import { sendTwoFactorEmailCode } from "@/server/email";
 import type { AuthSession } from "@/server/routes/auth";
 
@@ -79,13 +72,6 @@ function hashEmailCode({
     .digest("hex");
 }
 
-function timingSafeCompare(a: string, b: string) {
-  const left = Buffer.from(a);
-  const right = Buffer.from(b);
-
-  return left.length === right.length && timingSafeEqual(left, right);
-}
-
 async function verifyTotpCode(secret: string, code: string) {
   const normalizedCode = normalizeCode(code);
 
@@ -106,32 +92,6 @@ function createEmailCodeValue(codeHash: string): EmailCodeValue {
   };
 }
 
-function parseEmailCodeValue(value: string): EmailCodeValue {
-  try {
-    const parsed = JSON.parse(value) as Partial<EmailCodeValue>;
-    const failedAttempts = parsed.failedAttempts;
-
-    if (
-      typeof parsed.codeHash === "string" &&
-      Number.isInteger(failedAttempts) &&
-      typeof failedAttempts === "number" &&
-      failedAttempts >= 0
-    ) {
-      return {
-        codeHash: parsed.codeHash,
-        failedAttempts,
-      };
-    }
-  } catch {
-    // Older in-flight records stored just the code hash.
-  }
-
-  return {
-    codeHash: value,
-    failedAttempts: 0,
-  };
-}
-
 async function clearEmailCodes(userId: string) {
   await deleteVerificationsByIdentifierPatterns([
     `${EMAIL_CODE_PREFIX}:${userId}:%`,
@@ -147,88 +107,14 @@ async function verifyEmailCode({
   code: string;
   userId: string;
 }) {
-  await deleteExpiredVerifications([`${EMAIL_CODE_PREFIX}:%`]);
+  // Verification and attempt counting are serialized by the database.
 
   const identifier = getEmailCodeIdentifier(userId, action);
-  const [record] = await db
-    .select()
-    .from(verification)
-    .where(eq(verification.identifier, identifier))
-    .limit(1);
-
-  if (!record || record.expiresAt < new Date()) {
-    if (record) {
-      await deleteVerification(record.id);
-    }
-
-    return false;
-  }
-
-  const value = parseEmailCodeValue(record.value);
-
-  if (value.failedAttempts >= EMAIL_CODE_MAX_FAILED_ATTEMPTS) {
-    await deleteVerification(record.id);
-    return false;
-  }
-
-  const expected = hashEmailCode({
-    code: normalizeCode(code),
+  return verifyAndConsumeEmailCode({
+    expectedHash: hashEmailCode({ code: normalizeCode(code), identifier }),
     identifier,
+    maxFailedAttempts: EMAIL_CODE_MAX_FAILED_ATTEMPTS,
   });
-
-  if (!timingSafeCompare(value.codeHash, expected)) {
-    const failedAttempts = value.failedAttempts + 1;
-
-    if (failedAttempts >= EMAIL_CODE_MAX_FAILED_ATTEMPTS) {
-      await deleteVerification(record.id);
-      return false;
-    }
-
-    await db
-      .update(verification)
-      .set({
-        value: JSON.stringify({
-          ...value,
-          failedAttempts,
-        }),
-        updatedAt: new Date(),
-      })
-      .where(eq(verification.id, record.id));
-
-    return false;
-  }
-
-  await deleteVerification(record.id);
-  return true;
-}
-
-async function deleteTwoFactorRows(userId: string) {
-  await db.delete(twoFactorTable).where(eq(twoFactorTable.userId, userId));
-}
-
-async function updateTwoFactorEnabled(userId: string, enabled: boolean) {
-  await db
-    .update(userTable)
-    .set({
-      twoFactorEnabled: enabled,
-      updatedAt: new Date(),
-    })
-    .where(eq(userTable.id, userId));
-}
-
-async function getPendingTwoFactorSetup(userId: string) {
-  const [record] = await db
-    .select()
-    .from(twoFactorTable)
-    .where(
-      and(
-        eq(twoFactorTable.userId, userId),
-        eq(twoFactorTable.verified, false),
-      ),
-    )
-    .limit(1);
-
-  return record ?? null;
 }
 
 export async function sendAccountTwoFactorEmailCode({
@@ -320,12 +206,11 @@ export async function startAccountTwoFactorSetup({
   });
 
   await deleteTwoFactorRows(authSession.user.id);
-  await db.insert(twoFactorTable).values({
+  await createTwoFactorSetup({
     id: randomUUID(),
     backupCodes: encryptedBackupCodes,
     secret: encryptedSecret,
     userId: authSession.user.id,
-    verified: false,
   });
 
   return {
@@ -344,7 +229,7 @@ export async function verifyAccountTwoFactorSetup({
   authSession: AuthSession;
   code: string;
 }): Promise<TwoFactorMutationResult<{ twoFactorEnabled: boolean }>> {
-  const pendingSetup = await getPendingTwoFactorSetup(authSession.user.id);
+  const pendingSetup = await findPendingTwoFactorSetup(authSession.user.id);
 
   if (!pendingSetup) {
     return {
@@ -367,15 +252,17 @@ export async function verifyAccountTwoFactorSetup({
     };
   }
 
-  await db
-    .update(twoFactorTable)
-    .set({
-      failedVerificationCount: 0,
-      lockedUntil: null,
-      verified: true,
-    })
-    .where(eq(twoFactorTable.id, pendingSetup.id));
-  await updateTwoFactorEnabled(authSession.user.id, true);
+  const completed = await completeTwoFactorSetup(
+    authSession.user.id,
+    pendingSetup.id,
+  );
+  if (!completed) {
+    return {
+      kind: "error",
+      message: "Start setup again before verifying an authenticator code.",
+      statusCode: 400,
+    };
+  }
 
   return {
     kind: "success",
@@ -412,8 +299,7 @@ export async function disableAccountTwoFactor({
     };
   }
 
-  await deleteTwoFactorRows(authSession.user.id);
-  await updateTwoFactorEnabled(authSession.user.id, false);
+  await disableTwoFactorForUser(authSession.user.id);
 
   return {
     kind: "success",

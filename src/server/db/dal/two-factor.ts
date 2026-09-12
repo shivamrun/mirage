@@ -1,0 +1,148 @@
+import { timingSafeEqual } from "node:crypto";
+
+import { and, eq } from "drizzle-orm";
+
+import db from "@/server/db";
+import {
+  twoFactor as twoFactorTable,
+  user as userTable,
+  verification,
+} from "@/server/db/schema";
+
+function parseEmailCodeValue(value: string) {
+  try {
+    const parsed = JSON.parse(value) as {
+      codeHash?: unknown;
+      failedAttempts?: unknown;
+    };
+    if (
+      typeof parsed.codeHash === "string" &&
+      typeof parsed.failedAttempts === "number" &&
+      Number.isInteger(parsed.failedAttempts) &&
+      parsed.failedAttempts >= 0
+    ) {
+      return {
+        codeHash: parsed.codeHash,
+        failedAttempts: parsed.failedAttempts,
+      };
+    }
+  } catch {
+    // Older in-flight records stored only the code hash.
+  }
+  return { codeHash: value, failedAttempts: 0 };
+}
+
+export async function verifyAndConsumeEmailCode({
+  expectedHash,
+  identifier,
+  maxFailedAttempts,
+}: {
+  expectedHash: string;
+  identifier: string;
+  maxFailedAttempts: number;
+}) {
+  return db.transaction(async (tx) => {
+    const [record] = await tx
+      .select()
+      .from(verification)
+      .where(eq(verification.identifier, identifier))
+      .for("update")
+      .limit(1);
+
+    if (!record) return false;
+
+    const value = parseEmailCodeValue(record.value);
+    if (
+      record.expiresAt <= new Date() ||
+      value.failedAttempts >= maxFailedAttempts
+    ) {
+      await tx.delete(verification).where(eq(verification.id, record.id));
+      return false;
+    }
+
+    const actual = Buffer.from(value.codeHash);
+    const expected = Buffer.from(expectedHash);
+    const matches =
+      actual.length === expected.length && timingSafeEqual(actual, expected);
+
+    if (!matches) {
+      const failedAttempts = value.failedAttempts + 1;
+      if (failedAttempts >= maxFailedAttempts) {
+        await tx.delete(verification).where(eq(verification.id, record.id));
+      } else {
+        await tx
+          .update(verification)
+          .set({
+            value: JSON.stringify({ ...value, failedAttempts }),
+            updatedAt: new Date(),
+          })
+          .where(eq(verification.id, record.id));
+      }
+      return false;
+    }
+
+    await tx.delete(verification).where(eq(verification.id, record.id));
+    return true;
+  });
+}
+
+export async function deleteTwoFactorRows(userId: string) {
+  await db.delete(twoFactorTable).where(eq(twoFactorTable.userId, userId));
+}
+
+export async function findPendingTwoFactorSetup(userId: string) {
+  const [record] = await db
+    .select()
+    .from(twoFactorTable)
+    .where(
+      and(
+        eq(twoFactorTable.userId, userId),
+        eq(twoFactorTable.verified, false),
+      ),
+    )
+    .limit(1);
+
+  return record ?? null;
+}
+
+export async function createTwoFactorSetup(values: {
+  id: string;
+  backupCodes: string;
+  secret: string;
+  userId: string;
+}) {
+  await db.insert(twoFactorTable).values({ ...values, verified: false });
+}
+
+export async function completeTwoFactorSetup(userId: string, setupId: string) {
+  return db.transaction(async (tx) => {
+    const [setup] = await tx
+      .update(twoFactorTable)
+      .set({ failedVerificationCount: 0, lockedUntil: null, verified: true })
+      .where(
+        and(
+          eq(twoFactorTable.id, setupId),
+          eq(twoFactorTable.userId, userId),
+          eq(twoFactorTable.verified, false),
+        ),
+      )
+      .returning({ id: twoFactorTable.id });
+    if (!setup) return false;
+
+    await tx
+      .update(userTable)
+      .set({ twoFactorEnabled: true, updatedAt: new Date() })
+      .where(eq(userTable.id, userId));
+    return true;
+  });
+}
+
+export async function disableTwoFactorForUser(userId: string) {
+  await db.transaction(async (tx) => {
+    await tx.delete(twoFactorTable).where(eq(twoFactorTable.userId, userId));
+    await tx
+      .update(userTable)
+      .set({ twoFactorEnabled: false, updatedAt: new Date() })
+      .where(eq(userTable.id, userId));
+  });
+}

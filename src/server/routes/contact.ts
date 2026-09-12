@@ -3,6 +3,7 @@ import { Elysia } from "elysia";
 import { env } from "@/lib/env";
 import { createContactSubmission } from "@/server/db/dal/contact-submission";
 import { contactSubmissionSchema } from "@/zod";
+import { getPublicRateLimitKey } from "./public-rate-limit";
 
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const RATE_LIMIT_MAX_SUBMISSIONS = 5;
@@ -23,23 +24,9 @@ function rateLimitResponse() {
   );
 }
 
-function getRequestIdentifier(request: Request) {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-
-  if (forwardedFor) {
-    return forwardedFor.split(",")[0]?.trim() || "unknown";
-  }
-
-  return (
-    request.headers.get("x-real-ip") ||
-    request.headers.get("cf-connecting-ip") ||
-    "unknown"
-  );
-}
-
-function checkRateLimit(request: Request) {
+function checkRateLimit(email: string) {
   const now = Date.now();
-  const identifier = getRequestIdentifier(request);
+  const identifier = getPublicRateLimitKey(email);
 
   for (const [key, entry] of contactRateLimits) {
     if (entry.resetAt <= now) {
@@ -99,12 +86,6 @@ export const contactRoutes = new Elysia({ prefix: "/contact" }).post(
       return invalidMutationResponse;
     }
 
-    const rateLimitError = checkRateLimit(request);
-
-    if (rateLimitError) {
-      return rateLimitError;
-    }
-
     const parsed = contactSubmissionSchema.safeParse(
       body && typeof body === "object" ? body : {},
     );
@@ -122,6 +103,11 @@ export const contactRoutes = new Elysia({ prefix: "/contact" }).post(
 
     if (parsed.data.website) {
       return { status: true };
+    }
+
+    const rateLimitError = checkRateLimit(parsed.data.email);
+    if (rateLimitError) {
+      return rateLimitError;
     }
 
     await createContactSubmission(parsed.data);

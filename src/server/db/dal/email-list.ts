@@ -196,20 +196,6 @@ export async function subscribeEmailToList(values: EmailSubscriptionValues) {
       throw new Error("Email contact could not be created.");
     }
 
-    const [existingSubscription] = await tx
-      .select({
-        id: emailSubscription.id,
-        status: emailSubscription.status,
-      })
-      .from(emailSubscription)
-      .where(
-        and(
-          eq(emailSubscription.contactId, contact.id),
-          eq(emailSubscription.listKey, values.listKey),
-        ),
-      )
-      .limit(1);
-
     const [subscription] = await tx
       .insert(emailSubscription)
       .values({
@@ -241,7 +227,6 @@ export async function subscribeEmailToList(values: EmailSubscriptionValues) {
     return {
       contact,
       list,
-      subscriptionExisted: Boolean(existingSubscription),
       subscription,
     };
   });
@@ -477,17 +462,6 @@ export async function deleteEmailListVerification(token: string) {
     );
 }
 
-export async function deletePendingEmailSubscription(subscriptionId: string) {
-  await db
-    .delete(emailSubscription)
-    .where(
-      and(
-        eq(emailSubscription.id, subscriptionId),
-        eq(emailSubscription.status, "pending"),
-      ),
-    );
-}
-
 export async function confirmEmailListVerification(token: string) {
   if (!EMAIL_LIST_VERIFICATION_TOKEN_PATTERN.test(token)) {
     return { status: "invalid" as const };
@@ -502,26 +476,25 @@ export async function confirmEmailListVerification(token: string) {
       ),
     );
 
-  const identifier = getEmailListVerificationIdentifier(token);
-  const [record] = await db
-    .select()
-    .from(verification)
-    .where(
-      and(
-        eq(verification.identifier, identifier),
-        gt(verification.expiresAt, new Date()),
-      ),
-    )
-    .limit(1);
+  return db.transaction(async (tx) => {
+    const [record] = await tx
+      .delete(verification)
+      .where(
+        and(
+          eq(
+            verification.identifier,
+            getEmailListVerificationIdentifier(token),
+          ),
+          gt(verification.expiresAt, new Date()),
+        ),
+      )
+      .returning();
+    const payload = parseEmailListVerificationPayload(record?.value ?? null);
+    if (!record || !payload || payload.token !== token) {
+      return { status: "invalid" as const };
+    }
 
-  const payload = parseEmailListVerificationPayload(record?.value ?? null);
-
-  if (!record || !payload || payload.token !== token) {
-    return { status: "invalid" as const };
-  }
-
-  await db.transaction(async (tx) => {
-    await tx
+    const [updated] = await tx
       .update(emailSubscription)
       .set({
         status: "subscribed",
@@ -533,14 +506,15 @@ export async function confirmEmailListVerification(token: string) {
           eq(emailSubscription.listKey, payload.listKey),
           eq(emailSubscription.status, "pending"),
         ),
-      );
+      )
+      .returning({ id: emailSubscription.id });
 
-    await tx.delete(verification).where(eq(verification.id, record.id));
+    if (!updated) return { status: "invalid" as const };
+
+    return {
+      email: payload.email,
+      listKey: payload.listKey,
+      status: "success" as const,
+    };
   });
-
-  return {
-    email: payload.email,
-    listKey: payload.listKey,
-    status: "success" as const,
-  };
 }

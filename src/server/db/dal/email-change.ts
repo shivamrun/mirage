@@ -90,19 +90,72 @@ export async function findUserByEmail(email: string) {
   return record;
 }
 
-export async function updateUserEmail({
-  email,
+export async function replaceApprovalWithPending({
+  approvalId,
+  pending,
+}: {
+  approvalId: string;
+  pending: typeof verification.$inferInsert;
+}) {
+  return db.transaction(async (tx) => {
+    const [claimed] = await tx
+      .delete(verification)
+      .where(
+        and(
+          eq(verification.id, approvalId),
+          gt(verification.expiresAt, new Date()),
+        ),
+      )
+      .returning({ id: verification.id });
+
+    if (!claimed) return false;
+
+    await tx.insert(verification).values(pending);
+    return true;
+  });
+}
+
+export async function consumePendingAndUpdateUserEmail({
+  currentEmail,
+  identifierPatterns,
+  newEmail,
+  pendingId,
   userId,
 }: {
-  email: string;
+  currentEmail: string;
+  identifierPatterns: string[];
+  newEmail: string;
+  pendingId: string;
   userId: string;
 }) {
-  await db
-    .update(user)
-    .set({
-      email,
-      emailVerified: true,
-      updatedAt: new Date(),
-    })
-    .where(eq(user.id, userId));
+  return db.transaction(async (tx) => {
+    const [claimed] = await tx
+      .delete(verification)
+      .where(
+        and(
+          eq(verification.id, pendingId),
+          gt(verification.expiresAt, new Date()),
+        ),
+      )
+      .returning({ id: verification.id });
+
+    if (!claimed) return false;
+
+    const [updated] = await tx
+      .update(user)
+      .set({
+        email: newEmail,
+        emailVerified: true,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(user.id, userId), eq(user.email, currentEmail)))
+      .returning({ id: user.id });
+
+    if (!updated) return false;
+
+    await tx
+      .delete(verification)
+      .where(identifierCondition(identifierPatterns));
+    return true;
+  });
 }
