@@ -6,6 +6,7 @@ import { adminRoutes } from "./admin";
 import { authActionRoutes } from "./auth-actions";
 import { contactRoutes } from "./contact";
 import { emailListRoutes } from "./email-list";
+import { uploadsRoutes } from "./uploads";
 
 export const app = new Elysia({ adapter: node(), prefix: "/api" })
   .get("/", () => "Hello Elysia")
@@ -14,6 +15,7 @@ export const app = new Elysia({ adapter: node(), prefix: "/api" })
   .use(authActionRoutes)
   .use(contactRoutes)
   .use(emailListRoutes)
+  .use(uploadsRoutes)
   .use(adminRoutes);
 
 export type App = typeof app;

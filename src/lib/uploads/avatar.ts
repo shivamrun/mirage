@@ -1,5 +1,7 @@
 import { type PrepareUploadOutput, uploadFile } from "@marinedotsh/upload-sdk";
 
+import { api } from "@/lib/api/client";
+
 type PrepareAvatarUploadResponse = {
   key: string;
   publicUrl: string;
@@ -16,33 +18,20 @@ const avatarCropOutputType = "image/jpeg";
 const avatarAcceptedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
 
 async function prepareAvatarUpload(file: File) {
-  const response = await fetch("/api/uploads", {
-    body: JSON.stringify({
-      contentType: file.type,
-      filename: file.name,
-      key: "avatar",
-      size: file.size,
-    }),
-    headers: {
-      "Content-Type": "application/json",
-    },
-    method: "POST",
+  const { data, error } = await api.api.uploads.post({
+    contentType: file.type,
+    filename: file.name,
+    key: "avatar",
+    size: file.size,
   });
 
-  const data = (await response.json().catch(() => null)) as
-    | { message?: string }
-    | PrepareAvatarUploadResponse
-    | null;
-
-  if (!response.ok) {
+  if (error) {
     throw new Error(
-      data && "message" in data && data.message
-        ? data.message
-        : "Could not prepare the avatar upload.",
+      error.value.message || "Could not prepare the avatar upload.",
     );
   }
 
-  if (!data || !("upload" in data) || !("key" in data)) {
+  if (!data) {
     throw new Error("Could not prepare the avatar upload.");
   }
 

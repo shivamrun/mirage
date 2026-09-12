@@ -111,12 +111,8 @@
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -210,12 +206,8 @@
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -225,9 +217,7 @@
         "session_token_unique": {
           "name": "session_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},
@@ -317,9 +307,7 @@
         "user_email_unique": {
           "name": "user_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -497,9 +485,7 @@
         "mirage_email_contact_email_unique": {
           "name": "mirage_email_contact_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -671,12 +657,8 @@
           "name": "mirage_email_subscription_contact_id_mirage_email_contact_id_fk",
           "tableFrom": "mirage_email_subscription",
           "tableTo": "mirage_email_contact",
-          "columnsFrom": [
-            "contact_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["contact_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -684,12 +666,8 @@
           "name": "mirage_email_subscription_list_key_mirage_email_list_key_fk",
           "tableFrom": "mirage_email_subscription",
           "tableTo": "mirage_email_list",
-          "columnsFrom": [
-            "list_key"
-          ],
-          "columnsTo": [
-            "key"
-          ],
+          "columnsFrom": ["list_key"],
+          "columnsTo": ["key"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
