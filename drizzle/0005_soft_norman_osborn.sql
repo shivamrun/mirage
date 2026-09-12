@@ -1,2 +1,2 @@
-DROP TABLE "invite" CASCADE;--> statement-breakpoint
-DROP TABLE "invite_use" CASCADE;
+DROP TABLE "invite_use";--> statement-breakpoint
+DROP TABLE "invite";
