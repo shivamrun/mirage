@@ -4,7 +4,7 @@ import { ShieldCheck, ShieldOff } from "lucide-react";
 import * as React from "react";
 import QRCode from "react-qr-code";
 
-import { AuthInputField, AuthStatusMessage } from "@/components/auth";
+import { AuthOtpField, AuthStatusMessage } from "@/components/auth";
 import { getUnexpectedAuthErrorMessage } from "@/components/auth/auth-errors";
 import { HeadingBlock } from "@/components/heading-block";
 import {
@@ -68,6 +68,11 @@ function AccountTwoFactorForm({
     setIsEnabled(Boolean(user.twoFactorEnabled));
   }, [user.twoFactorEnabled]);
 
+  const hasEmailCode = emailCode.replace(/\D/g, "").length === 6;
+  const hasTotpCode = totpCode.replace(/\D/g, "").length === 6;
+  const destructiveButtonClassName =
+    "border-destructive bg-destructive text-white hover:bg-destructive/90 focus-visible:border-destructive focus-visible:ring-destructive/30 dark:text-white";
+
   async function sendEmailCode(action: TwoFactorAction) {
     setStatus(undefined);
     setIsSendingCode(true);
@@ -100,6 +105,10 @@ function AccountTwoFactorForm({
     event.preventDefault();
 
     if (!pendingAction) {
+      return;
+    }
+
+    if (!hasEmailCode) {
       return;
     }
 
@@ -151,6 +160,11 @@ function AccountTwoFactorForm({
 
   async function verifySetup(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!hasTotpCode) {
+      return;
+    }
+
     setStatus(undefined);
     setIsVerifying(true);
 
@@ -280,16 +294,10 @@ function AccountTwoFactorForm({
               </div>
 
               <FieldGroup>
-                <AuthInputField
-                  autoComplete="one-time-code"
+                <AuthOtpField
                   id="setup-totp-code"
-                  inputMode="numeric"
                   label="Authenticator code"
-                  maxLength={8}
-                  minLength={6}
-                  onChange={(event) => setTotpCode(event.target.value)}
-                  pattern="[0-9 ]*"
-                  placeholder="123456"
+                  onChange={setTotpCode}
                   required
                   value={totpCode}
                 />
@@ -299,7 +307,7 @@ function AccountTwoFactorForm({
                 <AlertDialogCancel disabled={isVerifying}>
                   Cancel
                 </AlertDialogCancel>
-                <Button disabled={isVerifying} type="submit">
+                <Button disabled={isVerifying || !hasTotpCode} type="submit">
                   <ShieldCheck data-icon="inline-start" />
                   {isVerifying ? "Verifying..." : "Finish setup"}
                 </Button>
@@ -311,28 +319,33 @@ function AccountTwoFactorForm({
               onSubmit={continueWithEmailCode}
             >
               <FieldGroup>
-                <AuthInputField
-                  autoComplete="one-time-code"
+                <AuthOtpField
                   id="two-factor-email-code"
-                  inputMode="numeric"
                   label="Email code"
-                  maxLength={8}
-                  minLength={6}
-                  onChange={(event) => setEmailCode(event.target.value)}
-                  pattern="[0-9 ]*"
-                  placeholder="123456"
+                  onChange={setEmailCode}
                   required
                   value={emailCode}
                 />
               </FieldGroup>
               <AlertDialogFooter>
-                <AlertDialogCancel disabled={isContinuing}>
+                <AlertDialogCancel
+                  className="w-full sm:w-1/2"
+                  disabled={isContinuing}
+                >
                   Cancel
                 </AlertDialogCancel>
                 <Button
-                  disabled={isContinuing}
+                  className={cn(
+                    "w-full sm:w-1/2",
+                    pendingAction === "disable"
+                      ? destructiveButtonClassName
+                      : undefined,
+                  )}
+                  disabled={isContinuing || !hasEmailCode}
                   type="submit"
-                  variant={pendingAction === "disable" ? "outline" : "default"}
+                  variant={
+                    pendingAction === "disable" ? "destructive" : "default"
+                  }
                 >
                   {pendingAction === "disable" ? (
                     <ShieldOff data-icon="inline-start" />
@@ -353,10 +366,11 @@ function AccountTwoFactorForm({
                 Cancel
               </AlertDialogCancel>
               <Button
+                className={isEnabled ? destructiveButtonClassName : undefined}
                 disabled={isSendingCode}
                 onClick={() => sendEmailCode(isEnabled ? "disable" : "enable")}
                 type="button"
-                variant={isEnabled ? "outline" : "default"}
+                variant={isEnabled ? "destructive" : "default"}
               >
                 {isEnabled ? (
                   <ShieldOff data-icon="inline-start" />

@@ -1,5 +1,6 @@
 export {
   AuthInputField,
+  AuthOtpField,
   EmailField,
   NameField,
   PasswordField,

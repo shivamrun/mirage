@@ -8,37 +8,35 @@ import {
   getAuthErrorMessage,
   getUnexpectedAuthErrorMessage,
 } from "@/components/auth/auth-errors";
-import { AuthInputField } from "@/components/auth/auth-fields";
+import { AuthOtpField } from "@/components/auth/auth-fields";
 import {
   AuthFormShell,
   AuthStatusMessage,
 } from "@/components/auth/auth-form-shell";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Field,
-  FieldContent,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
+import { FieldGroup } from "@/components/ui/field";
 import { authClient } from "@/lib/auth/client";
 
 function TwoFactorForm({ redirectTo = "/" }: { redirectTo?: string }) {
   const router = useRouter();
   const [code, setCode] = React.useState("");
-  const [trustDevice, setTrustDevice] = React.useState(false);
   const [error, setError] = React.useState<string>();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const hasCode = code.replace(/\D/g, "").length === 6;
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!hasCode) {
+      return;
+    }
+
     setError(undefined);
     setIsSubmitting(true);
 
     try {
       const result = await authClient.twoFactor.verifyTotp({
         code: code.replace(/\s/g, ""),
-        trustDevice,
       });
 
       if (result.error) {
@@ -65,31 +63,22 @@ function TwoFactorForm({ redirectTo = "/" }: { redirectTo?: string }) {
           {error ? (
             <AuthStatusMessage tone="error">{error}</AuthStatusMessage>
           ) : null}
-          <AuthInputField
-            autoComplete="one-time-code"
-            inputMode="numeric"
-            id="totp-code"
-            label="Authenticator code"
-            maxLength={8}
-            minLength={6}
-            onChange={(event) => setCode(event.target.value)}
-            pattern="[0-9 ]*"
-            placeholder="123456"
-            required
-            value={code}
-          />
-          <Field orientation="horizontal">
-            <Checkbox
-              id="trust-device"
-              checked={trustDevice}
-              onCheckedChange={(checked) => setTrustDevice(checked === true)}
+          <div className="flex items-center justify-center w-full">
+            <AuthOtpField
+              id="totp-code"
+              labelSrOnly
+              label="Authenticator code"
+              onChange={setCode}
+              required
+              value={code}
             />
-            <FieldContent>
-              <FieldLabel htmlFor="trust-device">Trust this device</FieldLabel>
-            </FieldContent>
-          </Field>
+          </div>
         </FieldGroup>
-        <Button className="w-full" disabled={isSubmitting} type="submit">
+        <Button
+          className="w-full"
+          disabled={isSubmitting || !hasCode}
+          type="submit"
+        >
           <ShieldCheck data-icon="inline-start" />
           {isSubmitting ? "Verifying..." : "Verify code"}
         </Button>
