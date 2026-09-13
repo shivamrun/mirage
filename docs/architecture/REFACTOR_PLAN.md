@@ -6,10 +6,10 @@ This plan improves the existing single Next.js application. It does not require 
 
 | Aspect | Why it needs work | What should improve | How to judge progress |
 |---|---|---|---|
-| Security | Public and email-send limits are weak across replicas and the public form limiter is keyed only by caller-supplied email. | Shared abuse budgets and throttled account email sends; retain the completed verified-admin and atomic-token protections. | Two-instance limit tests and concurrent token tests pass. |
+| Security | **Complete at the application layer.** Public and email-send limits now use durable application storage; verified-admin and atomic-token protections are complete. | Keep shared abuse budgets and throttled account email sends; revisit trusted client identity after hosting is selected. | Current focused tests pass; provider-specific two-instance trust assumptions remain part of Phase 0 hosting verification. |
 | Scalability | Admin inboxes read all rows, built-in lists are upserted on requests, and DB connection/query costs are unmeasured. | Bounded pages, one-time seeding, connection and query budgets. | Fixed response/page bounds, no foreground seed writes, measured p95/query plans. |
-| Maintainability | Email-list policy sits inside DAL and large UI modules are hard to change in isolation. | Keep simple SQL in DAL; move only growing workflows/contracts to focused modules. | A change to admin UI query controls does not require a DAL import from `components`; focused workflow tests exist. |
-| Separation of concerns | The direct Drizzle imports are resolved, but some DAL modules still import UI query contracts. | Move neutral contracts to a server-safe module without generic repositories. | `pnpm depcruise` remains green and DAL modules no longer depend on UI folders. |
+| Maintainability | **Partially complete.** Focused workflow modules and tests exist; some broader DAL/data-lifecycle cleanup remains. | Keep simple SQL in DAL; move only growing workflows/contracts to focused modules. | A change to admin UI query controls does not require a DAL import from `components`; focused workflow tests exist. |
+| Separation of concerns | **Complete for the reviewed dependency violations.** Direct Drizzle/schema violations are resolved and DAL modules no longer import UI query contracts. | Keep neutral contracts in server-safe modules without generic repositories. | `pnpm depcruise` remains green and DAL modules do not depend on UI folders. |
 | Developer experience | Focused tests and green local checks now exist; a deployment runbook still depends on the first hosting setup. | Keep checks green and document production operations when the host is selected. | `pnpm test`, `pnpm lint`, `pnpm depcruise`, and `pnpm build` pass, and a new engineer can execute the release/rollback runbook. |
 
 ## Order of work
@@ -78,6 +78,8 @@ These are deployable slices, not a single rewrite. Fixes within a phase can be s
 
 ### 2B. Define mail-delivery guarantees
 
+**Status (2026-09-13): Complete for the application behavior currently required.** Security-sensitive account email-change, 2FA, and admin force-reset flows now expose explicit recovery or partial-failure outcomes when delivery fails. Public email-list signup compensates failed verification delivery without broad deletion, and required sends are awaited where the request depends on them. Welcome mail remains best-effort; no durable outbox is implemented because the plan treats that as conditional on a concrete SLA or incident history.
+
 **Why:** Email-list rows commit before mail delivery and cleanup is best-effort; welcome mail is detached from the request with `void ...catch` (`src/server/routes/email-list.ts`, `src/lib/auth/index.ts`). This creates pending states with no message or messages that can be lost on invocation termination.
 
 **What:** Classify each sender as required for completing the operation or best-effort. Make email-list signup retry safely reuse or replace a valid verification token without deleting another concurrent signup's state. Decide whether welcome mail needs a delivery guarantee.
@@ -90,6 +92,8 @@ These are deployable slices, not a single rewrite. Fixes within a phase can be s
 
 ### 3A. Paginate contact and subscriber admin views
 
+**Status (2026-09-13): Partially complete.** Admin user listing is paginated with `limit` and `offset`, but the contact-submission and email-subscriber admin views named in this item still return all matching rows.
+
 **Why:** Both DAL reads return all matching rows and the pages render them all (`src/server/db/dal/contact-submission.ts`, `email-list.ts`, corresponding `src/app/admin` pages). Message bodies and metadata increase payload size.
 
 **What:** Introduce a fixed maximum page size, stable ordering and URL-preserved filters. Return `items` plus `hasMore` or a measured count. Keep bulk status actions explicitly scoped to the current filter, not accidentally to only the visible page.
@@ -99,6 +103,8 @@ These are deployable slices, not a single rewrite. Fixes within a phase can be s
 **Done when:** DB and serialized response work are bounded by page size for normal list views, while bulk actions retain their stated scope.
 
 ### 3B. Seed built-in email lists once
+
+**Status (2026-09-13): Pending.** `ensureDefaultEmailLists()` still runs on foreground signup and admin email-list read paths, so this phase is not complete.
 
 **Why:** `ensureDefaultEmailLists` upserts waitlist/newsletter on every signup and admin list read, and changes their status back to `active` (`src/server/db/dal/email-list.ts`). This couples requests to extra writes and defeats archiving.
 
@@ -112,9 +118,9 @@ These are deployable slices, not a single rewrite. Fixes within a phase can be s
 
 ### 4A. Make the dependency rule truthful
 
-**Status (2026-09-13): Partially complete.** Admin account/session deletes and 2FA persistence moved to focused DAL modules, resolving the four violations recorded on 2026-09-12. `pnpm depcruise` passes. Moving remaining UI query contracts out of `src/components` is still pending.
+**Status (2026-09-13): Complete.** Admin account/session deletes and 2FA persistence moved to focused DAL modules, resolving the four violations recorded on 2026-09-12. Admin query contracts moved out of `src/components` into neutral modules, server data modules no longer depend on UI folders, and `pnpm depcruise` passes.
 
-**Why:** The direct DB/schema imports conflicted with the repository's DAL-only policy. DAL imports of UI query types (`src/server/db/dal/admin-users.ts`, `contact-submission.ts`) still make the intended dependency direction unclear.
+**Why:** The direct DB/schema imports conflicted with the repository's DAL-only policy. DAL imports of UI query types (`src/server/db/dal/admin-users.ts`, `contact-submission.ts`) also made the intended dependency direction unclear before the query contracts moved to neutral modules.
 
 **What:** Keep a simple rule: HTTP/UI modules do not import Drizzle or the schema; DAL owns SQL, while focused workflow modules own business transitions. Put query-state contracts in a neutral server-safe module.
 
@@ -123,6 +129,8 @@ These are deployable slices, not a single rewrite. Fixes within a phase can be s
 **Done when:** The four violations are gone, server data modules do not depend on UI folders, and the dependency check passes without broad exclusions.
 
 ### 4B. Measure before database or caching changes
+
+**Status (2026-09-13): Pending.** There is no production p95/query-plan evidence, request-ID/metrics layer, connection budget, or deployment/backup/restore runbook yet.
 
 **Why:** Admin user `ILIKE`, flexible sorts and `OFFSET`/`COUNT(*)` may become slow, but table sizes and p95 latency are unknown (`src/server/db/dal/admin-users.ts`, `SCALABILITY.md`). Session checks are repeated, but their actual request cost is unmeasured.
 
