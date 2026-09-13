@@ -4,12 +4,14 @@ import type * as React from "react";
 
 import AuthContainer from "@/components/auth/auth-container";
 import { AuthFormShell } from "@/components/auth/auth-form-shell";
+import { TwoFactorForm } from "@/components/auth/two-factor-form";
 import { VerifyEmailRequired } from "@/components/auth/verify-email-required";
 import {
   type AuthRole,
   getCurrentUser,
   type RequestHeaders,
 } from "@/lib/auth/access";
+import { evaluateAdminAccess } from "@/lib/auth/admin-access";
 
 const fallbackCallbackURLByRole: Record<AuthRole, string> = {
   admin: "/admin",
@@ -96,6 +98,20 @@ async function VerifiedRoleGate({
         }
       />
     );
+  }
+
+  if (gateTwoFactor && requiredRole === "admin") {
+    const decision = await evaluateAdminAccess(user);
+
+    if (!decision.allowed) {
+      return (
+        <AuthContainer
+          authForm={
+            <TwoFactorForm mode="admin-step-up" redirectTo={callbackURL} />
+          }
+        />
+      );
+    }
   }
 
   return children;

@@ -8,6 +8,7 @@ export type AuthSession = typeof auth.$Infer.Session;
 
 export type CurrentUser = AuthUserRecord & {
   roles: AuthRole[];
+  session: AuthSession["session"];
 };
 
 export type CurrentUserOptions = {
@@ -38,5 +39,6 @@ export async function getCurrentUser({
   return {
     ...user,
     roles: getAllowedRoles(user),
+    session: session.session,
   };
 }

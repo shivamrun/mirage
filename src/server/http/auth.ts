@@ -1,16 +1,20 @@
 import { Elysia } from "elysia";
 
 import { auth } from "@/lib/auth";
+import {
+  adminAccessMessages,
+  evaluateAdminAccess,
+} from "@/lib/auth/admin-access";
 import { type AuthSession, getCurrentUser } from "@/lib/auth/current-user";
 
 export type { AuthSession };
 
 const emailVerificationRequired = {
-  message: "Email verification required",
+  message: adminAccessMessages.emailVerificationRequired,
 };
 
 const twoFactorRequired = {
-  message: "Two-factor authentication required",
+  message: adminAccessMessages.twoFactorRequired,
 };
 
 export const elysiaAuth = new Elysia({ name: "better-auth" }).macro({
@@ -41,19 +45,13 @@ export const elysiaAuth = new Elysia({ name: "better-auth" }).macro({
       });
 
       if (!authUser) {
-        return status(404, { message: "Not Found" });
+        return status(404, { message: adminAccessMessages.notFound });
       }
 
-      if (!authUser.roles.includes("admin")) {
-        return status(404, { message: "Not Found" });
-      }
+      const decision = await evaluateAdminAccess(authUser);
 
-      if (!authUser.emailVerified) {
-        return status(403, emailVerificationRequired);
-      }
-
-      if (!authUser.twoFactorEnabled) {
-        return status(403, twoFactorRequired);
+      if (!decision.allowed) {
+        return status(decision.statusCode, { message: decision.message });
       }
 
       return { authUser };

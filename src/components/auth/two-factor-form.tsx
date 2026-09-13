@@ -15,9 +15,16 @@ import {
 } from "@/components/auth/auth-form-shell";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
+import { api } from "@/lib/api/client";
 import { authClient } from "@/lib/auth/client";
 
-function TwoFactorForm({ redirectTo = "/" }: { redirectTo?: string }) {
+function TwoFactorForm({
+  mode = "login",
+  redirectTo = "/",
+}: {
+  mode?: "admin-step-up" | "login";
+  redirectTo?: string;
+}) {
   const router = useRouter();
   const [code, setCode] = React.useState("");
   const [error, setError] = React.useState<string>();
@@ -35,13 +42,37 @@ function TwoFactorForm({ redirectTo = "/" }: { redirectTo?: string }) {
     setIsSubmitting(true);
 
     try {
-      const result = await authClient.twoFactor.verifyTotp({
-        code: code.replace(/\s/g, ""),
-      });
+      const normalizedCode = code.replace(/\s/g, "");
 
-      if (result.error) {
-        setError(getAuthErrorMessage(result.error));
-        return;
+      if (mode === "admin-step-up") {
+        const result = await api.api.account["admin-step-up"].totp.post({
+          code: normalizedCode,
+        });
+
+        if (result.error) {
+          setError(result.error.value.message);
+          return;
+        }
+      } else {
+        const result = await authClient.twoFactor.verifyTotp({
+          code: normalizedCode,
+        });
+
+        if (result.error) {
+          setError(getAuthErrorMessage(result.error));
+          return;
+        }
+      }
+
+      if (mode === "login" && redirectTo.startsWith("/admin")) {
+        const stepUpResult = await api.api.account["admin-step-up"].totp.post({
+          code: normalizedCode,
+        });
+
+        if (stepUpResult.error) {
+          setError(stepUpResult.error.value.message);
+          return;
+        }
       }
 
       router.push(redirectTo);

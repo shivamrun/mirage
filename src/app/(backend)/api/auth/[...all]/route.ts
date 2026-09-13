@@ -1,6 +1,7 @@
 import { toNextJsHandler } from "better-auth/next-js";
 
 import { auth } from "@/lib/auth";
+import { evaluateAdminAccess } from "@/lib/auth/admin-access";
 import { getCurrentUser } from "@/lib/auth/current-user";
 
 const handlers = toNextJsHandler(auth.handler);
@@ -11,19 +12,17 @@ async function handleAdminRequest(
 ) {
   if (new URL(request.url).pathname.startsWith("/api/auth/admin/")) {
     const user = await getCurrentUser({ headers: request.headers });
+    const decision = await evaluateAdminAccess(user);
 
-    if (user?.roles.includes("admin") && !user.emailVerified) {
-      return Response.json(
-        { message: "Email verification required" },
-        { status: 403 },
-      );
+    if (
+      !decision.allowed &&
+      decision.reason === "email-verification-required"
+    ) {
+      return Response.json({ message: decision.message }, { status: 403 });
     }
 
-    if (user?.roles.includes("admin") && !user.twoFactorEnabled) {
-      return Response.json(
-        { message: "Two-factor authentication required" },
-        { status: 403 },
-      );
+    if (!decision.allowed && decision.reason === "two-factor-required") {
+      return Response.json({ message: decision.message }, { status: 403 });
     }
   }
 

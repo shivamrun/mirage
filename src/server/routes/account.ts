@@ -17,6 +17,7 @@ import {
   startAccountTwoFactorSetup,
   verifyAccountTwoFactorSetup,
 } from "@/server/account/two-factor";
+import { completeAdminTotpStepUp } from "@/server/auth/admin-step-up";
 import { elysiaAuth } from "@/server/http/auth";
 import { requestPolicy } from "@/server/http/request-policy";
 import {
@@ -89,6 +90,38 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
     },
     {
       auth: true,
+    },
+  )
+  .post(
+    "/admin-step-up/totp",
+    async ({ authSession, body, set, status }) => {
+      const result = await completeAdminTotpStepUp({
+        authSession,
+        code: body.code,
+      });
+
+      if (result.kind === "error") {
+        if (result.statusCode === 429 && result.retryAfterSeconds) {
+          set.headers["Retry-After"] = String(result.retryAfterSeconds);
+        }
+
+        return status(result.statusCode, { message: result.message });
+      }
+
+      return { status: true as const };
+    },
+    {
+      auth: true,
+      sameOrigin: true,
+      body: twoFactorCodeSchema,
+      response: {
+        200: twoFactorEmailCodeResponseSchema,
+        400: messageResponseSchema,
+        401: messageResponseSchema,
+        403: messageResponseSchema,
+        429: messageResponseSchema,
+        500: messageResponseSchema,
+      },
     },
   )
   .post(

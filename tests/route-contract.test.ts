@@ -14,6 +14,11 @@ const trustedOrigin = "http://localhost:3000";
 const jsonHeaders = { "content-type": "application/json" };
 
 const mutationRoutes = [
+  {
+    method: "POST",
+    path: "/api/account/admin-step-up/totp",
+    access: "user",
+  },
   { method: "POST", path: "/api/account/two-factor/send-code", access: "user" },
   {
     method: "POST",
@@ -103,6 +108,7 @@ function requestBody(path: string) {
     return JSON.stringify({ action: "enable" });
   }
   if (
+    path === "/api/account/admin-step-up/totp" ||
     path === "/api/account/two-factor/start-setup" ||
     path === "/api/account/two-factor/verify-setup" ||
     path === "/api/account/two-factor/disable"
@@ -174,8 +180,8 @@ describe("current Elysia HTTP contract", () => {
     ).toEqual(expected);
   });
 
-  it("guards all 22 mutations with the current origin response", async () => {
-    expect(mutationRoutes).toHaveLength(22);
+  it("guards all 23 mutations with the current origin response", async () => {
+    expect(mutationRoutes).toHaveLength(23);
     const user = await createTestActor();
     const admin = await createTestActor({ role: "admin", emailVerified: true });
     const sentBefore = testEmailOutbox.length;

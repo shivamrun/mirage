@@ -29,6 +29,7 @@ export const auth = betterAuth({
   account: {
     accountLinking: {
       allowDifferentEmails: true,
+      disableImplicitLinking: true,
       enabled: true,
       requireLocalEmailVerified: false,
       trustedProviders: ["google"],
@@ -59,6 +60,7 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
+    revokeSessionsOnPasswordReset: true,
     async sendResetPassword({ url, user }) {
       await sendPasswordResetEmail({
         email: user.email,

@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import db from "@/server/db";
+import { markAdminSessionAssurance } from "@/server/db/dal/admin-session-assurance";
 import { user } from "@/server/db/schema";
 
 const password = "TestPassword123!";
@@ -60,6 +61,20 @@ export async function createTestActor({
     .update(user)
     .set({ twoFactorEnabled: twoFactorEnabled ?? role === "admin" })
     .where(eq(user.id, record.id));
+
+  const authSession = await auth.api.getSession({
+    headers: new Headers({ cookie: sessionCookie }),
+  });
+  if (
+    authSession &&
+    role === "admin" &&
+    (twoFactorEnabled ?? role === "admin")
+  ) {
+    await markAdminSessionAssurance({
+      sessionId: authSession.session.id,
+      userId: record.id,
+    });
+  }
 
   return { cookie: sessionCookie, email, id: record.id };
 }

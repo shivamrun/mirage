@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import db from "@/server/db";
 import {
@@ -103,6 +103,73 @@ export async function findPendingTwoFactorSetup(userId: string) {
     .limit(1);
 
   return record ?? null;
+}
+
+export async function findVerifiedTwoFactor(userId: string) {
+  const [record] = await db
+    .select()
+    .from(twoFactorTable)
+    .where(
+      and(eq(twoFactorTable.userId, userId), eq(twoFactorTable.verified, true)),
+    )
+    .limit(1);
+
+  return record ?? null;
+}
+
+export function getTwoFactorLockState(
+  twoFactor: Pick<typeof twoFactorTable.$inferSelect, "lockedUntil">,
+) {
+  if (!twoFactor.lockedUntil) {
+    return null;
+  }
+
+  const retryAfterSeconds = Math.ceil(
+    (twoFactor.lockedUntil.getTime() - Date.now()) / 1000,
+  );
+
+  return retryAfterSeconds > 0 ? { retryAfterSeconds } : null;
+}
+
+export async function recordTwoFactorVerificationFailure({
+  lockUntil,
+  maxFailedAttempts,
+  twoFactorId,
+}: {
+  lockUntil: Date;
+  maxFailedAttempts: number;
+  twoFactorId: string;
+}) {
+  const [updated] = await db
+    .update(twoFactorTable)
+    .set({
+      failedVerificationCount: sql`${twoFactorTable.failedVerificationCount} + 1`,
+    })
+    .where(eq(twoFactorTable.id, twoFactorId))
+    .returning({
+      failedVerificationCount: twoFactorTable.failedVerificationCount,
+    });
+
+  if ((updated?.failedVerificationCount ?? 0) < maxFailedAttempts) {
+    return;
+  }
+
+  await db
+    .update(twoFactorTable)
+    .set({
+      lockedUntil: lockUntil,
+    })
+    .where(eq(twoFactorTable.id, twoFactorId));
+}
+
+export async function resetTwoFactorVerificationFailures(twoFactorId: string) {
+  await db
+    .update(twoFactorTable)
+    .set({
+      failedVerificationCount: 0,
+      lockedUntil: null,
+    })
+    .where(eq(twoFactorTable.id, twoFactorId));
 }
 
 export async function createTwoFactorSetup(values: {

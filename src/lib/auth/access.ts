@@ -1,6 +1,7 @@
 import { headers as requestHeaders } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
+import { evaluateAdminAccess } from "@/lib/auth/admin-access";
 import {
   type AuthRole,
   type CurrentUser,
@@ -65,8 +66,9 @@ export async function requireAdmin(options: AccessOptions = {}) {
 
 export async function requireVerifiedAdmin(options: AccessOptions = {}) {
   const user = await requireAdmin(options);
+  const decision = await evaluateAdminAccess(user);
 
-  if (!user.emailVerified || !user.twoFactorEnabled) {
+  if (!decision.allowed) {
     notFound();
   }
 

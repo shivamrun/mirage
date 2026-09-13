@@ -113,6 +113,13 @@
       "when": 1789240890318,
       "tag": "0015_slim_wasp",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1789315256323,
+      "tag": "0016_chemical_william_stryker",
+      "breakpoints": true
     }
   ]
 }
