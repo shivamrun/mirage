@@ -25,7 +25,7 @@ import type {
   FilterOperator,
   SearchOperator,
   SortField,
-} from "@/components/admin/users/query";
+} from "@/lib/admin/users-query";
 import db from "@/server/db";
 import { user as userTable } from "@/server/db/schema";
 

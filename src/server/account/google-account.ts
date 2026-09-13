@@ -1,5 +1,5 @@
+import type { AuthSession } from "@/lib/auth/current-user";
 import { getGoogleAccountByUserId } from "@/server/db/dal/google-account";
-import type { AuthSession } from "@/server/http/auth";
 
 type GoogleIdTokenPayload = {
   email?: unknown;

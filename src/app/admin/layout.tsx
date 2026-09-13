@@ -7,7 +7,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
-    <VerifiedRoleGate requiredRole="admin">
+    <VerifiedRoleGate gateTwoFactor requiredRole="admin">
       <SidebarProvider className="h-svh max-h-svh min-h-0 overflow-hidden">
         <AppSidebar mode="admin" />
 

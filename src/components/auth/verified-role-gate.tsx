@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import type * as React from "react";
 
 import AuthContainer from "@/components/auth/auth-container";
+import { AuthFormShell } from "@/components/auth/auth-form-shell";
 import { VerifyEmailRequired } from "@/components/auth/verify-email-required";
 import {
   type AuthRole,
@@ -36,10 +37,12 @@ function cleanCallbackURL(callbackURL: string) {
 
 async function VerifiedRoleGate({
   children,
+  gateTwoFactor = false,
   gateUnverifiedUsers = true,
   requiredRole,
 }: {
   children: React.ReactNode;
+  gateTwoFactor?: boolean;
   gateUnverifiedUsers?: boolean;
   requiredRole: AuthRole;
 }) {
@@ -65,6 +68,31 @@ async function VerifiedRoleGate({
             email={user.email}
             sent={isVerificationSent(requestedPath)}
           />
+        }
+      />
+    );
+  }
+
+  if (gateTwoFactor && !user.twoFactorEnabled) {
+    return (
+      <AuthContainer
+        authForm={
+          <AuthFormShell
+            title="Enable two-factor"
+            description="Admin access requires two-factor authentication. Enable it on your account before returning here."
+            footer={
+              <a className="link-text" href="/account/security">
+                Open account security
+              </a>
+            }
+          >
+            <a
+              className="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground text-sm transition-colors hover:bg-primary/90"
+              href="/account/security"
+            >
+              Enable two-factor authentication
+            </a>
+          </AuthFormShell>
         }
       />
     );

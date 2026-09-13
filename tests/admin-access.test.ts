@@ -85,6 +85,11 @@ describe("admin HTTP access", () => {
     { actor: "visitor", expectedCustom: 404, expectedAuth: 401 },
     { actor: "user", expectedCustom: 404, expectedAuth: 403 },
     { actor: "unverified admin", expectedCustom: 403, expectedAuth: 403 },
+    {
+      actor: "verified admin without 2FA",
+      expectedCustom: 403,
+      expectedAuth: 403,
+    },
     { actor: "verified admin", expectedCustom: 200, expectedAuth: 200 },
   ] as const)(
     "enforces access for $actor",
@@ -95,7 +100,8 @@ describe("admin HTTP access", () => {
           ? null
           : await createTestActor({
               role: actor === "user" ? "user" : "admin",
-              emailVerified: actor === "verified admin",
+              emailVerified: actor !== "user" && actor !== "unverified admin",
+              twoFactorEnabled: actor !== "verified admin without 2FA",
             });
       const headers: Record<string, string> = current
         ? { cookie: current.cookie }

@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
 import { auth } from "@/lib/auth";
+import type { AuthSession } from "@/lib/auth/current-user";
 import { env } from "@/lib/env";
 import {
   consumePendingAndUpdateUserEmail,
@@ -14,7 +15,6 @@ import {
   replaceApprovalWithPending,
 } from "@/server/db/dal/email-change";
 import { logEmailDeliveryFailure, sendVerificationEmail } from "@/server/email";
-import type { AuthSession } from "@/server/http/auth";
 import { consumeAccountEmailSendLimit } from "@/server/rate-limit";
 import type { ChangeEmailValues } from "@/zod";
 

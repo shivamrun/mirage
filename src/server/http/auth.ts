@@ -1,9 +1,17 @@
 import { Elysia } from "elysia";
 
 import { auth } from "@/lib/auth";
-import { getCurrentUser } from "@/lib/auth/access";
+import { type AuthSession, getCurrentUser } from "@/lib/auth/current-user";
 
-export type AuthSession = typeof auth.$Infer.Session;
+export type { AuthSession };
+
+const emailVerificationRequired = {
+  message: "Email verification required",
+};
+
+const twoFactorRequired = {
+  message: "Two-factor authentication required",
+};
 
 export const elysiaAuth = new Elysia({ name: "better-auth" }).macro({
   auth: {
@@ -41,10 +49,44 @@ export const elysiaAuth = new Elysia({ name: "better-auth" }).macro({
       }
 
       if (!authUser.emailVerified) {
-        return status(403, { message: "Email verification required" });
+        return status(403, emailVerificationRequired);
+      }
+
+      if (!authUser.twoFactorEnabled) {
+        return status(403, twoFactorRequired);
       }
 
       return { authUser };
+    },
+  },
+  verifiedEmail: {
+    async beforeHandle({ request, status }) {
+      const authUser = await getCurrentUser({
+        headers: request.headers,
+      });
+
+      if (!authUser) {
+        return status(401, { message: "Unauthorized" });
+      }
+
+      if (!authUser.emailVerified) {
+        return status(403, emailVerificationRequired);
+      }
+    },
+  },
+  twoFactor: {
+    async beforeHandle({ request, status }) {
+      const authUser = await getCurrentUser({
+        headers: request.headers,
+      });
+
+      if (!authUser) {
+        return status(401, { message: "Unauthorized" });
+      }
+
+      if (!authUser.twoFactorEnabled) {
+        return status(403, twoFactorRequired);
+      }
     },
   },
 });

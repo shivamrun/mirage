@@ -1,9 +1,12 @@
 import { headers as requestHeaders } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
-import { auth } from "@/lib/auth";
-import { type AuthRole, normalizeRoles } from "@/lib/auth/roles";
-import { type AuthUserRecord, getAuthUserById } from "@/server/db/dal/auth";
+import {
+  type AuthRole,
+  type CurrentUser,
+  type RequestHeaders as CurrentUserHeaders,
+  getCurrentUser as getCurrentUserFromHeaders,
+} from "@/lib/auth/current-user";
 
 export type RequestHeaders =
   | Headers
@@ -15,39 +18,20 @@ type AccessOptions = {
   headers?: RequestHeaders;
 };
 
-export type CurrentUser = AuthUserRecord & {
-  roles: AuthRole[];
-};
+export type { CurrentUser };
 
 async function getHeaders(headers?: RequestHeaders) {
-  return headers ?? (await requestHeaders());
-}
-
-export function getAllowedRoles(user: Pick<AuthUserRecord, "role">) {
-  return normalizeRoles(user.role);
+  return new Headers(
+    headers ?? (await requestHeaders()),
+  ) satisfies CurrentUserHeaders;
 }
 
 export async function getCurrentUser(
   options: AccessOptions = {},
 ): Promise<CurrentUser | null> {
-  const session = await auth.api.getSession({
+  return getCurrentUserFromHeaders({
     headers: await getHeaders(options.headers),
   });
-
-  if (!session) {
-    return null;
-  }
-
-  const user = await getAuthUserById(session.user.id);
-
-  if (!user) {
-    return null;
-  }
-
-  return {
-    ...user,
-    roles: getAllowedRoles(user),
-  };
 }
 
 export async function requireAuth(
@@ -82,7 +66,7 @@ export async function requireAdmin(options: AccessOptions = {}) {
 export async function requireVerifiedAdmin(options: AccessOptions = {}) {
   const user = await requireAdmin(options);
 
-  if (!user.emailVerified) {
+  if (!user.emailVerified || !user.twoFactorEnabled) {
     notFound();
   }
 

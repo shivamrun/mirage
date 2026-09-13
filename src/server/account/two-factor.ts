@@ -6,6 +6,7 @@ import {
   symmetricDecrypt,
   symmetricEncrypt,
 } from "better-auth/crypto";
+import type { AuthSession } from "@/lib/auth/current-user";
 import { env } from "@/lib/env";
 import { siteConfig } from "@/lib/metadata";
 import {
@@ -24,7 +25,6 @@ import {
   logEmailDeliveryFailure,
   sendTwoFactorEmailCode,
 } from "@/server/email";
-import type { AuthSession } from "@/server/http/auth";
 import { consumeAccountEmailSendLimit } from "@/server/rate-limit";
 
 const EMAIL_CODE_PREFIX = "account-two-factor-email-code";

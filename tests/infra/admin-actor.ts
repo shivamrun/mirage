@@ -28,9 +28,11 @@ async function authRequest(path: string, body: object) {
 export async function createTestActor({
   role = "user",
   emailVerified = false,
+  twoFactorEnabled,
 }: {
   role?: "admin" | "user";
   emailVerified?: boolean;
+  twoFactorEnabled?: boolean;
 } = {}) {
   const email = `test-${randomUUID()}@example.com`;
   await authRequest("/sign-up/email", {
@@ -53,6 +55,11 @@ export async function createTestActor({
     ?.split(";")[0];
   if (!sessionCookie)
     throw new Error("Sign-in did not return a session cookie.");
+
+  await db
+    .update(user)
+    .set({ twoFactorEnabled: twoFactorEnabled ?? role === "admin" })
+    .where(eq(user.id, record.id));
 
   return { cookie: sessionCookie, email, id: record.id };
 }

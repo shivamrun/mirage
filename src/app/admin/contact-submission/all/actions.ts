@@ -2,12 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 
+import { ADMIN_CONTACT_SUBMISSION_PAGE_PATH } from "@/components/admin/contact-submission/query";
 import {
-  ADMIN_CONTACT_SUBMISSION_PAGE_PATH,
   type AdminContactSubmissionPageSearchParams,
   type ContactSubmissionStatus,
   parseAdminContactSubmissionSearchParams,
-} from "@/components/admin/contact-submission/query";
+} from "@/lib/admin/contact-submission-query";
 import { requireVerifiedAdmin } from "@/lib/auth/access";
 import {
   bulkUpdateContactSubmissionStatus,

@@ -3,7 +3,7 @@ import { and, asc, desc, eq, ilike, ne, or, type SQL } from "drizzle-orm";
 import type {
   AdminContactSubmissionQueryState,
   ContactSubmissionStatus,
-} from "@/components/admin/contact-submission";
+} from "@/lib/admin/contact-submission-query";
 import db from "@/server/db";
 import { contactSubmission } from "@/server/db/schema";
 import type { ContactSubmissionValues } from "@/zod";
