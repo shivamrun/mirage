@@ -1,4 +1,3 @@
-import { node } from "@elysia/node";
 import { Elysia, t } from "elysia";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -19,9 +18,7 @@ describe("Elysia API error boundary", () => {
         throw new Error("private-error-value");
       },
     );
-    const app = new Elysia({ adapter: node(), prefix: "/api" })
-      .use(apiErrors)
-      .use(child);
+    const app = new Elysia({ prefix: "/api" }).use(apiErrors).use(child);
 
     const response = await httpRequest(
       app,
@@ -47,9 +44,7 @@ describe("Elysia API error boundary", () => {
       () => ({ count: "private-value" as unknown as number }),
       { response: t.Object({ count: t.Number() }) },
     );
-    const app = new Elysia({ adapter: node(), prefix: "/api" })
-      .use(apiErrors)
-      .use(child);
+    const app = new Elysia({ prefix: "/api" }).use(apiErrors).use(child);
 
     const response = await httpRequest(app, "/api/fixture/invalid-response");
 
@@ -74,9 +69,7 @@ describe("Elysia API error boundary", () => {
         set.headers["Retry-After"] = "30";
         throw status(503, { message: "Feature unavailable." });
       });
-    const app = new Elysia({ adapter: node(), prefix: "/api" })
-      .use(apiErrors)
-      .use(child);
+    const app = new Elysia({ prefix: "/api" }).use(apiErrors).use(child);
 
     const denied = await httpRequest(app, "/api/fixture/denied");
     expect(denied.status).toBe(403);
@@ -121,9 +114,7 @@ describe("Elysia API error boundary", () => {
           { status: 503, headers: { "X-Feature": "kept" } },
         ),
       );
-    const app = new Elysia({ adapter: node(), prefix: "/api" })
-      .use(apiErrors)
-      .use(child);
+    const app = new Elysia({ prefix: "/api" }).use(apiErrors).use(child);
 
     const invalid = await httpRequest(app, "/api/fixture/validated", {
       method: "POST",

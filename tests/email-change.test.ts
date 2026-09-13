@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 
-import { node } from "@elysia/node";
 import { eq, like } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { describe, expect, it } from "vitest";
@@ -12,7 +11,7 @@ import { createTestActor } from "./infra/admin-actor";
 import { setTestEmailDeliveryHook, testEmailOutbox } from "./infra/email-fake";
 
 const origin = "http://localhost:3000";
-const app = new Elysia({ adapter: node(), prefix: "/api" }).use(accountRoutes);
+const app = new Elysia({ prefix: "/api" }).use(accountRoutes);
 
 async function post(path: string, body: object, cookie?: string) {
   const response = await postResponse(path, body, cookie);

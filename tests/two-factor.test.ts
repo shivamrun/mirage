@@ -1,5 +1,4 @@
 import { createOTP } from "@better-auth/utils/otp";
-import { node } from "@elysia/node";
 import { symmetricDecrypt } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
@@ -18,7 +17,7 @@ import { createTestActor } from "./infra/admin-actor";
 import { setTestEmailDeliveryHook, testEmailOutbox } from "./infra/email-fake";
 
 const origin = "http://localhost:3000";
-const app = new Elysia({ adapter: node(), prefix: "/api" }).use(accountRoutes);
+const app = new Elysia({ prefix: "/api" }).use(accountRoutes);
 
 async function post(path: string, body: object, cookie: string) {
   const response = await app.fetch(

@@ -1,4 +1,3 @@
-import { node } from "@elysia/node";
 import { Elysia } from "elysia";
 
 import { authActionRoutes } from "@/server/auth-actions/routes";
@@ -9,7 +8,7 @@ import { contactRoutes } from "./contact";
 import { emailListRoutes } from "./email-list";
 import { uploadsRoutes } from "./uploads";
 
-export const app = new Elysia({ adapter: node(), prefix: "/api" })
+export const app = new Elysia({ prefix: "/api" })
   .use(apiErrors)
   .get("/", () => "Hello Elysia")
   .get("/health", () => ({ ok: true }))

@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 
-import { node } from "@elysia/node";
 import { and, eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { describe, expect, it } from "vitest";
@@ -11,7 +10,7 @@ import { adminRoutes } from "@/server/routes/admin";
 import { createTestActor } from "./infra/admin-actor";
 
 const origin = "http://localhost:3000";
-const app = new Elysia({ adapter: node(), prefix: "/api" }).use(adminRoutes);
+const app = new Elysia({ prefix: "/api" }).use(adminRoutes);
 
 async function remove(path: string, cookie: string) {
   return app.fetch(

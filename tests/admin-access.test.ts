@@ -1,4 +1,3 @@
-import { node } from "@elysia/node";
 import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { describe, expect, it } from "vitest";
@@ -14,7 +13,7 @@ import { createTestActor } from "./infra/admin-actor";
 import { setTestEmailDeliveryHook, testEmailOutbox } from "./infra/email-fake";
 
 const origin = "http://localhost:3000";
-const app = new Elysia({ adapter: node(), prefix: "/api" }).use(adminRoutes);
+const app = new Elysia({ prefix: "/api" }).use(adminRoutes);
 
 describe("admin HTTP access", () => {
   it("revokes target sessions before a failed password-reset dispatch", async () => {

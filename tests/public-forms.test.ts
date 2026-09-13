@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 
-import { node } from "@elysia/node";
 import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { describe, expect, it } from "vitest";
@@ -21,7 +20,7 @@ import { setTestEmailDeliveryHook, testEmailOutbox } from "./infra/email-fake";
 
 const origin = "http://localhost:3000";
 function createApp() {
-  return new Elysia({ adapter: node(), prefix: "/api" })
+  return new Elysia({ prefix: "/api" })
     .use(apiErrors)
     .use(contactRoutes)
     .use(emailListRoutes);
