@@ -38,9 +38,21 @@ export const emailListStatusUpdateBodySchema = z.object({
 
 export const adminStatusResponseSchema = passthroughStatusSuccessResponseSchema;
 
+export const adminPasswordResetSuccessResponseSchema =
+  passthroughStatusSuccessResponseSchema.extend({
+    message: z.string(),
+    resetEmailDelivery: z.literal("unconfirmed"),
+    revokedSessions: z.number(),
+  });
+
 export const adminPasswordResetPartialFailureResponseSchema = z.object({
   message: z.string(),
   resetEmailDelivery: z.literal("unconfirmed"),
   revokedSessions: z.number(),
   status: z.literal(false),
 });
+
+export const adminRevokeAllSessionsResponseSchema =
+  passthroughStatusSuccessResponseSchema.extend({
+    revokedSessions: z.number(),
+  });

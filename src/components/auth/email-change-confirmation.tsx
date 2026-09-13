@@ -8,6 +8,7 @@ import {
   AuthStatusMessage,
 } from "@/components/auth/auth-form-shell";
 import { Button } from "@/components/ui/button";
+import { api } from "@/lib/api/client";
 import { siteConfig } from "@/lib/metadata";
 
 type EmailChangeAction = "approve" | "confirm";
@@ -56,35 +57,30 @@ function EmailChangeConfirmation({
     setIsSubmitting(true);
 
     try {
-      const endpoint =
+      const result =
         action === "approve"
-          ? "/api/account/approve-email-change"
-          : "/api/account/confirm-email-change";
-      const response = await fetch(endpoint, {
-        body: JSON.stringify({ token }),
-        headers: {
-          "content-type": "application/json",
-        },
-        method: "POST",
-      });
-      const result = (await response.json()) as {
-        message?: string;
-        recovery?: string;
-        redirectURL?: string;
-      };
+          ? await api.api.account["approve-email-change"].post({ token })
+          : await api.api.account["confirm-email-change"].post({ token });
 
-      if (!response.ok) {
-        setError(result.message || "That email change link could not be used.");
-        setNeedsAccountRecovery(result.recovery === "resend-from-account");
+      if (result.error) {
+        const value = result.error.value as {
+          message?: string;
+          recovery?: string;
+        } | null;
+        setError(value?.message || "That email change link could not be used.");
+        setNeedsAccountRecovery(value?.recovery === "resend-from-account");
         return;
       }
 
-      if (!result.redirectURL) {
+      if (!result.data?.redirectURL) {
         setError("We could not complete that email change link.");
         return;
       }
 
-      const redirectURL = new URL(result.redirectURL, window.location.origin);
+      const redirectURL = new URL(
+        result.data.redirectURL,
+        window.location.origin,
+      );
 
       if (redirectURL.origin !== window.location.origin) {
         setError("We could not complete that email change link.");

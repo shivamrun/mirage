@@ -17,6 +17,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { api } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 import { formatProviderName } from "../formatters";
 
@@ -62,16 +63,17 @@ export function AdminUserAccountManageDialog({
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(
-        `/api/admin/users/${encodeURIComponent(userId)}/accounts/${encodeURIComponent(account.id)}`,
-        {
-          method: "DELETE",
-        },
-      );
+      const { error } = await api.api.admin
+        .users({ userId })
+        .accounts({ accountRowId: account.id })
+        .delete();
 
-      if (!response.ok) {
+      if (error) {
         setStatus({
-          text: await getResponseMessage(response),
+          text: getEdenMessage(
+            error,
+            "Could not unlink this account. Please try again.",
+          ),
           tone: "error",
         });
         return;
@@ -155,21 +157,17 @@ function AccountDetail({ label, value }: { label: string; value: string }) {
   );
 }
 
-async function getResponseMessage(response: Response) {
-  try {
-    const body = await response.json();
+function getEdenMessage(error: { value?: unknown } | null, fallback: string) {
+  const value = error?.value;
 
-    if (
-      body &&
-      typeof body === "object" &&
-      "message" in body &&
-      typeof body.message === "string"
-    ) {
-      return body.message;
-    }
-  } catch {
-    // Fall through to the generic message below.
+  if (
+    value &&
+    typeof value === "object" &&
+    "message" in value &&
+    typeof value.message === "string"
+  ) {
+    return value.message;
   }
 
-  return "Could not unlink this account. Please try again.";
+  return fallback;
 }

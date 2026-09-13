@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
+import { api } from "@/lib/api/client";
 
 type SecurityControlSummary = {
   activeBans: number;
@@ -83,30 +84,26 @@ function ForcePasswordResetPanel() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/admin/security/force-password-reset", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
+      const { data, error, response } = await api.api.admin.security[
+        "force-password-reset"
+      ].post({ email });
 
-      if (!response.ok) {
+      if (error) {
         setStatus({
-          text: await getResponseMessage(response),
+          text: getEdenMessage(
+            error,
+            "Security action failed. Please try again.",
+          ),
           tone: response.status === 503 ? "info" : "error",
         });
         if (response.status === 503) router.refresh();
         return;
       }
 
-      const body = await response.json();
-
       setStatus({
         text:
-          typeof body.message === "string"
-            ? body.message
-            : "Sessions were revoked. Password reset email delivery is unconfirmed.",
+          data?.message ??
+          "Sessions were revoked. Password reset email delivery is unconfirmed.",
         tone: "info",
       });
       router.refresh();
@@ -165,21 +162,21 @@ function GlobalSessionRevokePanel({
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/admin/security/revoke-all-sessions", {
-        method: "POST",
-      });
+      const { data, error } =
+        await api.api.admin.security["revoke-all-sessions"].post();
 
-      if (!response.ok) {
+      if (error) {
         setStatus({
-          text: await getResponseMessage(response),
+          text: getEdenMessage(
+            error,
+            "Security action failed. Please try again.",
+          ),
           tone: "error",
         });
         return;
       }
 
-      const body = await response.json();
-      const revokedCount =
-        typeof body.revokedSessions === "number" ? body.revokedSessions : 0;
+      const revokedCount = data?.revokedSessions ?? 0;
 
       setStatus({
         text: `Revoked ${revokedCount} sessions. Redirecting to sign in...`,
@@ -262,21 +259,17 @@ function SummaryRow({ label, value }: { label: string; value: number }) {
   );
 }
 
-async function getResponseMessage(response: Response) {
-  try {
-    const body = await response.json();
+function getEdenMessage(error: { value?: unknown } | null, fallback: string) {
+  const value = error?.value;
 
-    if (
-      body &&
-      typeof body === "object" &&
-      "message" in body &&
-      typeof body.message === "string"
-    ) {
-      return body.message;
-    }
-  } catch {
-    // Fall through to the generic message below.
+  if (
+    value &&
+    typeof value === "object" &&
+    "message" in value &&
+    typeof value.message === "string"
+  ) {
+    return value.message;
   }
 
-  return "Security action failed. Please try again.";
+  return fallback;
 }

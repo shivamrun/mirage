@@ -22,6 +22,8 @@ import { requestPolicy } from "@/server/http/request-policy";
 import {
   adminCreateEmailListSchema,
   adminPasswordResetPartialFailureResponseSchema,
+  adminPasswordResetSuccessResponseSchema,
+  adminRevokeAllSessionsResponseSchema,
   adminStatusResponseSchema,
   adminUpdateEmailListSchema,
   emailListKeyParamsSchema,
@@ -271,7 +273,7 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
       sameOrigin: true,
       body: forcePasswordResetSchema,
       response: {
-        200: adminStatusResponseSchema,
+        200: adminPasswordResetSuccessResponseSchema,
         400: messageResponseSchema,
         403: messageResponseSchema,
         404: messageResponseSchema,
@@ -294,7 +296,7 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
       admin: true,
       sameOrigin: true,
       response: {
-        200: adminStatusResponseSchema,
+        200: adminRevokeAllSessionsResponseSchema,
         403: messageResponseSchema,
         500: messageResponseSchema,
       },

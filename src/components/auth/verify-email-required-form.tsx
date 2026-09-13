@@ -6,17 +6,12 @@ import * as React from "react";
 
 import { AuthStatusMessage } from "@/components/auth/auth-form-shell";
 import { Button } from "@/components/ui/button";
+import { api } from "@/lib/api/client";
 
 type VerifyEmailRequiredFormProps = {
   callbackURL: string;
   email: string;
   sent?: boolean;
-};
-
-type VerificationResponse = {
-  message?: string;
-  redirectURL?: string;
-  status?: boolean;
 };
 
 function VerifyEmailRequiredForm({
@@ -40,32 +35,23 @@ function VerifyEmailRequiredForm({
     setState({ message: "", sent: false });
 
     try {
-      const response = await fetch(
-        "/api/auth-actions/protected-route-verification-email",
-        {
-          body: JSON.stringify({ callbackURL }),
-          headers: {
-            "Content-Type": "application/json",
-          },
-          method: "POST",
-        },
-      );
-      const result = (await response.json().catch(() => ({}))) as
-        | VerificationResponse
-        | undefined;
+      const { data, error } = await api.api["auth-actions"][
+        "protected-route-verification-email"
+      ].post({ callbackURL });
 
-      if (!response.ok) {
+      if (error) {
+        const value = error.value as { message?: string } | null;
         setState({
           message:
-            result?.message ||
+            value?.message ||
             "We could not send the verification link. Please try again.",
           sent: false,
         });
         return;
       }
 
-      if (result?.redirectURL) {
-        router.replace(result.redirectURL, { scroll: false });
+      if (data?.redirectURL) {
+        router.replace(data.redirectURL, { scroll: false });
       }
 
       setState({ message: "", sent: true });

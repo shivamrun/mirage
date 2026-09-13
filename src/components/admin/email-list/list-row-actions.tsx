@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { api } from "@/lib/api/client";
 
 type StatusMessage = {
   message: string;
@@ -48,18 +49,6 @@ type EmailListRowActionsProps = {
 };
 
 const protectedEmailListKeys = new Set(["waitlist", "newsletter"]);
-
-async function readErrorMessage(response: Response) {
-  try {
-    const body = (await response.json()) as { message?: unknown };
-
-    return typeof body.message === "string"
-      ? body.message
-      : "Could not update email list.";
-  } catch {
-    return "Could not update email list.";
-  }
-}
 
 export function EmailListRowActions({ list }: EmailListRowActionsProps) {
   const router = useRouter();
@@ -79,23 +68,21 @@ export function EmailListRowActions({ list }: EmailListRowActionsProps) {
 
   async function updateStatus() {
     const nextStatus = list.status === "active" ? "archived" : "active";
-    const response = await fetch(
-      `/api/admin/email-list/${encodeURIComponent(list.key)}/status`,
-      {
-        body: JSON.stringify({ status: nextStatus }),
-        headers: {
-          "content-type": "application/json",
-        },
-        method: "PATCH",
-      },
-    );
 
-    if (!response.ok) {
-      console.error(await readErrorMessage(response));
-      return;
+    try {
+      const { error } = await api.api.admin["email-list"]({
+        key: list.key,
+      }).status.patch({ status: nextStatus });
+
+      if (error) {
+        console.error(getEdenMessage(error, "Could not update email list."));
+        return;
+      }
+
+      router.refresh();
+    } catch {
+      console.error("Could not update email list.");
     }
-
-    router.refresh();
   }
 
   async function onUpdateSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -103,60 +90,64 @@ export function EmailListRowActions({ list }: EmailListRowActionsProps) {
     setStatus(undefined);
     setIsSubmitting(true);
 
-    const formData = new FormData(event.currentTarget);
-    const response = await fetch(
-      `/api/admin/email-list/${encodeURIComponent(list.key)}`,
-      {
-        body: JSON.stringify({
-          description: formData.get("description"),
-          emailVerificationRequired:
-            formData.get("emailVerificationRequired") === "true",
-          name: formData.get("name"),
-        }),
-        headers: {
-          "content-type": "application/json",
-        },
-        method: "PATCH",
-      },
-    );
+    try {
+      const formData = new FormData(event.currentTarget);
+      const { error } = await api.api.admin["email-list"]({
+        key: list.key,
+      }).patch({
+        description: formString(formData, "description"),
+        emailVerificationRequired:
+          formData.get("emailVerificationRequired") === "true",
+        name: requiredFormString(formData, "name"),
+      });
 
-    setIsSubmitting(false);
+      if (error) {
+        setStatus({
+          message: getEdenMessage(error, "Could not update email list."),
+          tone: "error",
+        });
+        return;
+      }
 
-    if (!response.ok) {
+      setDialogMode(null);
+      router.refresh();
+    } catch {
       setStatus({
-        message: await readErrorMessage(response),
+        message: "Could not update email list.",
         tone: "error",
       });
-      return;
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setDialogMode(null);
-    router.refresh();
   }
 
   async function deleteList() {
     setStatus(undefined);
     setIsSubmitting(true);
 
-    const response = await fetch(
-      `/api/admin/email-list/${encodeURIComponent(list.key)}`,
-      {
-        method: "DELETE",
-      },
-    );
+    try {
+      const { error } = await api.api.admin["email-list"]({
+        key: list.key,
+      }).delete();
 
-    setIsSubmitting(false);
+      if (error) {
+        setStatus({
+          message: getEdenMessage(error, "Could not update email list."),
+          tone: "error",
+        });
+        return;
+      }
 
-    if (!response.ok) {
+      setDialogMode(null);
+      router.refresh();
+    } catch {
       setStatus({
-        message: await readErrorMessage(response),
+        message: "Could not update email list.",
         tone: "error",
       });
-      return;
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setDialogMode(null);
-    router.refresh();
   }
 
   return (
@@ -294,4 +285,28 @@ export function EmailListRowActions({ list }: EmailListRowActionsProps) {
       </AlertDialogContent>
     </AlertDialog>
   );
+}
+
+function formString(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return typeof value === "string" ? value : null;
+}
+
+function requiredFormString(formData: FormData, key: string) {
+  return formString(formData, key) ?? "";
+}
+
+function getEdenMessage(error: { value?: unknown } | null, fallback: string) {
+  const value = error?.value;
+
+  if (
+    value &&
+    typeof value === "object" &&
+    "message" in value &&
+    typeof value.message === "string"
+  ) {
+    return value.message;
+  }
+
+  return fallback;
 }

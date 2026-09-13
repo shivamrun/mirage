@@ -18,23 +18,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { api } from "@/lib/api/client";
 
 type StatusMessage = {
   message: string;
   tone: "error" | "success";
 };
-
-async function readErrorMessage(response: Response) {
-  try {
-    const body = (await response.json()) as { message?: unknown };
-
-    return typeof body.message === "string"
-      ? body.message
-      : "Could not create email list.";
-  } catch {
-    return "Could not create email list.";
-  }
-}
 
 export function EmailListCreateDialog() {
   const router = useRouter();
@@ -54,33 +43,34 @@ export function EmailListCreateDialog() {
     setStatus(undefined);
     setIsSubmitting(true);
 
-    const formData = new FormData(event.currentTarget);
-    const response = await fetch("/api/admin/email-list", {
-      body: JSON.stringify({
-        description: formData.get("description"),
+    try {
+      const formData = new FormData(event.currentTarget);
+      const { error } = await api.api.admin["email-list"].post({
+        description: formString(formData, "description"),
         emailVerificationRequired:
           formData.get("emailVerificationRequired") === "true",
-        key: formData.get("key"),
-        name: formData.get("name"),
-      }),
-      headers: {
-        "content-type": "application/json",
-      },
-      method: "POST",
-    });
+        key: requiredFormString(formData, "key"),
+        name: requiredFormString(formData, "name"),
+      });
 
-    setIsSubmitting(false);
+      if (error) {
+        setStatus({
+          message: getEdenMessage(error, "Could not create email list."),
+          tone: "error",
+        });
+        return;
+      }
 
-    if (!response.ok) {
+      setOpen(false);
+      router.refresh();
+    } catch {
       setStatus({
-        message: await readErrorMessage(response),
+        message: "Could not create email list.",
         tone: "error",
       });
-      return;
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setOpen(false);
-    router.refresh();
   }
 
   return (
@@ -134,4 +124,28 @@ export function EmailListCreateDialog() {
       </AlertDialogContent>
     </AlertDialog>
   );
+}
+
+function formString(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return typeof value === "string" ? value : null;
+}
+
+function requiredFormString(formData: FormData, key: string) {
+  return formString(formData, key) ?? "";
+}
+
+function getEdenMessage(error: { value?: unknown } | null, fallback: string) {
+  const value = error?.value;
+
+  if (
+    value &&
+    typeof value === "object" &&
+    "message" in value &&
+    typeof value.message === "string"
+  ) {
+    return value.message;
+  }
+
+  return fallback;
 }
