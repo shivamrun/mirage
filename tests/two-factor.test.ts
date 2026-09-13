@@ -15,7 +15,7 @@ import {
 } from "@/server/db/schema";
 import { accountRoutes } from "@/server/routes/account";
 import { createTestActor } from "./infra/admin-actor";
-import { testEmailOutbox } from "./infra/email-fake";
+import { setTestEmailDeliveryHook, testEmailOutbox } from "./infra/email-fake";
 
 const origin = "http://localhost:3000";
 const app = new Elysia({ adapter: node(), prefix: "/api" }).use(accountRoutes);
@@ -62,6 +62,50 @@ async function codeRecord(userId: string, action: "enable" | "disable") {
 }
 
 describe("two-factor authentication", () => {
+  it("replaces the old code before delivery and retains cooldown after a failed send", async () => {
+    const actor = await createTestActor();
+    expect(
+      (await post("/send-code", { action: "enable" }, actor.cookie)).status,
+    ).toBe(200);
+    const oldCode = latestEmailCode(actor.email);
+    const firstRecord = await codeRecord(actor.id, "enable");
+    await db
+      .update(applicationRateLimit)
+      .set({ resetAt: new Date(Date.now() - 1000) });
+    setTestEmailDeliveryHook(async () => {
+      throw new Error("Test delivery failure");
+    });
+
+    const failed = await app.fetch(
+      new Request(`${origin}/api/account/two-factor/send-code`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin,
+          cookie: actor.cookie,
+        },
+        body: JSON.stringify({ action: "enable" }),
+      }),
+    );
+    expect(failed.status).toBe(500);
+    expect(await failed.text()).toContain("Test delivery failure");
+    const replacement = await codeRecord(actor.id, "enable");
+    expect(replacement).toBeDefined();
+    expect(replacement?.id).not.toBe(firstRecord?.id);
+    expect(
+      testEmailOutbox.filter(
+        (entry) =>
+          entry.to === actor.email && entry.text.includes("Your code is:"),
+      ),
+    ).toHaveLength(1);
+    expect(
+      (await post("/start-setup", { code: oldCode }, actor.cookie)).status,
+    ).toBe(400);
+    const retry = await post("/send-code", { action: "enable" }, actor.cookie);
+    expect(retry.status).toBe(429);
+    expect(Number(retry.retryAfter)).toBeGreaterThan(0);
+  });
+
   it("throttles repeated email-code sends", async () => {
     const actor = await createTestActor();
     expect(

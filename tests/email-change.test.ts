@@ -1,13 +1,15 @@
+import { randomUUID } from "node:crypto";
+
 import { node } from "@elysia/node";
 import { eq, like } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { describe, expect, it } from "vitest";
 
 import db from "@/server/db";
-import { user, verification } from "@/server/db/schema";
+import { applicationRateLimit, user, verification } from "@/server/db/schema";
 import { accountRoutes } from "@/server/routes/account";
 import { createTestActor } from "./infra/admin-actor";
-import { testEmailOutbox } from "./infra/email-fake";
+import { setTestEmailDeliveryHook, testEmailOutbox } from "./infra/email-fake";
 
 const origin = "http://localhost:3000";
 const app = new Elysia({ adapter: node(), prefix: "/api" }).use(accountRoutes);
@@ -56,6 +58,167 @@ function redirectStatus(redirectURL?: string) {
 }
 
 describe("email-change tokens", () => {
+  it.each([
+    { emailVerified: false, step: "verify-new", recipient: "new" },
+    { emailVerified: true, step: "approve-current", recipient: "current" },
+  ] as const)(
+    "keeps an undelivered $step challenge and cooldown after a failed send",
+    async ({ emailVerified, step, recipient }) => {
+      const actor = await createTestActor({ emailVerified });
+      const newEmail = `failed-${randomUUID()}@example.com`;
+      setTestEmailDeliveryHook(async () => {
+        throw new Error("Test delivery failure");
+      });
+
+      const failed = await postResponse(
+        "/change-email",
+        { newEmail },
+        actor.cookie,
+      );
+      expect(failed.status).toBe(500);
+      expect(await failed.text()).toContain("Test delivery failure");
+      expect((await storedUser(actor.id))?.email).toBe(actor.email);
+      const records = await db
+        .select()
+        .from(verification)
+        .where(
+          like(verification.identifier, `account-email-change%:${actor.id}:%`),
+        );
+      expect(records).toHaveLength(1);
+      expect(
+        records[0]?.identifier.startsWith(
+          step === "verify-new"
+            ? "account-email-change:"
+            : "account-email-change-approval:",
+        ),
+      ).toBe(true);
+      expect(
+        testEmailOutbox.some(
+          (entry) =>
+            entry.to === (recipient === "new" ? newEmail : actor.email) &&
+            entry.text.includes("email change"),
+        ),
+      ).toBe(false);
+
+      const state = await app.fetch(
+        new Request(`${origin}/api/account/`, {
+          headers: { cookie: actor.cookie },
+        }),
+      );
+      expect(state.status).toBe(200);
+      expect(await state.json()).toMatchObject({
+        pendingEmail: newEmail,
+        pendingEmailStep: step,
+      });
+      const retry = await postResponse(
+        "/change-email",
+        { newEmail },
+        actor.cookie,
+      );
+      expect(retry.status).toBe(429);
+      expect(Number(retry.headers.get("retry-after"))).toBeGreaterThan(0);
+    },
+  );
+
+  it("consumes approval and leaves an undelivered confirmation after send failure", async () => {
+    const actor = await createTestActor({ emailVerified: true });
+    const newEmail = `failed-confirmation-${randomUUID()}@example.com`;
+    await post("/change-email", { newEmail }, actor.cookie);
+    const approvalToken = tokenFromEmail(actor.email, "/approve-email-change");
+    setTestEmailDeliveryHook(async () => {
+      throw new Error("Test delivery failure");
+    });
+
+    const failed = await postResponse("/approve-email-change", {
+      token: approvalToken,
+    });
+    expect(failed.status).toBe(500);
+    expect(await failed.text()).toContain("Test delivery failure");
+    expect((await storedUser(actor.id))?.email).toBe(actor.email);
+    const records = await db
+      .select()
+      .from(verification)
+      .where(
+        like(verification.identifier, `account-email-change%:${actor.id}:%`),
+      );
+    expect(records).toHaveLength(1);
+    expect(records[0]?.identifier).toMatch(/^account-email-change:/);
+    expect(
+      testEmailOutbox.some(
+        (entry) =>
+          entry.to === newEmail && entry.text.includes("/confirm-email-change"),
+      ),
+    ).toBe(false);
+
+    setTestEmailDeliveryHook(null);
+    const replay = await post("/approve-email-change", {
+      token: approvalToken,
+    });
+    expect(redirectStatus(replay.redirectURL)).toBe("invalid");
+    const resend = await postResponse(
+      "/resend-email-change-verification",
+      {},
+      actor.cookie,
+    );
+    expect(resend.status).toBe(429);
+    expect(Number(resend.headers.get("retry-after"))).toBeGreaterThan(0);
+  });
+
+  it("keeps only the latest active challenge across delayed sends at a cooldown boundary", async () => {
+    const actor = await createTestActor();
+    const firstEmail = `first-${randomUUID()}@example.com`;
+    const secondEmail = `second-${randomUUID()}@example.com`;
+    let releaseFirst: () => void = () => undefined;
+    let firstEntered: () => void = () => undefined;
+    const entered = new Promise<void>((resolve) => {
+      firstEntered = resolve;
+    });
+    const released = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    setTestEmailDeliveryHook(async ({ to }) => {
+      if (to === firstEmail) {
+        firstEntered();
+        await released;
+      }
+    });
+
+    const first = postResponse(
+      "/change-email",
+      { newEmail: firstEmail },
+      actor.cookie,
+    );
+    await entered;
+    await db
+      .update(applicationRateLimit)
+      .set({ resetAt: new Date(Date.now() - 1000) });
+    const second = await postResponse(
+      "/change-email",
+      { newEmail: secondEmail },
+      actor.cookie,
+    );
+    releaseFirst();
+    expect(second.status).toBe(200);
+    expect((await first).status).toBe(200);
+
+    const records = await db
+      .select()
+      .from(verification)
+      .where(
+        like(verification.identifier, `account-email-change:${actor.id}:%`),
+      );
+    expect(records).toHaveLength(1);
+    expect(JSON.parse(records[0]?.value ?? "{}").newEmail).toBe(secondEmail);
+    expect(testEmailOutbox.some((entry) => entry.to === firstEmail)).toBe(true);
+    expect(testEmailOutbox.some((entry) => entry.to === secondEmail)).toBe(
+      true,
+    );
+    const staleToken = tokenFromEmail(firstEmail, "/confirm-email-change");
+    const staleResult = await post("/confirm-email-change", {
+      token: staleToken,
+    });
+    expect(redirectStatus(staleResult.redirectURL)).toBe("invalid");
+  });
   it("throttles a destination across accounts and returns a retry hint", async () => {
     const firstActor = await createTestActor();
     const secondActor = await createTestActor();

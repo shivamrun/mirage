@@ -8,14 +8,58 @@ import {
   POST as authPost,
 } from "@/app/(backend)/api/auth/[...all]/route";
 import db from "@/server/db";
-import { emailList, user } from "@/server/db/schema";
+import { emailList, session, user } from "@/server/db/schema";
 import { adminRoutes } from "@/server/routes/admin";
 import { createTestActor } from "./infra/admin-actor";
+import { setTestEmailDeliveryHook, testEmailOutbox } from "./infra/email-fake";
 
 const origin = "http://localhost:3000";
 const app = new Elysia({ adapter: node(), prefix: "/api" }).use(adminRoutes);
 
 describe("admin HTTP access", () => {
+  it("revokes target sessions before a failed password-reset dispatch", async () => {
+    const target = await createTestActor();
+    const admin = await createTestActor({ role: "admin", emailVerified: true });
+    const before = await db
+      .select()
+      .from(session)
+      .where(eq(session.userId, target.id));
+    expect(before.length).toBeGreaterThan(0);
+    const sentBefore = testEmailOutbox.length;
+    let markAttempted: () => void = () => undefined;
+    const attempted = new Promise<void>((resolve) => {
+      markAttempted = resolve;
+    });
+    setTestEmailDeliveryHook(async ({ to }) => {
+      if (to === target.email) {
+        markAttempted();
+        throw new Error("Test reset delivery failure");
+      }
+    });
+
+    const response = await app.fetch(
+      new Request(`${origin}/api/admin/security/force-password-reset`, {
+        method: "POST",
+        headers: {
+          cookie: admin.cookie,
+          "content-type": "application/json",
+          origin,
+        },
+        body: JSON.stringify({ email: target.email }),
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: true,
+      revokedSessions: before.length,
+    });
+    await attempted;
+    expect(
+      await db.select().from(session).where(eq(session.userId, target.id)),
+    ).toHaveLength(0);
+    expect(testEmailOutbox).toHaveLength(sentBefore);
+  });
+
   it.each([
     { actor: "visitor", expectedCustom: 404, expectedAuth: 401 },
     { actor: "user", expectedCustom: 404, expectedAuth: 403 },
@@ -32,7 +76,9 @@ describe("admin HTTP access", () => {
               role: actor === "user" ? "user" : "admin",
               emailVerified: actor === "verified admin",
             });
-      const headers = current ? { cookie: current.cookie } : {};
+      const headers: Record<string, string> = current
+        ? { cookie: current.cookie }
+        : {};
       const listKey = `test-${actor.replaceAll(" ", "-")}`;
 
       const customRead = await app.fetch(
