@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { statusSuccessResponseSchema } from "./api";
 import { emailSchema } from "./helpers";
 
 export const CONTACT_MESSAGE_MAX_LENGTH = 2000;
@@ -50,6 +51,8 @@ export const contactSubmissionSchema = z.object({
 export type ContactSubmissionInput = z.input<typeof contactSubmissionSchema>;
 export type ContactSubmissionValues = z.output<typeof contactSubmissionSchema>;
 
+export const contactSuccessResponseSchema = statusSuccessResponseSchema;
+
 export const emailSubscriptionSchema = z.object({
   email: emailSchema,
   listKey: emailListKeySchema,
@@ -69,6 +72,15 @@ export const emailSubscriptionSchema = z.object({
 
 export type EmailSubscriptionInput = z.input<typeof emailSubscriptionSchema>;
 export type EmailSubscriptionValues = z.output<typeof emailSubscriptionSchema>;
+
+export const emailListSignupSuccessResponseSchema =
+  statusSuccessResponseSchema.extend({
+    verificationRequired: z.boolean().optional(),
+  });
+
+export const emailListVerifyQuerySchema = z.object({
+  token: z.string().optional(),
+});
 
 export const emailListStatusSchema = z.enum(["active", "archived"]);
 export const emailSubscriptionStatusSchema = z.enum([
@@ -98,7 +110,7 @@ export const adminCreateEmailListSchema = z.object({
     .nullable()
     .optional()
     .transform((value) => value || null),
-  emailVerificationRequired: z.coerce.boolean().catch(false).default(false),
+  emailVerificationRequired: z.boolean().default(false),
 });
 
 export const adminEmailSubscriberSearchParamsSchema = z.object({

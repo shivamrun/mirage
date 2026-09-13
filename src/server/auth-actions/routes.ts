@@ -1,21 +1,16 @@
 import { Elysia } from "elysia";
-import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { env } from "@/lib/env";
-
-import { elysiaAuth } from "./auth";
-import { requestPolicy } from "./request-policy";
+import { elysiaAuth } from "@/server/http/auth";
+import { requestPolicy } from "@/server/http/request-policy";
+import {
+  messageResponseSchema,
+  protectedRouteVerificationResponseSchema,
+  protectedRouteVerificationSchema,
+} from "@/zod";
 
 const protectedRoutePrefixes = ["/admin"];
-
-const protectedRouteVerificationSchema = z.object({
-  callbackURL: z.string().optional(),
-});
-
-function jsonResponse(message: string, status: number) {
-  return Response.json({ message }, { status });
-}
 
 function isProtectedAccessPath(pathname: string) {
   return protectedRoutePrefixes.some(
@@ -51,21 +46,13 @@ export const authActionRoutes = new Elysia({ prefix: "/auth-actions" })
   .use(requestPolicy)
   .post(
     "/protected-route-verification-email",
-    async ({ authSession, body, request }) => {
-      const parsed = protectedRouteVerificationSchema.safeParse(
-        body && typeof body === "object" ? body : {},
-      );
-
-      if (!parsed.success) {
-        return jsonResponse("Invalid verification request.", 400);
-      }
-
-      const callbackURL = sanitizeProtectedCallbackURL(parsed.data.callbackURL);
+    async ({ authSession, body, request, status }) => {
+      const callbackURL = sanitizeProtectedCallbackURL(body.callbackURL);
 
       if (authSession.user.emailVerified) {
         return {
           redirectURL: callbackURL,
-          status: true,
+          status: true as const,
         };
       }
 
@@ -78,19 +65,26 @@ export const authActionRoutes = new Elysia({ prefix: "/auth-actions" })
           headers: request.headers,
         });
       } catch {
-        return jsonResponse(
-          "We could not send the verification link. Please try again.",
-          500,
-        );
+        return status(500, {
+          message: "We could not send the verification link. Please try again.",
+        });
       }
 
       return {
         redirectURL: createVerificationSentURL(callbackURL),
-        status: true,
+        status: true as const,
       };
     },
     {
       auth: true,
       sameOrigin: true,
+      body: protectedRouteVerificationSchema,
+      response: {
+        200: protectedRouteVerificationResponseSchema,
+        400: messageResponseSchema,
+        401: messageResponseSchema,
+        403: messageResponseSchema,
+        500: messageResponseSchema,
+      },
     },
   );

@@ -3,7 +3,7 @@ import { Elysia, t } from "elysia";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { apiErrors } from "@/server/routes/errors";
+import { apiErrors } from "@/server/http/errors";
 import { httpRequest } from "./infra/http-request";
 
 afterEach(() => {

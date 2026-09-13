@@ -8,14 +8,14 @@ import {
   subscribeEmailToList,
 } from "@/server/db/dal/email-list";
 import { sendEmailListVerificationEmail } from "@/server/email";
+import { requestPolicy } from "@/server/http/request-policy";
 import { consumePublicWriteLimit } from "@/server/rate-limit";
-import { emailSubscriptionSchema } from "@/zod";
-import { requestPolicy } from "./request-policy";
-import { rateLimitResponse } from "./responses";
-
-function validationErrorResponse(message: string) {
-  return Response.json({ message }, { status: 400 });
-}
+import {
+  emailListSignupSuccessResponseSchema,
+  emailListVerifyQuerySchema,
+  emailSubscriptionSchema,
+  messageResponseSchema,
+} from "@/zod";
 
 function createEmailListVerificationUrl(token: string) {
   const url = new URL("/api/email-list/verify", env.NEXT_PUBLIC_BASE_URL);
@@ -35,39 +35,24 @@ export const emailListRoutes = new Elysia({ prefix: "/email-list" })
   .use(requestPolicy)
   .post(
     "/",
-    async ({ body }) => {
-      const parsed = emailSubscriptionSchema.safeParse(
-        body && typeof body === "object" ? body : {},
-      );
-
-      if (!parsed.success) {
-        const message =
-          parsed.error.flatten().formErrors[0] ||
-          Object.values(parsed.error.flatten().fieldErrors)
-            .flat()
-            .find(Boolean) ||
-          "Invalid email signup.";
-
-        return validationErrorResponse(message);
-      }
-
-      if (parsed.data.website) {
-        return { status: true };
+    async ({ body, set, status }) => {
+      if (body.website) {
+        return { status: true as const };
       }
 
       const rateLimit = await consumePublicWriteLimit({
-        destination: parsed.data.email,
+        destination: body.email,
         flow: "email-list",
       });
       if (!rateLimit.allowed) {
-        return rateLimitResponse(
-          "Too many email signups. Please try again later.",
-          rateLimit.retryAfterSeconds,
-        );
+        set.headers["Retry-After"] = String(rateLimit.retryAfterSeconds);
+        return status(429, {
+          message: "Too many email signups. Please try again later.",
+        });
       }
 
       try {
-        const subscription = await subscribeEmailToList(parsed.data);
+        const subscription = await subscribeEmailToList(body);
         const verificationRequired =
           subscription.subscription.status === "pending";
 
@@ -89,23 +74,20 @@ export const emailListRoutes = new Elysia({ prefix: "/email-list" })
             });
           } catch {
             await deleteEmailListVerification(verification.token);
-            return Response.json(
-              {
-                message:
-                  "Verification email could not be sent. Please try signing up again.",
-              },
-              { status: 503 },
-            );
+            return status(503, {
+              message:
+                "Verification email could not be sent. Please try signing up again.",
+            });
           }
         }
 
         return {
-          status: true,
+          status: true as const,
           verificationRequired,
         };
       } catch (error) {
         if (error instanceof Error && error.message === "Unknown email list.") {
-          return validationErrorResponse("Unknown email list.");
+          return status(400, { message: "Unknown email list." });
         }
 
         throw error;
@@ -113,11 +95,26 @@ export const emailListRoutes = new Elysia({ prefix: "/email-list" })
     },
     {
       sameOrigin: true,
+      body: emailSubscriptionSchema,
+      response: {
+        200: emailListSignupSuccessResponseSchema,
+        400: messageResponseSchema,
+        403: messageResponseSchema,
+        429: messageResponseSchema,
+        500: messageResponseSchema,
+        503: messageResponseSchema,
+      },
     },
   )
-  .get("/verify", async ({ query }) => {
-    const token = typeof query.token === "string" ? query.token : "";
-    const result = await confirmEmailListVerification(token);
+  .get(
+    "/verify",
+    async ({ query }) => {
+      const token = query.token ?? "";
+      const result = await confirmEmailListVerification(token);
 
-    return Response.redirect(createEmailListRedirectUrl(result.status), 302);
-  });
+      return Response.redirect(createEmailListRedirectUrl(result.status), 302);
+    },
+    {
+      query: emailListVerifyQuerySchema,
+    },
+  );

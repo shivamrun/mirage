@@ -1,5 +1,4 @@
 import { Elysia } from "elysia";
-import { z } from "zod";
 
 import { env } from "@/lib/env";
 import {
@@ -18,23 +17,24 @@ import {
   startAccountTwoFactorSetup,
   verifyAccountTwoFactorSetup,
 } from "@/server/account/two-factor";
-import { changeEmailSchema, emailChangeTokenSchema } from "@/zod";
-
-import { elysiaAuth } from "./auth";
-import { requestPolicy } from "./request-policy";
-import { type MutationError, mutationErrorResponse } from "./responses";
-
-function validationErrorResponse(message: string) {
-  return Response.json({ message }, { status: 400 });
-}
-
-const twoFactorEmailCodeActionSchema = z.object({
-  action: z.enum(["enable", "disable"]),
-});
-
-const twoFactorCodeSchema = z.object({
-  code: z.string().min(1),
-});
+import { elysiaAuth } from "@/server/http/auth";
+import { requestPolicy } from "@/server/http/request-policy";
+import {
+  accountEmailMutationResponseSchema,
+  accountEmailStateResponseSchema,
+  accountRedirectResponseSchema,
+  changeAccountEmailBodySchema,
+  emailChangeApprovalRecoveryResponseSchema,
+  emailChangeRedirectQuerySchema,
+  emailChangeTokenSchema,
+  messageResponseSchema,
+  twoFactorCodeSchema,
+  twoFactorDeliveryRecoveryResponseSchema,
+  twoFactorEmailCodeActionSchema,
+  twoFactorEmailCodeResponseSchema,
+  twoFactorEnabledResponseSchema,
+  twoFactorStartSetupResponseSchema,
+} from "@/zod";
 
 function emailChangePageURL({
   action,
@@ -55,54 +55,6 @@ function invalidEmailChangePageURL() {
   return url;
 }
 
-function parseEmailChangeToken(body: unknown) {
-  const parsed = emailChangeTokenSchema.safeParse(
-    body && typeof body === "object" ? body : {},
-  );
-
-  if (!parsed.success) {
-    return {
-      error: validationErrorResponse(
-        parsed.error.flatten().fieldErrors.token?.[0] ||
-          "Email change token is required.",
-      ),
-    };
-  }
-
-  return { token: parsed.data.token };
-}
-
-function parseBody<T>(schema: z.ZodType<T>, body: unknown, fallback: string) {
-  const parsed = schema.safeParse(body && typeof body === "object" ? body : {});
-
-  if (!parsed.success) {
-    const fieldMessage = Object.values(parsed.error.flatten().fieldErrors)
-      .flat()
-      .find((value): value is string => typeof value === "string");
-    const message =
-      parsed.error.flatten().formErrors[0] || fieldMessage || fallback;
-
-    return { error: validationErrorResponse(message) };
-  }
-
-  return { data: parsed.data };
-}
-
-function accountMutationResponse<T extends Record<string, unknown>>(
-  result: ({ kind: "error" } & MutationError) | ({ kind: "success" } & T),
-) {
-  if (result.kind === "error") {
-    return mutationErrorResponse(result);
-  }
-
-  const { kind: _kind, ...data } = result;
-
-  return {
-    status: true,
-    ...data,
-  };
-}
-
 export const accountRoutes = new Elysia({ prefix: "/account" })
   .use(elysiaAuth)
   .use(requestPolicy)
@@ -117,6 +69,11 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
     },
     {
       auth: true,
+      response: {
+        200: accountEmailStateResponseSchema,
+        401: messageResponseSchema,
+        500: messageResponseSchema,
+      },
     },
   )
   .get(
@@ -136,290 +93,416 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
   )
   .post(
     "/two-factor/send-code",
-    async ({ authSession, body }) => {
-      const parsed = parseBody(
-        twoFactorEmailCodeActionSchema,
-        body,
-        "Two-factor action is required.",
-      );
-
-      if (parsed.error) {
-        return parsed.error;
-      }
-
+    async ({ authSession, body, set, status }) => {
       const result = await sendAccountTwoFactorEmailCode({
-        action: parsed.data.action,
+        action: body.action,
         authSession,
       });
       if (result.kind === "error" && result.recovery) {
-        return Response.json(
-          { message: result.message, recovery: result.recovery },
-          { status: result.statusCode },
-        );
+        return status(503, {
+          message: result.message,
+          recovery: result.recovery,
+        });
       }
-      return accountMutationResponse(result);
+      if (result.kind === "error") {
+        if (result.statusCode === 429 && result.retryAfterSeconds) {
+          set.headers["Retry-After"] = String(result.retryAfterSeconds);
+          return status(429, { message: result.message });
+        }
+
+        return status(400, { message: result.message });
+      }
+
+      return { status: true as const };
     },
     {
       auth: true,
       sameOrigin: true,
+      body: twoFactorEmailCodeActionSchema,
+      response: {
+        200: twoFactorEmailCodeResponseSchema,
+        400: messageResponseSchema,
+        401: messageResponseSchema,
+        403: messageResponseSchema,
+        409: messageResponseSchema,
+        429: messageResponseSchema,
+        500: messageResponseSchema,
+        503: twoFactorDeliveryRecoveryResponseSchema,
+      },
     },
   )
   .post(
     "/two-factor/start-setup",
-    async ({ authSession, body }) => {
-      const parsed = parseBody(
-        twoFactorCodeSchema,
-        body,
-        "Email code is required.",
-      );
+    async ({ authSession, body, set, status }) => {
+      const result = await startAccountTwoFactorSetup({
+        authSession,
+        code: body.code,
+      });
 
-      if (parsed.error) {
-        return parsed.error;
+      if (result.kind === "error") {
+        if (result.statusCode === 429 && result.retryAfterSeconds) {
+          set.headers["Retry-After"] = String(result.retryAfterSeconds);
+          return status(429, { message: result.message });
+        }
+
+        return status(400, { message: result.message });
       }
 
-      return accountMutationResponse(
-        await startAccountTwoFactorSetup({
-          authSession,
-          code: parsed.data.code,
-        }),
-      );
+      return {
+        status: true as const,
+        totpURI: result.totpURI,
+      };
     },
     {
       auth: true,
       sameOrigin: true,
+      body: twoFactorCodeSchema,
+      response: {
+        200: twoFactorStartSetupResponseSchema,
+        400: messageResponseSchema,
+        401: messageResponseSchema,
+        403: messageResponseSchema,
+        409: messageResponseSchema,
+        429: messageResponseSchema,
+        500: messageResponseSchema,
+      },
     },
   )
   .post(
     "/two-factor/verify-setup",
-    async ({ authSession, body }) => {
-      const parsed = parseBody(
-        twoFactorCodeSchema,
-        body,
-        "Authenticator code is required.",
-      );
+    async ({ authSession, body, set, status }) => {
+      const result = await verifyAccountTwoFactorSetup({
+        authSession,
+        code: body.code,
+      });
 
-      if (parsed.error) {
-        return parsed.error;
+      if (result.kind === "error") {
+        if (result.statusCode === 429 && result.retryAfterSeconds) {
+          set.headers["Retry-After"] = String(result.retryAfterSeconds);
+          return status(429, { message: result.message });
+        }
+
+        return status(400, { message: result.message });
       }
 
-      return accountMutationResponse(
-        await verifyAccountTwoFactorSetup({
-          authSession,
-          code: parsed.data.code,
-        }),
-      );
+      return {
+        status: true as const,
+        twoFactorEnabled: result.twoFactorEnabled,
+      };
     },
     {
       auth: true,
       sameOrigin: true,
+      body: twoFactorCodeSchema,
+      response: {
+        200: twoFactorEnabledResponseSchema,
+        400: messageResponseSchema,
+        401: messageResponseSchema,
+        403: messageResponseSchema,
+        409: messageResponseSchema,
+        429: messageResponseSchema,
+        500: messageResponseSchema,
+      },
     },
   )
   .post(
     "/two-factor/disable",
-    async ({ authSession, body }) => {
-      const parsed = parseBody(
-        twoFactorCodeSchema,
-        body,
-        "Email code is required.",
-      );
+    async ({ authSession, body, set, status }) => {
+      const result = await disableAccountTwoFactor({
+        authSession,
+        code: body.code,
+      });
 
-      if (parsed.error) {
-        return parsed.error;
+      if (result.kind === "error") {
+        if (result.statusCode === 429 && result.retryAfterSeconds) {
+          set.headers["Retry-After"] = String(result.retryAfterSeconds);
+          return status(429, { message: result.message });
+        }
+
+        return status(400, { message: result.message });
       }
 
-      return accountMutationResponse(
-        await disableAccountTwoFactor({
-          authSession,
-          code: parsed.data.code,
-        }),
-      );
+      return {
+        status: true as const,
+        twoFactorEnabled: result.twoFactorEnabled,
+      };
     },
     {
       auth: true,
       sameOrigin: true,
+      body: twoFactorCodeSchema,
+      response: {
+        200: twoFactorEnabledResponseSchema,
+        400: messageResponseSchema,
+        401: messageResponseSchema,
+        403: messageResponseSchema,
+        409: messageResponseSchema,
+        429: messageResponseSchema,
+        500: messageResponseSchema,
+      },
     },
   )
-  .get("/confirm-email-change", async ({ query }) => {
-    const token = typeof query.token === "string" ? query.token : "";
+  .get(
+    "/confirm-email-change",
+    async ({ query }) => {
+      const token = query.token ?? "";
 
-    if (!token) {
-      return Response.redirect(invalidEmailChangePageURL());
-    }
+      if (!token) {
+        return Response.redirect(invalidEmailChangePageURL());
+      }
 
-    return Response.redirect(emailChangePageURL({ action: "confirm", token }));
-  })
+      return Response.redirect(
+        emailChangePageURL({ action: "confirm", token }),
+      );
+    },
+    {
+      query: emailChangeRedirectQuerySchema,
+    },
+  )
   .post(
     "/confirm-email-change",
     async ({ body }) => {
-      const parsed = parseEmailChangeToken(body);
-
-      if (parsed.error) {
-        return parsed.error;
-      }
-
       const result = await resolveEmailChangeConfirmationRedirectURL({
-        token: parsed.token,
+        token: body.token,
       });
 
       return {
-        status: true,
+        status: true as const,
         redirectURL: result.redirectURL,
       };
     },
     {
       sameOrigin: true,
+      body: emailChangeTokenSchema,
+      response: {
+        200: accountRedirectResponseSchema,
+        400: messageResponseSchema,
+        403: messageResponseSchema,
+        500: messageResponseSchema,
+      },
     },
   )
-  .get("/approve-email-change", async ({ query }) => {
-    const token = typeof query.token === "string" ? query.token : "";
-
-    if (!token) {
-      return Response.redirect(invalidEmailChangePageURL());
-    }
-
-    return Response.redirect(emailChangePageURL({ action: "approve", token }));
-  })
-  .post(
+  .get(
     "/approve-email-change",
-    async ({ body }) => {
-      const parsed = parseEmailChangeToken(body);
+    async ({ query }) => {
+      const token = query.token ?? "";
 
-      if (parsed.error) {
-        return parsed.error;
+      if (!token) {
+        return Response.redirect(invalidEmailChangePageURL());
       }
 
+      return Response.redirect(
+        emailChangePageURL({ action: "approve", token }),
+      );
+    },
+    {
+      query: emailChangeRedirectQuerySchema,
+    },
+  )
+  .post(
+    "/approve-email-change",
+    async ({ body, set, status }) => {
       const result = await resolveEmailChangeApprovalRedirectURL({
-        token: parsed.token,
+        token: body.token,
       });
 
       if (result.retryAfterSeconds) {
-        return mutationErrorResponse({
+        set.headers["Retry-After"] = String(result.retryAfterSeconds);
+        return status(429, {
           message:
             "Please wait before requesting another email change message.",
-          retryAfterSeconds: result.retryAfterSeconds,
-          statusCode: 429,
         });
       }
 
       if (result.deliveryFailed) {
-        return Response.json(
-          {
-            message:
-              "Your approval was saved, but we could not confirm delivery to the new address. Sign in and resend verification from your account after a minute if the message does not arrive.",
-            recovery: "resend-from-account",
-          },
-          { status: 503 },
-        );
+        return status(503, {
+          message:
+            "Your approval was saved, but we could not confirm delivery to the new address. Sign in and resend verification from your account after a minute if the message does not arrive.",
+          recovery: "resend-from-account",
+        });
       }
 
       return {
-        status: true,
+        status: true as const,
         redirectURL: result.redirectURL,
       };
     },
     {
       sameOrigin: true,
+      body: emailChangeTokenSchema,
+      response: {
+        200: accountRedirectResponseSchema,
+        400: messageResponseSchema,
+        403: messageResponseSchema,
+        429: messageResponseSchema,
+        500: messageResponseSchema,
+        503: emailChangeApprovalRecoveryResponseSchema,
+      },
     },
   )
   .post(
     "/change-email",
-    async ({ authSession, body }) => {
-      const parsed = changeEmailSchema.safeParse({
-        ...(body && typeof body === "object" ? body : {}),
-        callbackURL: "/email-verification?status=success",
-      });
-
-      if (!parsed.success) {
-        const message =
-          parsed.error.flatten().formErrors[0] ||
-          Object.values(parsed.error.flatten().fieldErrors)
-            .flat()
-            .find(Boolean) ||
-          "Invalid email change request.";
-
-        return validationErrorResponse(message);
-      }
-
+    async ({ authSession, body, set, status }) => {
       const result = await changeAccountEmail({
         authSession,
-        body: parsed.data,
+        body: {
+          ...body,
+          callbackURL: "/email-verification?status=success",
+        },
       });
 
       if (result.kind === "error") {
-        return mutationErrorResponse(result);
+        if (result.statusCode === 429 && result.retryAfterSeconds) {
+          set.headers["Retry-After"] = String(result.retryAfterSeconds);
+          return status(429, { message: result.message });
+        }
+        if (result.statusCode === 409) {
+          return status(409, { message: result.message });
+        }
+        if (result.statusCode === 503) {
+          return status(503, { message: result.message });
+        }
+
+        return status(400, { message: result.message });
       }
 
       return {
-        status: true,
+        status: true as const,
         ...result.value,
       };
     },
     {
       auth: true,
       sameOrigin: true,
+      body: changeAccountEmailBodySchema,
+      response: {
+        200: accountEmailMutationResponseSchema,
+        400: messageResponseSchema,
+        401: messageResponseSchema,
+        403: messageResponseSchema,
+        409: messageResponseSchema,
+        429: messageResponseSchema,
+        500: messageResponseSchema,
+        503: messageResponseSchema,
+      },
     },
   )
   .post(
     "/cancel-email-change",
-    async ({ authSession }) => {
+    async ({ authSession, set, status }) => {
       const result = await cancelPendingEmailChange({
         authSession,
       });
 
       if (result.kind === "error") {
-        return mutationErrorResponse(result);
+        if (result.statusCode === 429 && result.retryAfterSeconds) {
+          set.headers["Retry-After"] = String(result.retryAfterSeconds);
+          return status(429, { message: result.message });
+        }
+        if (result.statusCode === 409) {
+          return status(409, { message: result.message });
+        }
+
+        return status(400, { message: result.message });
       }
 
       return {
-        status: true,
+        status: true as const,
         ...result.value,
       };
     },
     {
       auth: true,
       sameOrigin: true,
+      response: {
+        200: accountEmailMutationResponseSchema,
+        400: messageResponseSchema,
+        401: messageResponseSchema,
+        403: messageResponseSchema,
+        409: messageResponseSchema,
+        429: messageResponseSchema,
+        500: messageResponseSchema,
+      },
     },
   )
   .post(
     "/resend-verification",
-    async ({ authSession, request }) => {
+    async ({ authSession, request, set, status }) => {
       const result = await resendAccountVerification({
         authSession,
         headers: request.headers,
       });
 
       if (result.kind === "error") {
-        return mutationErrorResponse(result);
+        if (result.statusCode === 429 && result.retryAfterSeconds) {
+          set.headers["Retry-After"] = String(result.retryAfterSeconds);
+          return status(429, { message: result.message });
+        }
+        if (result.statusCode === 409) {
+          return status(409, { message: result.message });
+        }
+
+        return status(400, { message: result.message });
       }
 
       return {
-        status: true,
+        status: true as const,
         ...result.value,
       };
     },
     {
       auth: true,
       sameOrigin: true,
+      response: {
+        200: accountEmailMutationResponseSchema,
+        400: messageResponseSchema,
+        401: messageResponseSchema,
+        403: messageResponseSchema,
+        409: messageResponseSchema,
+        429: messageResponseSchema,
+        500: messageResponseSchema,
+      },
     },
   )
   .post(
     "/resend-email-change-verification",
-    async ({ authSession }) => {
+    async ({ authSession, set, status }) => {
       const result = await resendPendingEmailChangeVerification({
         authSession,
       });
 
       if (result.kind === "error") {
-        return mutationErrorResponse(result);
+        if (result.statusCode === 429 && result.retryAfterSeconds) {
+          set.headers["Retry-After"] = String(result.retryAfterSeconds);
+          return status(429, { message: result.message });
+        }
+        if (result.statusCode === 409) {
+          return status(409, { message: result.message });
+        }
+        if (result.statusCode === 503) {
+          return status(503, { message: result.message });
+        }
+
+        return status(400, { message: result.message });
       }
 
       return {
-        status: true,
+        status: true as const,
         ...result.value,
       };
     },
     {
       auth: true,
       sameOrigin: true,
+      response: {
+        200: accountEmailMutationResponseSchema,
+        400: messageResponseSchema,
+        401: messageResponseSchema,
+        403: messageResponseSchema,
+        409: messageResponseSchema,
+        429: messageResponseSchema,
+        500: messageResponseSchema,
+        503: messageResponseSchema,
+      },
     },
   );

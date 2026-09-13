@@ -1,5 +1,4 @@
 import { Elysia } from "elysia";
-import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { env } from "@/lib/env";
@@ -18,34 +17,20 @@ import {
   revokeAllSessions,
   revokeUserSessions,
 } from "@/server/db/dal/security";
+import { elysiaAuth } from "@/server/http/auth";
+import { requestPolicy } from "@/server/http/request-policy";
 import {
   adminCreateEmailListSchema,
-  emailListKeySchema,
-  emailListStatusSchema,
+  adminPasswordResetPartialFailureResponseSchema,
+  adminStatusResponseSchema,
+  adminUpdateEmailListSchema,
+  emailListKeyParamsSchema,
+  emailListStatusUpdateBodySchema,
+  forcePasswordResetSchema,
+  linkedAccountParamsSchema,
+  messageResponseSchema,
+  userSessionParamsSchema,
 } from "@/zod";
-import { emailSchema } from "@/zod/helpers";
-import { elysiaAuth } from "../auth";
-import { requestPolicy } from "../request-policy";
-
-const forcePasswordResetSchema = z.object({
-  email: emailSchema,
-});
-const emailListStatusUpdateSchema = z.object({
-  key: emailListKeySchema,
-  status: emailListStatusSchema,
-});
-
-function jsonResponse(message: string, status: number) {
-  return Response.json({ message }, { status });
-}
-
-async function parseJsonRequest(request: Request) {
-  try {
-    return await request.json();
-  } catch {
-    return null;
-  }
-}
 
 export const adminRoutes = new Elysia({ prefix: "/admin" })
   .use(elysiaAuth)
@@ -66,181 +51,192 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
   )
   .delete(
     "/users/:userId/accounts/:accountRowId",
-    async ({ params }) => {
+    async ({ params, status }) => {
       const result = await deleteAdminLinkedAccount(
         params.userId,
         params.accountRowId,
       );
 
       if (result.status === "not-found") {
-        return jsonResponse("Linked account not found.", 404);
+        return status(404, { message: "Linked account not found." });
       }
 
       if (result.status === "credential") {
-        return jsonResponse(
-          "Password credentials cannot be unlinked here.",
-          400,
-        );
+        return status(400, {
+          message: "Password credentials cannot be unlinked here.",
+        });
       }
 
       return {
         account: result.account,
-        status: true,
+        status: true as const,
       };
     },
     {
       admin: true,
       sameOrigin: true,
+      params: linkedAccountParamsSchema,
+      response: {
+        200: adminStatusResponseSchema,
+        400: messageResponseSchema,
+        403: messageResponseSchema,
+        404: messageResponseSchema,
+        500: messageResponseSchema,
+      },
     },
   )
   .delete(
     "/users/:userId/sessions/:sessionId",
-    async ({ params }) => {
+    async ({ params, status }) => {
       const userSession = await deleteAdminUserSession(
         params.userId,
         params.sessionId,
       );
 
       if (!userSession) {
-        return jsonResponse("Session not found.", 404);
+        return status(404, { message: "Session not found." });
       }
 
       return {
         session: userSession,
-        status: true,
+        status: true as const,
       };
     },
     {
       admin: true,
       sameOrigin: true,
+      params: userSessionParamsSchema,
+      response: {
+        200: adminStatusResponseSchema,
+        400: messageResponseSchema,
+        403: messageResponseSchema,
+        404: messageResponseSchema,
+        500: messageResponseSchema,
+      },
     },
   )
   .post(
     "/email-list",
-    async ({ request }) => {
-      const parsed = adminCreateEmailListSchema.safeParse(
-        await parseJsonRequest(request),
-      );
-
-      if (!parsed.success) {
-        return jsonResponse(
-          parsed.error.issues[0]?.message ?? "Invalid email list request.",
-          400,
-        );
-      }
-
-      const list = await createEmailList(parsed.data);
+    async ({ body }) => {
+      const list = await createEmailList(body);
 
       return {
         list,
-        status: true,
+        status: true as const,
       };
     },
     {
       admin: true,
       sameOrigin: true,
+      body: adminCreateEmailListSchema,
+      response: {
+        200: adminStatusResponseSchema,
+        400: messageResponseSchema,
+        403: messageResponseSchema,
+        500: messageResponseSchema,
+      },
     },
   )
   .patch(
     "/email-list/:key",
-    async ({ params, request }) => {
-      const body = await parseJsonRequest(request);
-      const parsed = adminCreateEmailListSchema.safeParse({
-        ...(body && typeof body === "object" ? body : {}),
+    async ({ body, params, status }) => {
+      const list = await updateEmailList({
+        ...body,
         key: params.key,
       });
 
-      if (!parsed.success) {
-        return jsonResponse(
-          parsed.error.issues[0]?.message ?? "Invalid email list request.",
-          400,
-        );
-      }
-
-      const list = await updateEmailList(parsed.data);
-
       if (!list) {
-        return jsonResponse("Email list not found.", 404);
+        return status(404, { message: "Email list not found." });
       }
 
       return {
         list,
-        status: true,
+        status: true as const,
       };
     },
     {
       admin: true,
       sameOrigin: true,
+      body: adminUpdateEmailListSchema,
+      params: emailListKeyParamsSchema,
+      response: {
+        200: adminStatusResponseSchema,
+        400: messageResponseSchema,
+        403: messageResponseSchema,
+        404: messageResponseSchema,
+        500: messageResponseSchema,
+      },
     },
   )
   .patch(
     "/email-list/:key/status",
-    async ({ params, request }) => {
-      const body = await parseJsonRequest(request);
-      const parsedStatus = emailListStatusUpdateSchema.safeParse({
-        ...(body && typeof body === "object" ? body : {}),
+    async ({ body, params, status }) => {
+      const list = await updateEmailListStatus({
         key: params.key,
+        status: body.status,
       });
 
-      if (!parsedStatus.success) {
-        return jsonResponse("Invalid email list status.", 400);
-      }
-
-      const list = await updateEmailListStatus(parsedStatus.data);
-
       if (!list) {
-        return jsonResponse("Email list not found.", 404);
+        return status(404, { message: "Email list not found." });
       }
 
       return {
-        status: true,
+        status: true as const,
       };
     },
     {
       admin: true,
       sameOrigin: true,
+      body: emailListStatusUpdateBodySchema,
+      params: emailListKeyParamsSchema,
+      response: {
+        200: adminStatusResponseSchema,
+        400: messageResponseSchema,
+        403: messageResponseSchema,
+        404: messageResponseSchema,
+        500: messageResponseSchema,
+      },
     },
   )
   .delete(
     "/email-list/:key",
-    async ({ params }) => {
+    async ({ params, status }) => {
       const result = await deleteEmailList(params.key);
 
       if (result.status === "protected") {
-        return jsonResponse("Built-in email lists cannot be deleted.", 400);
+        return status(400, {
+          message: "Built-in email lists cannot be deleted.",
+        });
       }
 
       if (result.status === "not-found") {
-        return jsonResponse("Email list not found.", 404);
+        return status(404, { message: "Email list not found." });
       }
 
       return {
-        status: true,
+        status: true as const,
       };
     },
     {
       admin: true,
       sameOrigin: true,
+      params: emailListKeyParamsSchema,
+      response: {
+        200: adminStatusResponseSchema,
+        400: messageResponseSchema,
+        403: messageResponseSchema,
+        404: messageResponseSchema,
+        500: messageResponseSchema,
+      },
     },
   )
   .post(
     "/security/force-password-reset",
-    async ({ request }) => {
-      const parsed = forcePasswordResetSchema.safeParse(
-        await parseJsonRequest(request),
-      );
-
-      if (!parsed.success) {
-        return jsonResponse(
-          parsed.error.issues[0]?.message ?? "Invalid password reset request.",
-          400,
-        );
-      }
-
-      const targetUser = await getUserForPasswordReset(parsed.data.email);
+    async ({ body, request, status }) => {
+      const targetUser = await getUserForPasswordReset(body.email);
 
       if (!targetUser) {
-        return jsonResponse("User not found.", 404);
+        return status(404, { message: "User not found." });
       }
 
       const revokedSessions = await revokeUserSessions(targetUser.id);
@@ -254,28 +250,34 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
         });
       } catch {
         console.error("Admin password-reset request failed after revocation.");
-        return Response.json(
-          {
-            message: `Revoked ${revokedSessions.length} sessions for ${targetUser.email}, but the reset email request failed. Try requesting the reset again.`,
-            resetEmailDelivery: "unconfirmed",
-            revokedSessions: revokedSessions.length,
-            status: false,
-          },
-          { status: 503 },
-        );
+        return status(503, {
+          message: `Revoked ${revokedSessions.length} sessions for ${targetUser.email}, but the reset email request failed. Try requesting the reset again.`,
+          resetEmailDelivery: "unconfirmed",
+          revokedSessions: revokedSessions.length,
+          status: false,
+        });
       }
 
       return {
         message: `Revoked ${revokedSessions.length} sessions for ${targetUser.email}. A password reset email was requested, but delivery cannot be confirmed. Request another reset if the user does not receive it.`,
         resetEmailDelivery: "unconfirmed" as const,
         revokedSessions: revokedSessions.length,
-        status: true,
+        status: true as const,
         user: targetUser,
       };
     },
     {
       admin: true,
       sameOrigin: true,
+      body: forcePasswordResetSchema,
+      response: {
+        200: adminStatusResponseSchema,
+        400: messageResponseSchema,
+        403: messageResponseSchema,
+        404: messageResponseSchema,
+        500: messageResponseSchema,
+        503: adminPasswordResetPartialFailureResponseSchema,
+      },
     },
   )
   .post(
@@ -285,11 +287,16 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
 
       return {
         revokedSessions: revokedSessions.length,
-        status: true,
+        status: true as const,
       };
     },
     {
       admin: true,
       sameOrigin: true,
+      response: {
+        200: adminStatusResponseSchema,
+        403: messageResponseSchema,
+        500: messageResponseSchema,
+      },
     },
   );

@@ -99,6 +99,60 @@ function requestBody(path: string) {
       size: 10,
     });
   }
+  if (path === "/api/account/two-factor/send-code") {
+    return JSON.stringify({ action: "enable" });
+  }
+  if (
+    path === "/api/account/two-factor/start-setup" ||
+    path === "/api/account/two-factor/verify-setup" ||
+    path === "/api/account/two-factor/disable"
+  ) {
+    return JSON.stringify({ code: "123456" });
+  }
+  if (
+    path === "/api/account/confirm-email-change" ||
+    path === "/api/account/approve-email-change"
+  ) {
+    return JSON.stringify({ token: "a".repeat(64) });
+  }
+  if (path === "/api/account/change-email") {
+    return JSON.stringify({
+      newEmail: `phase-zero-${randomUUID()}@example.com`,
+    });
+  }
+  if (path === "/api/auth-actions/protected-route-verification-email") {
+    return JSON.stringify({ callbackURL: "/admin" });
+  }
+  if (path === "/api/contact/") {
+    return JSON.stringify({
+      email: "phase-zero-contact@example.com",
+      message: "A valid contact message.",
+      name: "Phase Zero",
+    });
+  }
+  if (path === "/api/email-list/") {
+    return JSON.stringify({
+      email: "phase-zero-list@example.com",
+      listKey: "phase-zero-list",
+    });
+  }
+  if (path === "/api/admin/email-list") {
+    return JSON.stringify({
+      key: `phase-zero-${randomUUID()}`,
+      name: "Phase zero list",
+    });
+  }
+  if (path === "/api/admin/email-list/:key") {
+    return JSON.stringify({
+      name: "Phase zero list",
+    });
+  }
+  if (path === "/api/admin/email-list/:key/status") {
+    return JSON.stringify({ status: "active" });
+  }
+  if (path === "/api/admin/security/force-password-reset") {
+    return JSON.stringify({ email: "phase-zero-reset@example.com" });
+  }
   return "{}";
 }
 
@@ -192,10 +246,12 @@ describe("current Elysia HTTP contract", () => {
       status: 403,
     },
   ])("preserves $name origin semantics", async ({ headers, status }) => {
+    const body =
+      status === 403 ? requestBody("/api/contact/") : JSON.stringify({});
     const response = await httpRequest(app, "/api/contact/", {
       method: "POST",
       headers: { ...jsonHeaders, ...headers } as Record<string, string>,
-      body: "{}",
+      body,
     });
     expect(response.status).toBe(status);
     if (status === 403) {
@@ -225,11 +281,15 @@ describe("current Elysia HTTP contract", () => {
       { ...jsonHeaders, origin: "https://evil.example" },
       { ...jsonHeaders, origin: trustedOrigin },
     ]) {
+      const invalidBody = headers.origin === trustedOrigin;
       const response = await httpRequest(app, "/api/admin/email-list", {
         method: "POST",
         cookie: admin.cookie,
         headers,
-        body: JSON.stringify({ key, name: "x" }),
+        body: JSON.stringify({
+          key,
+          name: invalidBody ? "x" : "Phase zero list",
+        }),
       });
       expect(response.status).toBe(
         headers.origin === trustedOrigin ? 400 : 403,
@@ -410,12 +470,9 @@ describe("current Elysia HTTP contract", () => {
   it.each([
     { value: false, expected: false },
     { value: true, expected: true },
-    { value: "false", expected: true },
-    { value: "0", expected: true },
-    { value: null, expected: false },
     { value: undefined, expected: false },
   ])(
-    "records current admin-list boolean coercion for $value",
+    "records strict admin-list boolean acceptance for $value",
     async ({ value, expected }) => {
       const admin = await createTestActor({
         role: "admin",
@@ -438,6 +495,34 @@ describe("current Elysia HTTP contract", () => {
         .from(emailList)
         .where(eq(emailList.key, key));
       expect(list?.emailVerificationRequired).toBe(expected);
+    },
+  );
+
+  it.each(["false", "0", null])(
+    "rejects misleading admin-list boolean value $value",
+    async (value) => {
+      const admin = await createTestActor({
+        role: "admin",
+        emailVerified: true,
+      });
+      const key = `phase-zero-${randomUUID()}`;
+      const response = await httpRequest(app, "/api/admin/email-list", {
+        method: "POST",
+        cookie: admin.cookie,
+        headers: { ...jsonHeaders, origin: trustedOrigin },
+        body: JSON.stringify({
+          emailVerificationRequired: value,
+          key,
+          name: "Phase zero list",
+        }),
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        message: expect.stringContaining("expected boolean"),
+      });
+      expect(
+        await db.select().from(emailList).where(eq(emailList.key, key)),
+      ).toHaveLength(0);
     },
   );
 });

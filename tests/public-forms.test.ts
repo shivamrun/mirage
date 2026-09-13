@@ -13,6 +13,7 @@ import {
   emailSubscription,
   verification,
 } from "@/server/db/schema";
+import { apiErrors } from "@/server/http/errors";
 import { contactRoutes } from "@/server/routes/contact";
 import { emailListRoutes } from "@/server/routes/email-list";
 import { setTestEmailDeliveryHook, testEmailOutbox } from "./infra/email-fake";
@@ -20,6 +21,7 @@ import { setTestEmailDeliveryHook, testEmailOutbox } from "./infra/email-fake";
 const origin = "http://localhost:3000";
 function createApp() {
   return new Elysia({ adapter: node(), prefix: "/api" })
+    .use(apiErrors)
     .use(contactRoutes)
     .use(emailListRoutes);
 }

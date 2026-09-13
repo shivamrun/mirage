@@ -24,8 +24,8 @@ import {
   logEmailDeliveryFailure,
   sendTwoFactorEmailCode,
 } from "@/server/email";
+import type { AuthSession } from "@/server/http/auth";
 import { consumeAccountEmailSendLimit } from "@/server/rate-limit";
-import type { AuthSession } from "@/server/routes/auth";
 
 const EMAIL_CODE_PREFIX = "account-two-factor-email-code";
 const EMAIL_CODE_EXPIRES_IN_MS = 1000 * 60 * 10;

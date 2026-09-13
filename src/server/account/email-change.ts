@@ -14,8 +14,8 @@ import {
   replaceApprovalWithPending,
 } from "@/server/db/dal/email-change";
 import { logEmailDeliveryFailure, sendVerificationEmail } from "@/server/email";
+import type { AuthSession } from "@/server/http/auth";
 import { consumeAccountEmailSendLimit } from "@/server/rate-limit";
-import type { AuthSession } from "@/server/routes/auth";
 import type { ChangeEmailValues } from "@/zod";
 
 const EMAIL_CHANGE_PREFIX = "account-email-change";

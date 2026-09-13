@@ -6,9 +6,8 @@ import {
   getUploadPublicUrl,
   type UploadAssetKey,
 } from "@/lib/uploads/server";
-
-import { elysiaAuth } from "./auth";
-import { requestPolicy } from "./request-policy";
+import { elysiaAuth } from "@/server/http/auth";
+import { requestPolicy } from "@/server/http/request-policy";
 
 const uploadAssetKeyEnum = {
   avatar: "avatar",
