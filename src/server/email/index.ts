@@ -1,6 +1,10 @@
 export { getResendClient } from "./client";
 export { type EmailConfig, getEmailConfig } from "./config";
-export { EmailConfigurationError, EmailDeliveryError } from "./errors";
+export {
+  EmailConfigurationError,
+  EmailDeliveryError,
+  logEmailDeliveryFailure,
+} from "./errors";
 export { sendEmail } from "./send-email";
 export { sendEmailListVerificationEmail } from "./senders/send-email-list-verification-email";
 export { sendPasswordResetEmail } from "./senders/send-password-reset-email";

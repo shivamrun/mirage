@@ -62,7 +62,7 @@ async function codeRecord(userId: string, action: "enable" | "disable") {
 }
 
 describe("two-factor authentication", () => {
-  it("replaces the old code before delivery and retains cooldown after a failed send", async () => {
+  it("reports replacement-code delivery uncertainty and a retry path", async () => {
     const actor = await createTestActor();
     expect(
       (await post("/send-code", { action: "enable" }, actor.cookie)).status,
@@ -87,8 +87,11 @@ describe("two-factor authentication", () => {
         body: JSON.stringify({ action: "enable" }),
       }),
     );
-    expect(failed.status).toBe(500);
-    expect(await failed.text()).toContain("Test delivery failure");
+    expect(failed.status).toBe(503);
+    expect(await failed.json()).toMatchObject({
+      message: expect.stringContaining("previous code is no longer valid"),
+      recovery: "try-delivered-code",
+    });
     const replacement = await codeRecord(actor.id, "enable");
     expect(replacement).toBeDefined();
     expect(replacement?.id).not.toBe(firstRecord?.id);
@@ -104,6 +107,48 @@ describe("two-factor authentication", () => {
     const retry = await post("/send-code", { action: "enable" }, actor.cookie);
     expect(retry.status).toBe(429);
     expect(Number(retry.retryAfter)).toBeGreaterThan(0);
+
+    setTestEmailDeliveryHook(null);
+    await db
+      .update(applicationRateLimit)
+      .set({ resetAt: new Date(Date.now() - 1000) });
+    expect(
+      (await post("/send-code", { action: "enable" }, actor.cookie)).status,
+    ).toBe(200);
+    expect(
+      (
+        await post(
+          "/start-setup",
+          { code: latestEmailCode(actor.email) },
+          actor.cookie,
+        )
+      ).status,
+    ).toBe(200);
+  });
+
+  it("accepts a code that may have been delivered before a timeout", async () => {
+    const actor = await createTestActor();
+    setTestEmailDeliveryHook(async (options) => {
+      testEmailOutbox.push(options);
+      throw new Error("Provider timed out after acceptance");
+    });
+
+    const requested = await post(
+      "/send-code",
+      { action: "enable" },
+      actor.cookie,
+    );
+    expect(requested.status).toBe(503);
+    expect(requested.body).toMatchObject({
+      recovery: "try-delivered-code",
+    });
+    setTestEmailDeliveryHook(null);
+    const setup = await post(
+      "/start-setup",
+      { code: latestEmailCode(actor.email) },
+      actor.cookie,
+    );
+    expect(setup.status).toBe(200);
   });
 
   it("throttles repeated email-code sends", async () => {

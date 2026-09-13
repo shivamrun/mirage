@@ -52,12 +52,33 @@ describe("admin HTTP access", () => {
     expect(await response.json()).toMatchObject({
       status: true,
       revokedSessions: before.length,
+      resetEmailDelivery: "unconfirmed",
+      message: expect.stringContaining("delivery cannot be confirmed"),
     });
     await attempted;
     expect(
       await db.select().from(session).where(eq(session.userId, target.id)),
     ).toHaveLength(0);
     expect(testEmailOutbox).toHaveLength(sentBefore);
+
+    setTestEmailDeliveryHook(null);
+    const retry = await app.fetch(
+      new Request(`${origin}/api/admin/security/force-password-reset`, {
+        method: "POST",
+        headers: {
+          cookie: admin.cookie,
+          "content-type": "application/json",
+          origin,
+        },
+        body: JSON.stringify({ email: target.email }),
+      }),
+    );
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toMatchObject({
+      revokedSessions: 0,
+      resetEmailDelivery: "unconfirmed",
+    });
+    expect(testEmailOutbox).toHaveLength(sentBefore + 1);
   });
 
   it.each([

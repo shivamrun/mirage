@@ -39,6 +39,7 @@ function EmailChangeConfirmation({
   token?: string;
 }) {
   const [error, setError] = React.useState<string>();
+  const [needsAccountRecovery, setNeedsAccountRecovery] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const copy = getActionCopy(action);
   const canSubmit = Boolean(token && !status);
@@ -68,11 +69,13 @@ function EmailChangeConfirmation({
       });
       const result = (await response.json()) as {
         message?: string;
+        recovery?: string;
         redirectURL?: string;
       };
 
       if (!response.ok) {
         setError(result.message || "That email change link could not be used.");
+        setNeedsAccountRecovery(result.recovery === "resend-from-account");
         return;
       }
 
@@ -115,7 +118,15 @@ function EmailChangeConfirmation({
         {error ? (
           <AuthStatusMessage tone="error">{error}</AuthStatusMessage>
         ) : null}
-        <Button disabled={isSubmitting || !canSubmit} type="submit">
+        {needsAccountRecovery ? (
+          <Link className="link-text" href="/account">
+            Go to account settings
+          </Link>
+        ) : null}
+        <Button
+          disabled={isSubmitting || !canSubmit || needsAccountRecovery}
+          type="submit"
+        >
           {isSubmitting ? "Processing..." : copy.button}
         </Button>
       </form>

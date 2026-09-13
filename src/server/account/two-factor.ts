@@ -20,7 +20,10 @@ import {
   findPendingTwoFactorSetup,
   verifyAndConsumeEmailCode,
 } from "@/server/db/dal/two-factor";
-import { sendTwoFactorEmailCode } from "@/server/email";
+import {
+  logEmailDeliveryFailure,
+  sendTwoFactorEmailCode,
+} from "@/server/email";
 import { consumeAccountEmailSendLimit } from "@/server/rate-limit";
 import type { AuthSession } from "@/server/routes/auth";
 
@@ -37,6 +40,7 @@ type TwoFactorMutationResult<T extends object = object> =
   | {
       kind: "error";
       message: string;
+      recovery?: "try-delivered-code";
       retryAfterSeconds?: number;
       statusCode: number;
     }
@@ -177,12 +181,25 @@ export async function sendAccountTwoFactorEmailCode({
     expiresAt,
   });
 
-  await sendTwoFactorEmailCode({
-    action,
-    code,
-    email: authSession.user.email,
-    name: authSession.user.name,
-  });
+  try {
+    await sendTwoFactorEmailCode({
+      action,
+      code,
+      email: authSession.user.email,
+      name: authSession.user.name,
+    });
+  } catch (error) {
+    logEmailDeliveryFailure("two-factor-code", error);
+    // The provider may have accepted a timed-out send. Keep the new code
+    // valid, and never restore the old code after a replacement request.
+    return {
+      kind: "error",
+      message:
+        "We could not confirm code delivery. Your previous code is no longer valid; wait a minute and request a new code if this one does not arrive.",
+      recovery: "try-delivered-code",
+      statusCode: 503,
+    };
+  }
 
   return { kind: "success" };
 }

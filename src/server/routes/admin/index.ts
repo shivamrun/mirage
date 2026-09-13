@@ -307,16 +307,30 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
       }
 
       const revokedSessions = await revokeUserSessions(targetUser.id);
-      const result = await auth.api.requestPasswordReset({
-        body: {
-          email: targetUser.email,
-          redirectTo: `${env.NEXT_PUBLIC_BASE_URL}/reset-password`,
-        },
-        headers: request.headers,
-      });
+      try {
+        await auth.api.requestPasswordReset({
+          body: {
+            email: targetUser.email,
+            redirectTo: `${env.NEXT_PUBLIC_BASE_URL}/reset-password`,
+          },
+          headers: request.headers,
+        });
+      } catch {
+        console.error("Admin password-reset request failed after revocation.");
+        return Response.json(
+          {
+            message: `Revoked ${revokedSessions.length} sessions for ${targetUser.email}, but the reset email request failed. Try requesting the reset again.`,
+            resetEmailDelivery: "unconfirmed",
+            revokedSessions: revokedSessions.length,
+            status: false,
+          },
+          { status: 503 },
+        );
+      }
 
       return {
-        message: `${result.message} Revoked ${revokedSessions.length} sessions for ${targetUser.email}.`,
+        message: `Revoked ${revokedSessions.length} sessions for ${targetUser.email}. A password reset email was requested, but delivery cannot be confirmed. Request another reset if the user does not receive it.`,
+        resetEmailDelivery: "unconfirmed" as const,
         revokedSessions: revokedSessions.length,
         status: true,
         user: targetUser,

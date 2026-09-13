@@ -13,7 +13,7 @@ import {
   findVerificationByIdentifierPattern,
   replaceApprovalWithPending,
 } from "@/server/db/dal/email-change";
-import { sendVerificationEmail } from "@/server/email";
+import { logEmailDeliveryFailure, sendVerificationEmail } from "@/server/email";
 import { consumeAccountEmailSendLimit } from "@/server/rate-limit";
 import type { AuthSession } from "@/server/routes/auth";
 import type { ChangeEmailValues } from "@/zod";
@@ -60,6 +60,7 @@ type AccountEmailMutationResult =
     };
 
 type EmailChangeConfirmationResult = {
+  deliveryFailed?: boolean;
   notificationEmail: string | null;
   notificationUserId: string | null;
   redirectURL: string;
@@ -185,10 +186,19 @@ async function createPendingEmailChange({
     expiresAt,
   });
 
-  await sendPendingEmailChangeConfirmation(pendingChange);
+  // A provider timeout can happen after acceptance. Keep this exact challenge
+  // so a delivered link still works and the account owner can resend it.
+  let deliveryFailed = false;
+  try {
+    await sendPendingEmailChangeConfirmation(pendingChange);
+  } catch (error) {
+    logEmailDeliveryFailure("email-change-confirmation", error);
+    deliveryFailed = true;
+  }
 
   return {
     ...pendingChange,
+    deliveryFailed,
     expiresAt,
   };
 }
@@ -244,16 +254,23 @@ async function createPendingEmailChangeApproval({
   );
   approvalURL.searchParams.set("token", token);
 
-  await sendVerificationEmail({
-    actionLabel: "Approve email change",
-    email: currentEmail,
-    heading: "Approve your email change",
-    intro: `Approve changing your Mirage account email to ${newEmail}.`,
-    verificationUrl: approvalURL.toString(),
-  });
+  let deliveryFailed = false;
+  try {
+    await sendVerificationEmail({
+      actionLabel: "Approve email change",
+      email: currentEmail,
+      heading: "Approve your email change",
+      intro: `Approve changing your Mirage account email to ${newEmail}.`,
+      verificationUrl: approvalURL.toString(),
+    });
+  } catch (error) {
+    logEmailDeliveryFailure("email-change-approval", error);
+    deliveryFailed = true;
+  }
 
   return {
     ...pendingChange,
+    deliveryFailed,
     expiresAt,
   };
 }
@@ -337,6 +354,16 @@ export async function changeAccountEmail({
     newEmail: body.newEmail,
     userId: authSession.user.id,
   });
+
+  if (pendingChange.deliveryFailed) {
+    return {
+      kind: "error",
+      message: authSession.user.emailVerified
+        ? "We could not confirm email delivery. Your change is pending; wait a minute, then start it again from your account if the approval message does not arrive."
+        : "We could not confirm email delivery. Your change is pending; wait a minute, then resend verification from your account if the message does not arrive.",
+      statusCode: 503,
+    };
+  }
 
   return {
     kind: "success",
@@ -443,7 +470,17 @@ export async function resolveEmailChangeApprovalRedirectURL({
     };
   }
 
-  await sendPendingEmailChangeConfirmation(newEmailChange);
+  try {
+    await sendPendingEmailChangeConfirmation(newEmailChange);
+  } catch (error) {
+    logEmailDeliveryFailure("email-change-transition", error);
+    return {
+      deliveryFailed: true,
+      notificationEmail: null,
+      notificationUserId: null,
+      redirectURL: createAccountRedirectURL("pending"),
+    };
+  }
 
   return {
     notificationEmail: newEmailChange.newEmail,
@@ -501,7 +538,17 @@ export async function resendPendingEmailChangeVerification({
     };
   }
 
-  await sendPendingEmailChangeConfirmation(pendingChange);
+  try {
+    await sendPendingEmailChangeConfirmation(pendingChange);
+  } catch (error) {
+    logEmailDeliveryFailure("email-change-resend", error);
+    return {
+      kind: "error",
+      message:
+        "We could not confirm email delivery. Your verification is still pending; wait a minute and resend if the message does not arrive.",
+      statusCode: 503,
+    };
+  }
 
   return {
     kind: "success",

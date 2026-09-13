@@ -55,6 +55,8 @@ function AccountTwoFactorForm({
   const [totpCode, setTotpCode] = React.useState("");
   const [totpURI, setTotpURI] = React.useState<string>();
   const [pendingAction, setPendingAction] = React.useState<TwoFactorAction>();
+  const [codeDeliveryUnconfirmed, setCodeDeliveryUnconfirmed] =
+    React.useState(false);
   const [status, setStatus] = React.useState<StatusMessage>();
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [isSendingCode, setIsSendingCode] = React.useState(false);
@@ -83,12 +85,19 @@ function AccountTwoFactorForm({
       });
 
       if (error) {
+        const body = error.value as { recovery?: string } | null;
+        if (body?.recovery === "try-delivered-code") {
+          setEmailCode("");
+          setPendingAction(action);
+          setCodeDeliveryUnconfirmed(true);
+        }
         setStatus({ text: readAccountError(error), tone: "error" });
         return;
       }
 
       setEmailCode("");
       setPendingAction(action);
+      setCodeDeliveryUnconfirmed(false);
     } catch (reason) {
       setStatus({
         text: getUnexpectedAuthErrorMessage(reason),
@@ -207,7 +216,9 @@ function AccountTwoFactorForm({
   const dialogDescription = totpURI
     ? "Scan this QR code with your authenticator app, then enter the 6-digit code it shows."
     : pendingAction
-      ? `Enter the 6-digit code sent to ${user.email}.`
+      ? codeDeliveryUnconfirmed
+        ? `Delivery could not be confirmed. If a code arrived at ${user.email}, enter it here. Otherwise, request another code after a minute.`
+        : `Enter the 6-digit code sent to ${user.email}.`
       : isEnabled
         ? `We will send a 6-digit code to ${user.email}. Enter it here to remove authenticator app sign-in from your account.`
         : `We will send a 6-digit code to ${user.email}. Enter it here before scanning a QR code with your authenticator app.`;
@@ -225,6 +236,7 @@ function AccountTwoFactorForm({
 
           if (!open && !isSendingCode && !isContinuing && !isVerifying) {
             setPendingAction(undefined);
+            setCodeDeliveryUnconfirmed(false);
             setEmailCode("");
             setTotpCode("");
             setTotpURI(undefined);

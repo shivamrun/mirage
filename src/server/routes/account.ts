@@ -180,12 +180,17 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
         return parsed.error;
       }
 
-      return accountMutationResponse(
-        await sendAccountTwoFactorEmailCode({
-          action: parsed.data.action,
-          authSession,
-        }),
-      );
+      const result = await sendAccountTwoFactorEmailCode({
+        action: parsed.data.action,
+        authSession,
+      });
+      if (result.kind === "error" && result.recovery) {
+        return Response.json(
+          { message: result.message, recovery: result.recovery },
+          { status: result.statusCode },
+        );
+      }
+      return accountMutationResponse(result);
     },
     {
       auth: true,
@@ -344,6 +349,17 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
         retryAfterSeconds: result.retryAfterSeconds,
         statusCode: 429,
       });
+    }
+
+    if (result.deliveryFailed) {
+      return Response.json(
+        {
+          message:
+            "Your approval was saved, but we could not confirm delivery to the new address. Sign in and resend verification from your account after a minute if the message does not arrive.",
+          recovery: "resend-from-account",
+        },
+        { status: 503 },
+      );
     }
 
     return {

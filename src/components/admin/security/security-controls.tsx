@@ -55,7 +55,7 @@ export function SecurityControls({
       </AccountSection>
 
       <AccountSection
-        description="Revoke a user's sessions and send them a password reset link."
+        description="Revoke a user's sessions and request a password reset email."
         title="Force password reset"
       >
         <ForcePasswordResetPanel />
@@ -94,8 +94,9 @@ function ForcePasswordResetPanel() {
       if (!response.ok) {
         setStatus({
           text: await getResponseMessage(response),
-          tone: "error",
+          tone: response.status === 503 ? "info" : "error",
         });
+        if (response.status === 503) router.refresh();
         return;
       }
 
@@ -105,10 +106,9 @@ function ForcePasswordResetPanel() {
         text:
           typeof body.message === "string"
             ? body.message
-            : "Password reset was forced.",
-        tone: "success",
+            : "Sessions were revoked. Password reset email delivery is unconfirmed.",
+        tone: "info",
       });
-      setEmail("");
       router.refresh();
     } catch (reason) {
       setStatus({
@@ -140,7 +140,11 @@ function ForcePasswordResetPanel() {
 
         <Button className="w-full" disabled={isSubmitting} type="submit">
           <KeyRound data-icon="inline-start" />
-          {isSubmitting ? "Sending..." : "Force reset"}
+          {isSubmitting
+            ? "Requesting..."
+            : status?.tone === "info"
+              ? "Request reset again"
+              : "Force reset"}
         </Button>
       </FieldGroup>
     </form>

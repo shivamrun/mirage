@@ -176,6 +176,8 @@ function AccountEmailManager({
           text: readAccountError(error),
           tone: "error",
         });
+        const state = await api.api.account.get().catch(() => null);
+        if (state?.data) setEmailState(state.data as AccountEmailResponse);
         return;
       }
 
@@ -218,6 +220,8 @@ function AccountEmailManager({
           text: readAccountError(error),
           tone: "error",
         });
+        const state = await api.api.account.get().catch(() => null);
+        if (state?.data) setEmailState(state.data as AccountEmailResponse);
         return;
       }
 
@@ -263,8 +267,8 @@ function AccountEmailManager({
         : "needs-verification";
   const note = emailState.pendingEmail
     ? emailState.pendingEmailStep === "approve-current"
-      ? `Approve the request sent to your current email to change email to ${emailState.pendingEmail}.`
-      : `Verification link has been sent to ${emailState.pendingEmail}.`
+      ? `Email change to ${emailState.pendingEmail} is pending approval from your current email.`
+      : `Email change to ${emailState.pendingEmail} is pending verification. You can resend if the message does not arrive.`
     : status && status.tone !== "error"
       ? status.text
       : null;

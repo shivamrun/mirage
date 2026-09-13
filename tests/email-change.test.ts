@@ -62,7 +62,7 @@ describe("email-change tokens", () => {
     { emailVerified: false, step: "verify-new", recipient: "new" },
     { emailVerified: true, step: "approve-current", recipient: "current" },
   ] as const)(
-    "keeps an undelivered $step challenge and cooldown after a failed send",
+    "reports a recoverable $step challenge and cooldown after a failed send",
     async ({ emailVerified, step, recipient }) => {
       const actor = await createTestActor({ emailVerified });
       const newEmail = `failed-${randomUUID()}@example.com`;
@@ -75,8 +75,10 @@ describe("email-change tokens", () => {
         { newEmail },
         actor.cookie,
       );
-      expect(failed.status).toBe(500);
-      expect(await failed.text()).toContain("Test delivery failure");
+      expect(failed.status).toBe(503);
+      const failure = (await failed.json()) as { message: string };
+      expect(failure.message).toContain("could not confirm email delivery");
+      expect(failure.message).not.toContain("Test delivery failure");
       expect((await storedUser(actor.id))?.email).toBe(actor.email);
       const records = await db
         .select()
@@ -117,6 +119,26 @@ describe("email-change tokens", () => {
       );
       expect(retry.status).toBe(429);
       expect(Number(retry.headers.get("retry-after"))).toBeGreaterThan(0);
+
+      setTestEmailDeliveryHook(null);
+      await db
+        .update(applicationRateLimit)
+        .set({ resetAt: new Date(Date.now() - 1000) });
+      const recovered = await postResponse(
+        step === "verify-new"
+          ? "/resend-email-change-verification"
+          : "/change-email",
+        step === "verify-new" ? {} : { newEmail },
+        actor.cookie,
+      );
+      expect(recovered.status).toBe(200);
+      expect(
+        testEmailOutbox.some(
+          (entry) =>
+            entry.to === (recipient === "new" ? newEmail : actor.email) &&
+            entry.text.includes("email change"),
+        ),
+      ).toBe(true);
     },
   );
 
@@ -132,8 +154,11 @@ describe("email-change tokens", () => {
     const failed = await postResponse("/approve-email-change", {
       token: approvalToken,
     });
-    expect(failed.status).toBe(500);
-    expect(await failed.text()).toContain("Test delivery failure");
+    expect(failed.status).toBe(503);
+    expect(await failed.json()).toMatchObject({
+      recovery: "resend-from-account",
+      message: expect.stringContaining("approval was saved"),
+    });
     expect((await storedUser(actor.id))?.email).toBe(actor.email);
     const records = await db
       .select()
@@ -162,6 +187,61 @@ describe("email-change tokens", () => {
     );
     expect(resend.status).toBe(429);
     expect(Number(resend.headers.get("retry-after"))).toBeGreaterThan(0);
+
+    await db
+      .update(applicationRateLimit)
+      .set({ resetAt: new Date(Date.now() - 1000) });
+    const recovered = await postResponse(
+      "/resend-email-change-verification",
+      {},
+      actor.cookie,
+    );
+    expect(recovered.status).toBe(200);
+    expect(tokenFromEmail(newEmail, "/confirm-email-change")).toBeTruthy();
+  });
+
+  it("keeps a possibly delivered link valid after an ambiguous send failure", async () => {
+    const actor = await createTestActor();
+    const newEmail = `timeout-${randomUUID()}@example.com`;
+    setTestEmailDeliveryHook(async (options) => {
+      testEmailOutbox.push(options);
+      throw new Error("Provider timed out after acceptance");
+    });
+
+    const response = await postResponse(
+      "/change-email",
+      { newEmail },
+      actor.cookie,
+    );
+    expect(response.status).toBe(503);
+    const token = tokenFromEmail(newEmail, "/confirm-email-change");
+    setTestEmailDeliveryHook(null);
+    const confirmed = await post("/confirm-email-change", { token });
+    expect(redirectStatus(confirmed.redirectURL)).toBe("success");
+    expect((await storedUser(actor.id))?.email).toBe(newEmail);
+  });
+
+  it("keeps a possibly delivered confirmation valid after approval is consumed", async () => {
+    const actor = await createTestActor({ emailVerified: true });
+    const newEmail = `approval-timeout-${randomUUID()}@example.com`;
+    await post("/change-email", { newEmail }, actor.cookie);
+    const approvalToken = tokenFromEmail(actor.email, "/approve-email-change");
+    setTestEmailDeliveryHook(async (options) => {
+      testEmailOutbox.push(options);
+      throw new Error("Provider timed out after acceptance");
+    });
+
+    const response = await postResponse("/approve-email-change", {
+      token: approvalToken,
+    });
+    expect(response.status).toBe(503);
+    const confirmationToken = tokenFromEmail(newEmail, "/confirm-email-change");
+    setTestEmailDeliveryHook(null);
+    const confirmed = await post("/confirm-email-change", {
+      token: confirmationToken,
+    });
+    expect(redirectStatus(confirmed.redirectURL)).toBe("success");
+    expect((await storedUser(actor.id))?.email).toBe(newEmail);
   });
 
   it("keeps only the latest active challenge across delayed sends at a cooldown boundary", async () => {
