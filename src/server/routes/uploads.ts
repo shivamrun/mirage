@@ -94,10 +94,16 @@ export const uploadsRoutes = new Elysia({ prefix: "/uploads" })
     {
       auth: true,
       body: t.Object({
-        contentType: t.String({ minLength: 1 }),
-        filename: t.String({ minLength: 1 }),
-        key: t.Enum(uploadAssetKeyEnum),
-        size: t.Integer({ minimum: 1 }),
+        contentType: t.String({
+          minLength: 1,
+          error: "Content type is required.",
+        }),
+        filename: t.String({ minLength: 1, error: "Filename is required." }),
+        key: t.Enum(uploadAssetKeyEnum, { error: "Invalid upload key." }),
+        size: t.Integer({
+          minimum: 1,
+          error: "Size must be a positive integer.",
+        }),
       }),
       response: {
         200: t.Object({
@@ -106,7 +112,7 @@ export const uploadsRoutes = new Elysia({ prefix: "/uploads" })
           upload: prepareUploadResponseSchema,
         }),
         400: t.Object({
-          code: t.String(),
+          code: t.Optional(t.String()),
           message: t.String(),
         }),
         401: t.Object({

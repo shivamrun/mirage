@@ -285,10 +285,24 @@ describe("current Elysia HTTP contract", () => {
       method: "POST",
       cookie: actor.cookie,
       headers: { ...jsonHeaders, origin: "https://evil.example" },
-      body: "{}",
+      body: JSON.stringify({
+        contentType: "image/png",
+        filename: "",
+        key: "avatar",
+        size: 10,
+      }),
     });
-    expect(response.status).toBe(422);
-    expect(await response.text()).not.toContain("Invalid request origin.");
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      message: "Filename is required.",
+    });
+  });
+
+  it("returns a JSON 404 for an unmatched API path", async () => {
+    const response = await httpRequest(app, "/api/phase-one-missing");
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(await response.json()).toEqual({ message: "Not Found" });
   });
 
   it.each([
@@ -359,7 +373,7 @@ describe("current Elysia HTTP contract", () => {
     { path: "/api/account/two-factor/send-code", access: "user" },
     { path: "/api/admin/email-list", access: "admin" },
   ] as const)(
-    "records malformed JSON and text bodies at $path",
+    "handles malformed JSON and text bodies at $path",
     async ({ path, access }) => {
       const actor =
         access === "public"
@@ -379,20 +393,16 @@ describe("current Elysia HTTP contract", () => {
           body,
         });
         expect(response.status, `${path} ${contentType}`).toBe(400);
-        if (
-          contentType === "application/json" &&
-          path !== "/api/admin/email-list"
-        ) {
-          expect(response.headers.get("content-type")).toContain("text/plain");
-          expect(await response.text()).toBe("Bad Request");
-        } else {
-          expect(response.headers.get("content-type")).toContain(
-            "application/json",
-          );
-          expect(await response.json()).toEqual({
-            message: expect.any(String),
-          });
-        }
+        expect(response.headers.get("content-type")).toContain(
+          "application/json",
+        );
+        expect(await response.json()).toEqual({
+          message:
+            contentType === "application/json" &&
+            path !== "/api/admin/email-list"
+              ? "Invalid request body."
+              : expect.any(String),
+        });
       }
     },
   );
