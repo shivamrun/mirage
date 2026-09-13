@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { env } from "@/lib/env";
 
 import { elysiaAuth } from "./auth";
+import { requestPolicy } from "./request-policy";
 
 const protectedRoutePrefixes = ["/admin"];
 
@@ -14,10 +15,6 @@ const protectedRouteVerificationSchema = z.object({
 
 function jsonResponse(message: string, status: number) {
   return Response.json({ message }, { status });
-}
-
-function forbiddenResponse() {
-  return jsonResponse("Invalid request origin.", 403);
 }
 
 function isProtectedAccessPath(pathname: string) {
@@ -49,42 +46,12 @@ function createVerificationSentURL(callbackURL: string) {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
-function isTrustedOriginRequest(request: Request) {
-  const trustedOrigin = new URL(env.NEXT_PUBLIC_BASE_URL).origin;
-  const origin = request.headers.get("origin");
-
-  if (origin) {
-    return origin === trustedOrigin;
-  }
-
-  const referer = request.headers.get("referer");
-
-  if (!referer) {
-    return false;
-  }
-
-  try {
-    return new URL(referer).origin === trustedOrigin;
-  } catch {
-    return false;
-  }
-}
-
-function validateMutationRequest(request: Request) {
-  return isTrustedOriginRequest(request) ? null : forbiddenResponse();
-}
-
 export const authActionRoutes = new Elysia({ prefix: "/auth-actions" })
   .use(elysiaAuth)
+  .use(requestPolicy)
   .post(
     "/protected-route-verification-email",
     async ({ authSession, body, request }) => {
-      const invalidMutationResponse = validateMutationRequest(request);
-
-      if (invalidMutationResponse) {
-        return invalidMutationResponse;
-      }
-
       const parsed = protectedRouteVerificationSchema.safeParse(
         body && typeof body === "object" ? body : {},
       );
@@ -124,5 +91,6 @@ export const authActionRoutes = new Elysia({ prefix: "/auth-actions" })
     },
     {
       auth: true,
+      sameOrigin: true,
     },
   );

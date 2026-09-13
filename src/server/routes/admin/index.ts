@@ -25,6 +25,7 @@ import {
 } from "@/zod";
 import { emailSchema } from "@/zod/helpers";
 import { elysiaAuth } from "../auth";
+import { requestPolicy } from "../request-policy";
 
 const forcePasswordResetSchema = z.object({
   email: emailSchema,
@@ -38,35 +39,6 @@ function jsonResponse(message: string, status: number) {
   return Response.json({ message }, { status });
 }
 
-function forbiddenResponse() {
-  return jsonResponse("Invalid request origin.", 403);
-}
-
-function isTrustedOriginRequest(request: Request) {
-  const trustedOrigin = new URL(env.NEXT_PUBLIC_BASE_URL).origin;
-  const origin = request.headers.get("origin");
-
-  if (origin) {
-    return origin === trustedOrigin;
-  }
-
-  const referer = request.headers.get("referer");
-
-  if (!referer) {
-    return false;
-  }
-
-  try {
-    return new URL(referer).origin === trustedOrigin;
-  } catch {
-    return false;
-  }
-}
-
-function validateMutationRequest(request: Request) {
-  return isTrustedOriginRequest(request) ? null : forbiddenResponse();
-}
-
 async function parseJsonRequest(request: Request) {
   try {
     return await request.json();
@@ -77,6 +49,7 @@ async function parseJsonRequest(request: Request) {
 
 export const adminRoutes = new Elysia({ prefix: "/admin" })
   .use(elysiaAuth)
+  .use(requestPolicy)
   .get(
     "/",
     ({ authUser }) => ({
@@ -93,13 +66,7 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
   )
   .delete(
     "/users/:userId/accounts/:accountRowId",
-    async ({ params, request }) => {
-      const invalidMutationResponse = validateMutationRequest(request);
-
-      if (invalidMutationResponse) {
-        return invalidMutationResponse;
-      }
-
+    async ({ params }) => {
       const result = await deleteAdminLinkedAccount(
         params.userId,
         params.accountRowId,
@@ -123,17 +90,12 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
     },
     {
       admin: true,
+      sameOrigin: true,
     },
   )
   .delete(
     "/users/:userId/sessions/:sessionId",
-    async ({ params, request }) => {
-      const invalidMutationResponse = validateMutationRequest(request);
-
-      if (invalidMutationResponse) {
-        return invalidMutationResponse;
-      }
-
+    async ({ params }) => {
       const userSession = await deleteAdminUserSession(
         params.userId,
         params.sessionId,
@@ -150,17 +112,12 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
     },
     {
       admin: true,
+      sameOrigin: true,
     },
   )
   .post(
     "/email-list",
     async ({ request }) => {
-      const invalidMutationResponse = validateMutationRequest(request);
-
-      if (invalidMutationResponse) {
-        return invalidMutationResponse;
-      }
-
       const parsed = adminCreateEmailListSchema.safeParse(
         await parseJsonRequest(request),
       );
@@ -181,17 +138,12 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
     },
     {
       admin: true,
+      sameOrigin: true,
     },
   )
   .patch(
     "/email-list/:key",
     async ({ params, request }) => {
-      const invalidMutationResponse = validateMutationRequest(request);
-
-      if (invalidMutationResponse) {
-        return invalidMutationResponse;
-      }
-
       const body = await parseJsonRequest(request);
       const parsed = adminCreateEmailListSchema.safeParse({
         ...(body && typeof body === "object" ? body : {}),
@@ -218,17 +170,12 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
     },
     {
       admin: true,
+      sameOrigin: true,
     },
   )
   .patch(
     "/email-list/:key/status",
     async ({ params, request }) => {
-      const invalidMutationResponse = validateMutationRequest(request);
-
-      if (invalidMutationResponse) {
-        return invalidMutationResponse;
-      }
-
       const body = await parseJsonRequest(request);
       const parsedStatus = emailListStatusUpdateSchema.safeParse({
         ...(body && typeof body === "object" ? body : {}),
@@ -251,17 +198,12 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
     },
     {
       admin: true,
+      sameOrigin: true,
     },
   )
   .delete(
     "/email-list/:key",
-    async ({ params, request }) => {
-      const invalidMutationResponse = validateMutationRequest(request);
-
-      if (invalidMutationResponse) {
-        return invalidMutationResponse;
-      }
-
+    async ({ params }) => {
       const result = await deleteEmailList(params.key);
 
       if (result.status === "protected") {
@@ -278,17 +220,12 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
     },
     {
       admin: true,
+      sameOrigin: true,
     },
   )
   .post(
     "/security/force-password-reset",
     async ({ request }) => {
-      const invalidMutationResponse = validateMutationRequest(request);
-
-      if (invalidMutationResponse) {
-        return invalidMutationResponse;
-      }
-
       const parsed = forcePasswordResetSchema.safeParse(
         await parseJsonRequest(request),
       );
@@ -338,17 +275,12 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
     },
     {
       admin: true,
+      sameOrigin: true,
     },
   )
   .post(
     "/security/revoke-all-sessions",
-    async ({ request }) => {
-      const invalidMutationResponse = validateMutationRequest(request);
-
-      if (invalidMutationResponse) {
-        return invalidMutationResponse;
-      }
-
+    async () => {
       const revokedSessions = await revokeAllSessions();
 
       return {
@@ -358,5 +290,6 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
     },
     {
       admin: true,
+      sameOrigin: true,
     },
   );

@@ -1,7 +1,6 @@
 import { isUploadSDKError } from "@marinedotsh/upload-sdk";
 import { Elysia, t } from "elysia";
 
-import { env } from "@/lib/env";
 import {
   createUploadSigner,
   getUploadPublicUrl,
@@ -9,6 +8,7 @@ import {
 } from "@/lib/uploads/server";
 
 import { elysiaAuth } from "./auth";
+import { requestPolicy } from "./request-policy";
 
 const uploadAssetKeyEnum = {
   avatar: "avatar",
@@ -24,36 +24,12 @@ const prepareUploadResponseSchema = t.Object({
   url: t.String(),
 });
 
-function isTrustedOriginRequest(request: Request) {
-  const trustedOrigin = new URL(env.NEXT_PUBLIC_BASE_URL).origin;
-  const origin = request.headers.get("origin");
-
-  if (origin) {
-    return origin === trustedOrigin;
-  }
-
-  const referer = request.headers.get("referer");
-
-  if (!referer) {
-    return false;
-  }
-
-  try {
-    return new URL(referer).origin === trustedOrigin;
-  } catch {
-    return false;
-  }
-}
-
 export const uploadsRoutes = new Elysia({ prefix: "/uploads" })
   .use(elysiaAuth)
+  .use(requestPolicy)
   .post(
     "/",
-    async ({ body, request, status }) => {
-      if (!isTrustedOriginRequest(request)) {
-        return status(403, { message: "Invalid request origin." });
-      }
-
+    async ({ body, status }) => {
       const { key, ...file } = body;
 
       try {
@@ -93,6 +69,7 @@ export const uploadsRoutes = new Elysia({ prefix: "/uploads" })
     },
     {
       auth: true,
+      sameOrigin: true,
       body: t.Object({
         contentType: t.String({
           minLength: 1,
