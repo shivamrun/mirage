@@ -112,10 +112,14 @@ export async function ensureDefaultEmailLists() {
     });
 }
 
-function isDefaultEmailListKey(key: string) {
+export function isDefaultEmailListKey(key: string) {
   return defaultEmailListKeys.includes(
     key as (typeof defaultEmailListKeys)[number],
   );
+}
+
+export function canDeleteEmailList(key: string) {
+  return !isDefaultEmailListKey(key);
 }
 
 function getSubscriberListCondition(state: AdminEmailSubscriberQueryState) {
@@ -168,9 +172,7 @@ export async function subscribeEmailToList(values: EmailSubscriptionValues) {
       )
       .limit(1);
 
-    if (!list) {
-      throw new Error("Unknown email list.");
-    }
+    if (!list) return { status: "unknown-list" as const };
 
     const subscriptionStatus = list.emailVerificationRequired
       ? "pending"
@@ -227,6 +229,7 @@ export async function subscribeEmailToList(values: EmailSubscriptionValues) {
     return {
       contact,
       list,
+      status: "subscribed" as const,
       subscription,
     };
   });
@@ -341,7 +344,7 @@ export async function deleteEmailList(key: string) {
 export async function listEmailLists() {
   await ensureDefaultEmailLists();
 
-  return db
+  const lists = await db
     .select({
       activeSubscribers: sql<number>`count(${emailSubscription.id}) filter (where ${emailSubscription.status} = 'subscribed')::int`,
       createdAt: emailList.createdAt,
@@ -357,6 +360,11 @@ export async function listEmailLists() {
     .leftJoin(emailSubscription, eq(emailSubscription.listKey, emailList.key))
     .groupBy(emailList.key)
     .orderBy(asc(emailList.key));
+
+  return lists.map((list) => ({
+    ...list,
+    canDelete: canDeleteEmailList(list.key),
+  }));
 }
 
 export async function listEmailSubscribers({

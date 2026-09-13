@@ -16,6 +16,7 @@ import {
 import { apiErrors } from "@/server/http/errors";
 import { contactRoutes } from "@/server/routes/contact";
 import { emailListRoutes } from "@/server/routes/email-list";
+import { EMAIL_LIST_METADATA_VALUE_MAX_LENGTH } from "@/zod";
 import { setTestEmailDeliveryHook, testEmailOutbox } from "./infra/email-fake";
 
 const origin = "http://localhost:3000";
@@ -117,8 +118,49 @@ describe("public contact and email signup", () => {
         })
       ).status,
     ).toBe(400);
+    expect(
+      (
+        await formRequest("/email-list/", {
+          ...signupBody(address),
+          metadata: { unexpected: "value" },
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await formRequest("/email-list/", {
+          ...signupBody(address),
+          metadata: {
+            utm_source: "x".repeat(EMAIL_LIST_METADATA_VALUE_MAX_LENGTH + 1),
+          },
+        })
+      ).status,
+    ).toBe(400);
     expect(await db.select().from(contactSubmission)).toHaveLength(0);
     expect(await subscriptionFor(address)).toBeNull();
+  });
+
+  it("accepts bounded allowlisted signup metadata", async () => {
+    const address = email();
+    const response = await formRequest("/email-list/", {
+      ...signupBody(address),
+      metadata: {
+        landing_path: "/",
+        referrer: "https://example.com/source",
+        utm_campaign: "launch",
+        utm_medium: "email",
+        utm_source: "newsletter",
+      },
+    });
+
+    expect(response.status, await response.clone().text()).toBe(200);
+    expect((await subscriptionFor(address))?.metadata).toEqual({
+      landing_path: "/",
+      referrer: "https://example.com/source",
+      utm_campaign: "launch",
+      utm_medium: "email",
+      utm_source: "newsletter",
+    });
   });
 
   it("rate-limits repeated requests despite changing client IP headers", async () => {

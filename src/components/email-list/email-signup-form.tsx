@@ -9,6 +9,7 @@ import { AuthStatusMessage } from "@/components/auth";
 import { EmailField } from "@/components/auth/auth-fields";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api/client";
+import { captureBrowserAttribution, hasAttribution } from "@/lib/attribution";
 import {
   type EmailSubscriptionInput,
   type EmailSubscriptionValues,
@@ -47,6 +48,21 @@ function isVerificationRequiredResponse(
   );
 }
 
+function getSignupMetadata(): EmailSubscriptionValues["metadata"] {
+  const attribution = captureBrowserAttribution();
+  if (!hasAttribution(attribution)) return null;
+
+  return {
+    landing_path: attribution.landingPath ?? undefined,
+    referrer: attribution.referrer ?? undefined,
+    utm_campaign: attribution.utmCampaign ?? undefined,
+    utm_content: attribution.utmContent ?? undefined,
+    utm_medium: attribution.utmMedium ?? undefined,
+    utm_source: attribution.utmSource ?? undefined,
+    utm_term: attribution.utmTerm ?? undefined,
+  };
+}
+
 function EmailSignupForm({
   inputId,
   listKey,
@@ -77,7 +93,10 @@ function EmailSignupForm({
     setStatusMessage(undefined);
 
     try {
-      const result = await api.api["email-list"].post(values);
+      const result = await api.api["email-list"].post({
+        ...values,
+        metadata: getSignupMetadata(),
+      });
 
       if (result.error) {
         setStatusMessage({

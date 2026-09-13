@@ -8,6 +8,7 @@ export const EMAIL_LIST_KEY_MAX_LENGTH = 80;
 export const EMAIL_LIST_NAME_MAX_LENGTH = 120;
 export const EMAIL_LIST_DESCRIPTION_MAX_LENGTH = 500;
 export const EMAIL_LIST_SOURCE_MAX_LENGTH = 120;
+export const EMAIL_LIST_METADATA_VALUE_MAX_LENGTH = 200;
 
 export const emailListKeySchema = z
   .string()
@@ -66,7 +67,50 @@ export const emailSubscriptionSchema = z.object({
     .nullable()
     .optional()
     .transform((value) => value || null),
-  metadata: z.record(z.string(), z.unknown()).nullable().optional(),
+  metadata: z
+    .object({
+      landing_path: z
+        .string()
+        .trim()
+        .max(EMAIL_LIST_METADATA_VALUE_MAX_LENGTH)
+        .optional(),
+      referrer: z
+        .string()
+        .trim()
+        .max(EMAIL_LIST_METADATA_VALUE_MAX_LENGTH)
+        .optional(),
+      utm_campaign: z
+        .string()
+        .trim()
+        .max(EMAIL_LIST_METADATA_VALUE_MAX_LENGTH)
+        .optional(),
+      utm_content: z
+        .string()
+        .trim()
+        .max(EMAIL_LIST_METADATA_VALUE_MAX_LENGTH)
+        .optional(),
+      utm_medium: z
+        .string()
+        .trim()
+        .max(EMAIL_LIST_METADATA_VALUE_MAX_LENGTH)
+        .optional(),
+      utm_source: z
+        .string()
+        .trim()
+        .max(EMAIL_LIST_METADATA_VALUE_MAX_LENGTH)
+        .optional(),
+      utm_term: z
+        .string()
+        .trim()
+        .max(EMAIL_LIST_METADATA_VALUE_MAX_LENGTH)
+        .optional(),
+    })
+    .strict()
+    .nullable()
+    .optional()
+    .transform((value) =>
+      value && Object.keys(value).length > 0 ? value : null,
+    ),
   website: z.string().optional(),
 });
 

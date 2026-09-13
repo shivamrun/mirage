@@ -40,6 +40,7 @@ type StatusMessage = {
 
 type EmailListRowActionsProps = {
   list: {
+    canDelete: boolean;
     description: string | null;
     emailVerificationRequired: boolean;
     key: string;
@@ -48,11 +49,8 @@ type EmailListRowActionsProps = {
   };
 };
 
-const protectedEmailListKeys = new Set(["waitlist", "newsletter"]);
-
 export function EmailListRowActions({ list }: EmailListRowActionsProps) {
   const router = useRouter();
-  const isProtectedList = protectedEmailListKeys.has(list.key);
   const [dialogMode, setDialogMode] = React.useState<
     "delete" | "update" | null
   >(null);
@@ -186,7 +184,7 @@ export function EmailListRowActions({ list }: EmailListRowActionsProps) {
             Pause submissions
           </DropdownMenuItem>
 
-          {!isProtectedList ? (
+          {list.canDelete ? (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem

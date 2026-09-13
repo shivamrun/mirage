@@ -32,6 +32,7 @@ import { emailListPageHref } from "./query";
 
 type EmailListItem = {
   activeSubscribers: number;
+  canDelete: boolean;
   createdAt: Date;
   description: string | null;
   emailVerificationRequired: boolean;
@@ -107,6 +108,16 @@ function metadataPreview(metadata: Record<string, unknown> | null) {
   }
 
   return JSON.stringify(metadata);
+}
+
+function metadataEntries(metadata: Record<string, unknown> | null) {
+  if (!metadata || Object.keys(metadata).length === 0) {
+    return [];
+  }
+
+  return Object.entries(metadata).filter(
+    ([, value]) => value !== null && value !== undefined && value !== "",
+  );
 }
 
 export function AdminEmailListsPanel({ lists }: AdminEmailListsPanelProps) {
@@ -278,7 +289,23 @@ export function AdminEmailSubmissionsPanel({
                     {subscriber.source ?? "-"}
                   </TableCell>
                   <TableCell className="max-w-[220px] truncate font-mono text-muted-foreground text-xs">
-                    {metadataPreview(subscriber.metadata)}
+                    <details>
+                      <summary className="cursor-pointer truncate">
+                        {metadataPreview(subscriber.metadata)}
+                      </summary>
+                      <dl className="mt-2 grid gap-1 text-xs">
+                        {metadataEntries(subscriber.metadata).map(
+                          ([key, value]) => (
+                            <div className="grid gap-0.5" key={key}>
+                              <dt className="text-muted-foreground">{key}</dt>
+                              <dd className="break-words text-foreground">
+                                {String(value)}
+                              </dd>
+                            </div>
+                          ),
+                        )}
+                      </dl>
+                    </details>
                   </TableCell>
                   <TableCell className="whitespace-nowrap pr-4 text-end text-muted-foreground">
                     {formatDate(subscriber.createdAt)}

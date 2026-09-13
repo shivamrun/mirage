@@ -1,28 +1,15 @@
 import { Elysia } from "elysia";
 
 import { env } from "@/lib/env";
-import {
-  confirmEmailListVerification,
-  createEmailListVerification,
-  deleteEmailListVerification,
-  subscribeEmailToList,
-} from "@/server/db/dal/email-list";
-import { sendEmailListVerificationEmail } from "@/server/email";
+import { confirmEmailListVerification } from "@/server/db/dal/email-list";
+import { subscribeToEmailList } from "@/server/email-list/service";
 import { requestPolicy } from "@/server/http/request-policy";
-import { consumePublicWriteLimit } from "@/server/rate-limit";
 import {
   emailListSignupSuccessResponseSchema,
   emailListVerifyQuerySchema,
   emailSubscriptionSchema,
   messageResponseSchema,
 } from "@/zod";
-
-function createEmailListVerificationUrl(token: string) {
-  const url = new URL("/api/email-list/verify", env.NEXT_PUBLIC_BASE_URL);
-  url.searchParams.set("token", token);
-
-  return url.toString();
-}
 
 function createEmailListRedirectUrl(status: "invalid" | "success") {
   const url = new URL("/", env.NEXT_PUBLIC_BASE_URL);
@@ -36,62 +23,34 @@ export const emailListRoutes = new Elysia({ prefix: "/email-list" })
   .post(
     "/",
     async ({ body, set, status }) => {
-      if (body.website) {
+      const result = await subscribeToEmailList(body);
+
+      if (result.status === "ignored") {
         return { status: true as const };
       }
 
-      const rateLimit = await consumePublicWriteLimit({
-        destination: body.email,
-        flow: "email-list",
-      });
-      if (!rateLimit.allowed) {
-        set.headers["Retry-After"] = String(rateLimit.retryAfterSeconds);
+      if (result.status === "rate-limited") {
+        set.headers["Retry-After"] = String(result.retryAfterSeconds);
         return status(429, {
           message: "Too many email signups. Please try again later.",
         });
       }
 
-      try {
-        const subscription = await subscribeEmailToList(body);
-        const verificationRequired =
-          subscription.subscription.status === "pending";
-
-        if (verificationRequired) {
-          const verification = await createEmailListVerification({
-            email: subscription.contact.email,
-            listKey: subscription.subscription.listKey,
-            subscriptionId: subscription.subscription.id,
-          });
-
-          try {
-            await sendEmailListVerificationEmail({
-              email: subscription.contact.email,
-              listKey: subscription.subscription.listKey,
-              listName: subscription.list.name,
-              verificationUrl: createEmailListVerificationUrl(
-                verification.token,
-              ),
-            });
-          } catch {
-            await deleteEmailListVerification(verification.token);
-            return status(503, {
-              message:
-                "Verification email could not be sent. Please try signing up again.",
-            });
-          }
-        }
-
-        return {
-          status: true as const,
-          verificationRequired,
-        };
-      } catch (error) {
-        if (error instanceof Error && error.message === "Unknown email list.") {
-          return status(400, { message: "Unknown email list." });
-        }
-
-        throw error;
+      if (result.status === "unknown-list") {
+        return status(400, { message: "Unknown email list." });
       }
+
+      if (result.status === "delivery-failed") {
+        return status(503, {
+          message:
+            "Verification email could not be sent. Please try signing up again.",
+        });
+      }
+
+      return {
+        status: true as const,
+        verificationRequired: result.verificationRequired,
+      };
     },
     {
       sameOrigin: true,
