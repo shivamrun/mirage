@@ -19,6 +19,22 @@ export function getAllowedRoles(user: Pick<AuthUserRecord, "role">) {
   return normalizeRoles(user.role);
 }
 
+export async function getCurrentUserFromAuthSession(
+  authSession: AuthSession,
+): Promise<CurrentUser | null> {
+  const user = await getAuthUserById(authSession.user.id);
+
+  if (!user) {
+    return null;
+  }
+
+  return {
+    ...user,
+    roles: getAllowedRoles(user),
+    session: authSession.session,
+  };
+}
+
 export async function getCurrentUser({
   headers,
 }: CurrentUserOptions): Promise<CurrentUser | null> {
@@ -30,15 +46,5 @@ export async function getCurrentUser({
     return null;
   }
 
-  const user = await getAuthUserById(session.user.id);
-
-  if (!user) {
-    return null;
-  }
-
-  return {
-    ...user,
-    roles: getAllowedRoles(user),
-    session: session.session,
-  };
+  return getCurrentUserFromAuthSession(session);
 }

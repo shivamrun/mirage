@@ -7,24 +7,41 @@ export const adminAccessMessages = {
   twoFactorRequired: "Two-factor authentication required",
 } as const;
 
-type AdminAccessDecision =
+type AuthPolicyReason =
+  | "email-verification-required"
+  | "not-found"
+  | "two-factor-required";
+
+export type AuthPolicyDecision =
   | {
       allowed: true;
     }
   | {
       allowed: false;
       message: string;
-      reason:
-        | "email-verification-required"
-        | "not-found"
-        | "two-factor-required";
+      reason: AuthPolicyReason;
       statusCode: 403 | 404;
     };
 
-export async function evaluateAdminAccess(
+export function evaluateAdminRole(
   user: CurrentUser | null,
-): Promise<AdminAccessDecision> {
+): AuthPolicyDecision {
   if (!user?.roles.includes("admin")) {
+    return {
+      allowed: false,
+      message: adminAccessMessages.notFound,
+      reason: "not-found",
+      statusCode: 404,
+    };
+  }
+
+  return { allowed: true };
+}
+
+export function evaluateVerifiedEmail(
+  user: CurrentUser | null,
+): AuthPolicyDecision {
+  if (!user) {
     return {
       allowed: false,
       message: adminAccessMessages.notFound,
@@ -42,13 +59,22 @@ export async function evaluateAdminAccess(
     };
   }
 
-  if (
-    !user.twoFactorEnabled ||
-    !(await hasAdminSessionAssurance({
-      sessionId: user.session.id,
-      userId: user.id,
-    }))
-  ) {
+  return { allowed: true };
+}
+
+export function evaluateTwoFactorEnabled(
+  user: CurrentUser | null,
+): AuthPolicyDecision {
+  if (!user) {
+    return {
+      allowed: false,
+      message: adminAccessMessages.notFound,
+      reason: "not-found",
+      statusCode: 404,
+    };
+  }
+
+  if (!user.twoFactorEnabled) {
     return {
       allowed: false,
       message: adminAccessMessages.twoFactorRequired,
@@ -58,4 +84,51 @@ export async function evaluateAdminAccess(
   }
 
   return { allowed: true };
+}
+
+export async function evaluateAdminSessionAssurance(
+  user: CurrentUser | null,
+): Promise<AuthPolicyDecision> {
+  if (!user) {
+    return {
+      allowed: false,
+      message: adminAccessMessages.notFound,
+      reason: "not-found",
+      statusCode: 404,
+    };
+  }
+
+  const hasAssurance = await hasAdminSessionAssurance({
+    sessionId: user.session.id,
+    userId: user.id,
+  });
+
+  if (!hasAssurance) {
+    return {
+      allowed: false,
+      message: adminAccessMessages.twoFactorRequired,
+      reason: "two-factor-required",
+      statusCode: 403,
+    };
+  }
+
+  return { allowed: true };
+}
+
+export async function evaluateAdminAccess(
+  user: CurrentUser | null,
+): Promise<AuthPolicyDecision> {
+  const decisions = [
+    evaluateAdminRole(user),
+    evaluateVerifiedEmail(user),
+    evaluateTwoFactorEnabled(user),
+  ];
+
+  for (const decision of decisions) {
+    if (!decision.allowed) {
+      return decision;
+    }
+  }
+
+  return evaluateAdminSessionAssurance(user);
 }

@@ -3,29 +3,36 @@ import { Elysia } from "elysia";
 import { auth } from "@/lib/auth";
 import {
   adminAccessMessages,
-  evaluateAdminAccess,
+  evaluateAdminRole,
+  evaluateAdminSessionAssurance,
+  evaluateTwoFactorEnabled,
+  evaluateVerifiedEmail,
 } from "@/lib/auth/admin-access";
-import { type AuthSession, getCurrentUser } from "@/lib/auth/current-user";
+import {
+  type AuthSession,
+  type CurrentUser,
+  getCurrentUserFromAuthSession,
+} from "@/lib/auth/current-user";
 
 export type { AuthSession };
 
-const emailVerificationRequired = {
-  message: adminAccessMessages.emailVerificationRequired,
-};
+async function resolveAuthSession(headers: Headers) {
+  return auth.api.getSession({
+    headers,
+    query: {
+      disableCookieCache: true,
+    },
+  });
+}
 
-const twoFactorRequired = {
-  message: adminAccessMessages.twoFactorRequired,
-};
+function getAuthUserFromContext(context: unknown) {
+  return (context as { authUser?: CurrentUser }).authUser ?? null;
+}
 
 export const elysiaAuth = new Elysia({ name: "better-auth" }).macro({
   auth: {
     async resolve({ request, status }) {
-      const authSession = await auth.api.getSession({
-        headers: request.headers,
-        query: {
-          disableCookieCache: true,
-        },
-      });
+      const authSession = await resolveAuthSession(request.headers);
 
       if (!authSession) {
         return status(401, { message: "Unauthorized" });
@@ -38,52 +45,94 @@ export const elysiaAuth = new Elysia({ name: "better-auth" }).macro({
       };
     },
   },
-  admin: {
+  currentUser: {
     async resolve({ request, status }) {
-      const authUser = await getCurrentUser({
-        headers: request.headers,
-      });
+      const authSession = await resolveAuthSession(request.headers);
+      const authUser = authSession
+        ? await getCurrentUserFromAuthSession(authSession)
+        : null;
 
-      if (!authUser) {
-        return status(404, { message: adminAccessMessages.notFound });
-      }
-
-      const decision = await evaluateAdminAccess(authUser);
-
-      if (!decision.allowed) {
-        return status(decision.statusCode, { message: decision.message });
-      }
-
-      return { authUser };
-    },
-  },
-  verifiedEmail: {
-    async beforeHandle({ request, status }) {
-      const authUser = await getCurrentUser({
-        headers: request.headers,
-      });
-
-      if (!authUser) {
+      if (!authSession || !authUser) {
         return status(401, { message: "Unauthorized" });
       }
 
-      if (!authUser.emailVerified) {
-        return status(403, emailVerificationRequired);
+      return {
+        authSession,
+        authUser,
+        session: authSession.session,
+        user: authSession.user,
+      };
+    },
+  },
+  admin: {
+    async resolve({ request, status }) {
+      const authSession = await resolveAuthSession(request.headers);
+      const authUser = authSession
+        ? await getCurrentUserFromAuthSession(authSession)
+        : null;
+
+      const decision = evaluateAdminRole(authUser);
+
+      if (!authSession || !authUser || !decision.allowed) {
+        return status(404, { message: adminAccessMessages.notFound });
+      }
+
+      return {
+        authSession,
+        authUser,
+        session: authSession.session,
+        user: authSession.user,
+      };
+    },
+  },
+  verifiedEmail: {
+    async beforeHandle(context) {
+      const authUser = getAuthUserFromContext(context);
+
+      if (!authUser) {
+        return context.status(401, { message: "Unauthorized" });
+      }
+
+      const decision = evaluateVerifiedEmail(authUser);
+
+      if (!decision.allowed) {
+        return context.status(decision.statusCode, {
+          message: decision.message,
+        });
       }
     },
   },
   twoFactor: {
-    async beforeHandle({ request, status }) {
-      const authUser = await getCurrentUser({
-        headers: request.headers,
-      });
+    async beforeHandle(context) {
+      const authUser = getAuthUserFromContext(context);
 
       if (!authUser) {
-        return status(401, { message: "Unauthorized" });
+        return context.status(401, { message: "Unauthorized" });
       }
 
-      if (!authUser.twoFactorEnabled) {
-        return status(403, twoFactorRequired);
+      const decision = evaluateTwoFactorEnabled(authUser);
+
+      if (!decision.allowed) {
+        return context.status(decision.statusCode, {
+          message: decision.message,
+        });
+      }
+    },
+  },
+  adminSessionAssurance: {
+    async beforeHandle(context) {
+      const authUser = getAuthUserFromContext(context);
+
+      if (!authUser) {
+        return context.status(401, { message: "Unauthorized" });
+      }
+
+      const decision = await evaluateAdminSessionAssurance(authUser);
+
+      if (!decision.allowed) {
+        return context.status(decision.statusCode, {
+          message: decision.message,
+        });
       }
     },
   },
