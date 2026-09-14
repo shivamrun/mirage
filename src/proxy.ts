@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
+import { getSafeAuthRedirect } from "@/lib/auth/redirect";
 
 const authRoutes = new Set(["/login", "/register"]);
 const protectedRoutePrefixes = ["/account", "/admin"];
@@ -16,10 +17,10 @@ function redirectTo(pathname: string, request: NextRequest) {
   const redirectURL = new URL(pathname, request.url);
 
   if (pathname === "/login") {
-    redirectURL.searchParams.set(
-      "callbackURL",
+    const callbackURL = getSafeAuthRedirect(
       `${request.nextUrl.pathname}${request.nextUrl.search}`,
     );
+    redirectURL.searchParams.set("callbackURL", callbackURL);
   }
 
   return NextResponse.redirect(redirectURL);

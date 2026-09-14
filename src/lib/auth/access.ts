@@ -8,6 +8,7 @@ import {
   type RequestHeaders as CurrentUserHeaders,
   getCurrentUser as getCurrentUserFromHeaders,
 } from "@/lib/auth/current-user";
+import { getLoginRedirectPath } from "@/lib/auth/redirect";
 
 export type RequestHeaders =
   | Headers
@@ -41,7 +42,7 @@ export async function requireAuth(
   const user = await getCurrentUser(options);
 
   if (!user) {
-    redirect(`/login?callbackURL=${options.callbackUrl ?? "/"}`);
+    redirect(getLoginRedirectPath(options.callbackUrl));
   }
 
   return user;

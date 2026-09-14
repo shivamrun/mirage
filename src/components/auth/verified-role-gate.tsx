@@ -12,6 +12,7 @@ import {
   type RequestHeaders,
 } from "@/lib/auth/access";
 import { evaluateAdminAccess } from "@/lib/auth/admin-access";
+import { getLoginRedirectPath, getSafeAuthRedirect } from "@/lib/auth/redirect";
 
 const fallbackCallbackURLByRole: Record<AuthRole, string> = {
   admin: "/admin",
@@ -25,13 +26,13 @@ function getRequestedPath(headers: RequestHeaders, role: AuthRole) {
 }
 
 function isVerificationSent(callbackURL: string) {
-  const url = new URL(callbackURL, "http://localhost");
+  const url = new URL(getSafeAuthRedirect(callbackURL), "http://localhost");
 
   return url.searchParams.get("verificationEmail") === "sent";
 }
 
 function cleanCallbackURL(callbackURL: string) {
-  const url = new URL(callbackURL, "http://localhost");
+  const url = new URL(getSafeAuthRedirect(callbackURL), "http://localhost");
   url.searchParams.delete("verificationEmail");
 
   return `${url.pathname}${url.search}${url.hash}`;
@@ -54,7 +55,7 @@ async function VerifiedRoleGate({
   const user = await getCurrentUser({ headers });
 
   if (!user) {
-    redirect(`/login?callbackURL=${encodeURIComponent(callbackURL)}`);
+    redirect(getLoginRedirectPath(callbackURL));
   }
 
   if (!user.roles.includes(requiredRole)) {

@@ -56,7 +56,7 @@ export const env = createEnv({
     RESEND_API_KEY: optionalEnvString,
   },
   client: {
-    NEXT_PUBLIC_BASE_URL: z.string().min(1),
+    NEXT_PUBLIC_BASE_URL: z.url(),
     NEXT_PUBLIC_UPLOAD_BASE_URL: optionalEnvString,
   },
   runtimeEnv: {
