@@ -8,10 +8,7 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
   .use(elysiaAuth)
   .guard(
     {
-      admin: true,
-      verifiedEmail: true,
-      twoFactor: true,
-      adminSessionAssurance: true,
+      adminAccess: true,
     },
     (app) =>
       app

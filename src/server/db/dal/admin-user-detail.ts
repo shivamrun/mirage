@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, sql } from "drizzle-orm";
 
 import db from "@/server/db";
 import {
@@ -66,7 +66,7 @@ export type AdminUserDetail = NonNullable<
   Awaited<ReturnType<typeof getAdminUserDetail>>
 >;
 
-export async function deleteAdminLinkedAccount(
+export async function getAdminLinkedAccountForDeletion(
   userId: string,
   accountRowId: string,
 ) {
@@ -90,22 +90,78 @@ export async function deleteAdminLinkedAccount(
     return { status: "credential" } as const;
   }
 
-  await db
-    .delete(accountTable)
-    .where(
-      and(eq(accountTable.id, account.id), eq(accountTable.userId, userId)),
-    );
+  const [signInMethodMetrics] = await db
+    .select({ total: count() })
+    .from(accountTable)
+    .where(eq(accountTable.userId, userId));
+  const remainingSignInMethods = (signInMethodMetrics?.total ?? 0) - 1;
 
-  return { account, status: "deleted" } as const;
+  if (remainingSignInMethods < 1) {
+    return { account, remainingSignInMethods, status: "last-method" } as const;
+  }
+
+  return { account, remainingSignInMethods, status: "deletable" } as const;
 }
 
-export async function deleteAdminUserSession(
+export async function deleteAdminLinkedAccount(
+  userId: string,
+  accountRowId: string,
+) {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${userId}))`);
+
+    const [account] = await tx
+      .select({
+        accountId: accountTable.accountId,
+        id: accountTable.id,
+        providerId: accountTable.providerId,
+      })
+      .from(accountTable)
+      .where(
+        and(eq(accountTable.id, accountRowId), eq(accountTable.userId, userId)),
+      )
+      .limit(1);
+
+    if (!account) {
+      return { status: "not-found" } as const;
+    }
+
+    if (account.providerId === "credential") {
+      return { status: "credential" } as const;
+    }
+
+    const [signInMethodMetrics] = await tx
+      .select({ total: count() })
+      .from(accountTable)
+      .where(eq(accountTable.userId, userId));
+    const remainingSignInMethods = (signInMethodMetrics?.total ?? 0) - 1;
+
+    if (remainingSignInMethods < 1) {
+      return {
+        account,
+        remainingSignInMethods,
+        status: "last-method",
+      } as const;
+    }
+
+    await tx
+      .delete(accountTable)
+      .where(
+        and(eq(accountTable.id, account.id), eq(accountTable.userId, userId)),
+      );
+
+    return { account, remainingSignInMethods, status: "deleted" } as const;
+  });
+}
+
+export async function getAdminUserSessionForDeletion(
   userId: string,
   sessionId: string,
 ) {
   const [session] = await db
     .select({
       id: sessionTable.id,
+      token: sessionTable.token,
       userId: sessionTable.userId,
     })
     .from(sessionTable)
@@ -115,12 +171,6 @@ export async function deleteAdminUserSession(
   if (!session) {
     return null;
   }
-
-  await db
-    .delete(sessionTable)
-    .where(
-      and(eq(sessionTable.id, session.id), eq(sessionTable.userId, userId)),
-    );
 
   return session;
 }

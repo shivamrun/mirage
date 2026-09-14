@@ -1,12 +1,19 @@
 import { Elysia } from "elysia";
 
+import { auth } from "@/lib/auth";
+import {
+  canDeleteLinkedAccount,
+  canDeleteUserSession,
+} from "@/lib/auth/admin-access";
+import type { CurrentUser } from "@/lib/auth/current-user";
 import {
   forcePasswordReset,
   revokeEverySession,
 } from "@/server/admin/security";
 import {
   deleteAdminLinkedAccount,
-  deleteAdminUserSession,
+  getAdminLinkedAccountForDeletion,
+  getAdminUserSessionForDeletion,
 } from "@/server/db/dal/admin-user-detail";
 import { requestPolicy } from "@/server/http/request-policy";
 import {
@@ -20,11 +27,42 @@ import {
   userSessionParamsSchema,
 } from "@/zod";
 
+function getAdminRouteUser(context: unknown) {
+  return (context as { authUser: CurrentUser }).authUser;
+}
+
 export const adminUserSecurityRoutes = new Elysia()
   .use(requestPolicy)
   .delete(
     "/users/:userId/accounts/:accountRowId",
-    async ({ params, status }) => {
+    async (context) => {
+      const { params, status } = context;
+      const target = await getAdminLinkedAccountForDeletion(
+        params.userId,
+        params.accountRowId,
+      );
+
+      if (target.status === "not-found") {
+        return status(404, { message: "Linked account not found." });
+      }
+
+      if (target.status === "credential") {
+        return status(400, {
+          message: "Password credentials cannot be unlinked here.",
+        });
+      }
+
+      const decision = canDeleteLinkedAccount({
+        actor: getAdminRouteUser(context),
+        remainingSignInMethods: target.remainingSignInMethods,
+      });
+
+      if (!decision.allowed) {
+        const denial = decision;
+
+        return status(denial.statusCode, { message: denial.message });
+      }
+
       const result = await deleteAdminLinkedAccount(
         params.userId,
         params.accountRowId,
@@ -37,6 +75,12 @@ export const adminUserSecurityRoutes = new Elysia()
       if (result.status === "credential") {
         return status(400, {
           message: "Password credentials cannot be unlinked here.",
+        });
+      }
+
+      if (result.status === "last-method") {
+        return status(403, {
+          message: "Cannot unlink the user's last sign-in method.",
         });
       }
 
@@ -59,8 +103,9 @@ export const adminUserSecurityRoutes = new Elysia()
   )
   .delete(
     "/users/:userId/sessions/:sessionId",
-    async ({ params, status }) => {
-      const userSession = await deleteAdminUserSession(
+    async (context) => {
+      const { params, request, status } = context;
+      const userSession = await getAdminUserSessionForDeletion(
         params.userId,
         params.sessionId,
       );
@@ -69,8 +114,29 @@ export const adminUserSecurityRoutes = new Elysia()
         return status(404, { message: "Session not found." });
       }
 
+      const decision = canDeleteUserSession({
+        actor: getAdminRouteUser(context),
+        targetSessionUserId: userSession.userId,
+      });
+
+      if (!decision.allowed) {
+        const denial = decision;
+
+        return status(denial.statusCode, { message: denial.message });
+      }
+
+      await auth.api.revokeUserSession({
+        body: {
+          sessionToken: userSession.token,
+        },
+        headers: request.headers,
+      });
+
       return {
-        session: userSession,
+        session: {
+          id: userSession.id,
+          userId: userSession.userId,
+        },
         status: true as const,
       };
     },

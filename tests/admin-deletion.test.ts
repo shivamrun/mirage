@@ -22,6 +22,57 @@ async function remove(path: string, cookie: string) {
 }
 
 describe("admin account and session deletion", () => {
+  it.each([
+    { actor: "visitor", expected: 404 },
+    { actor: "user", expected: 404 },
+    { actor: "unverified admin", expected: 403 },
+    { actor: "verified admin without 2FA", expected: 403 },
+  ] as const)(
+    "denies direct account and session deletion for $actor",
+    async ({ actor, expected }) => {
+      const target = await createTestActor();
+      const current =
+        actor === "visitor"
+          ? null
+          : await createTestActor({
+              role: actor === "user" ? "user" : "admin",
+              emailVerified: actor !== "user" && actor !== "unverified admin",
+              twoFactorEnabled: actor !== "verified admin without 2FA",
+            });
+      const cookie = current?.cookie ?? "";
+      const linkedId = randomUUID();
+      await db.insert(account).values({
+        id: linkedId,
+        accountId: "linked-google-account",
+        providerId: "google",
+        userId: target.id,
+      });
+      const [targetSession] = await db
+        .select()
+        .from(session)
+        .where(eq(session.userId, target.id));
+
+      expect(
+        (await remove(`/users/${target.id}/accounts/${linkedId}`, cookie))
+          .status,
+      ).toBe(expected);
+      expect(
+        (
+          await remove(
+            `/users/${target.id}/sessions/${targetSession.id}`,
+            cookie,
+          )
+        ).status,
+      ).toBe(expected);
+      expect(
+        await db.select().from(account).where(eq(account.id, linkedId)),
+      ).toHaveLength(1);
+      expect(
+        await db.select().from(session).where(eq(session.id, targetSession.id)),
+      ).toHaveLength(1);
+    },
+  );
+
   it("does not delete another user's account or session when IDs are paired", async () => {
     const admin = await createTestActor({ role: "admin", emailVerified: true });
     const first = await createTestActor();
@@ -135,5 +186,41 @@ describe("admin account and session deletion", () => {
     expect(
       await db.select().from(session).where(eq(session.id, targetSession.id)),
     ).toHaveLength(0);
+  });
+
+  it("does not unlink the target user's last sign-in method", async () => {
+    const admin = await createTestActor({ role: "admin", emailVerified: true });
+    const target = await createTestActor();
+    const [credential] = await db
+      .select()
+      .from(account)
+      .where(
+        and(
+          eq(account.userId, target.id),
+          eq(account.providerId, "credential"),
+        ),
+      );
+    const googleAccountId = randomUUID();
+
+    await db.insert(account).values({
+      id: googleAccountId,
+      accountId: "google-only-sign-in",
+      providerId: "google",
+      userId: target.id,
+    });
+    await db.delete(account).where(eq(account.id, credential.id));
+
+    const response = await remove(
+      `/users/${target.id}/accounts/${googleAccountId}`,
+      admin.cookie,
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      message: "Cannot unlink the user's last sign-in method.",
+    });
+    expect(
+      await db.select().from(account).where(eq(account.id, googleAccountId)),
+    ).toHaveLength(1);
   });
 });

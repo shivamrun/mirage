@@ -3,6 +3,7 @@ import { Elysia } from "elysia";
 import { auth } from "@/lib/auth";
 import {
   adminAccessMessages,
+  evaluateAdminAccess,
   evaluateAdminRole,
   evaluateAdminSessionAssurance,
   evaluateTwoFactorEnabled,
@@ -75,6 +76,33 @@ export const elysiaAuth = new Elysia({ name: "better-auth" }).macro({
 
       if (!authSession || !authUser || !decision.allowed) {
         return status(404, { message: adminAccessMessages.notFound });
+      }
+
+      return {
+        authSession,
+        authUser,
+        session: authSession.session,
+        user: authSession.user,
+      };
+    },
+  },
+  adminAccess: {
+    async resolve({ request, status }) {
+      const authSession = await resolveAuthSession(request.headers);
+      const authUser = authSession
+        ? await getCurrentUserFromAuthSession(authSession)
+        : null;
+
+      const decision = await evaluateAdminAccess(authUser);
+
+      if (!authSession || !authUser) {
+        return status(404, { message: adminAccessMessages.notFound });
+      }
+
+      if (!decision.allowed) {
+        const denial = decision;
+
+        return status(denial.statusCode, { message: denial.message });
       }
 
       return {

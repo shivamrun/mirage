@@ -9,6 +9,7 @@ export const adminAccessMessages = {
 
 type AuthPolicyReason =
   | "email-verification-required"
+  | "last-sign-in-method"
   | "not-found"
   | "two-factor-required";
 
@@ -131,4 +132,60 @@ export async function evaluateAdminAccess(
   }
 
   return evaluateAdminSessionAssurance(user);
+}
+
+export function canDeleteUserSession({
+  actor,
+  targetSessionUserId,
+}: {
+  actor: CurrentUser;
+  targetSessionUserId: string;
+}): AuthPolicyDecision {
+  if (!actor.roles.includes("admin")) {
+    return {
+      allowed: false,
+      message: adminAccessMessages.notFound,
+      reason: "not-found",
+      statusCode: 404,
+    };
+  }
+
+  if (!targetSessionUserId) {
+    return {
+      allowed: false,
+      message: adminAccessMessages.notFound,
+      reason: "not-found",
+      statusCode: 404,
+    };
+  }
+
+  return { allowed: true };
+}
+
+export function canDeleteLinkedAccount({
+  actor,
+  remainingSignInMethods,
+}: {
+  actor: CurrentUser;
+  remainingSignInMethods: number;
+}): AuthPolicyDecision {
+  if (!actor.roles.includes("admin")) {
+    return {
+      allowed: false,
+      message: adminAccessMessages.notFound,
+      reason: "not-found",
+      statusCode: 404,
+    };
+  }
+
+  if (remainingSignInMethods < 1) {
+    return {
+      allowed: false,
+      message: "Cannot unlink the user's last sign-in method.",
+      reason: "last-sign-in-method",
+      statusCode: 403,
+    };
+  }
+
+  return { allowed: true };
 }
