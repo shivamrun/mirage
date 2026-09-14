@@ -13,7 +13,7 @@ import {
   sql,
 } from "drizzle-orm";
 
-import db from "@/server/db";
+import db, { type DBClient } from "@/server/db";
 import {
   emailContact,
   emailList,
@@ -98,15 +98,16 @@ function parseEmailListVerificationPayload(value: string | null) {
   }
 }
 
-export async function ensureDefaultEmailLists() {
-  await db
+export async function seedDefaultEmailLists(executor: DBClient = db) {
+  await executor
     .insert(emailList)
     .values(defaultEmailLists)
     .onConflictDoUpdate({
       target: emailList.key,
       set: {
+        description: sql`excluded.description`,
         emailVerificationRequired: true,
-        status: "active",
+        name: sql`excluded.name`,
         updatedAt: new Date(),
       },
     });
@@ -157,8 +158,6 @@ function getSubscriberWhereClause(state: AdminEmailSubscriberQueryState) {
 }
 
 export async function subscribeEmailToList(values: EmailSubscriptionValues) {
-  await ensureDefaultEmailLists();
-
   return db.transaction(async (tx) => {
     const [list] = await tx
       .select({
@@ -342,8 +341,6 @@ export async function deleteEmailList(key: string) {
 }
 
 export async function listEmailLists() {
-  await ensureDefaultEmailLists();
-
   const lists = await db
     .select({
       activeSubscribers: sql<number>`count(${emailSubscription.id}) filter (where ${emailSubscription.status} = 'subscribed')::int`,
@@ -372,8 +369,6 @@ export async function listEmailSubscribers({
 }: {
   state: AdminEmailSubscriberQueryState;
 }) {
-  await ensureDefaultEmailLists();
-
   const whereClause = getSubscriberWhereClause(state);
   let subscribersQuery = db
     .select({
@@ -404,8 +399,6 @@ export async function listEmailSubscribers({
 }
 
 export async function listActiveEmailLists() {
-  await ensureDefaultEmailLists();
-
   return db
     .select({
       key: emailList.key,

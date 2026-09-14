@@ -1,40 +1,63 @@
 # Architecture improvement plan
 
-This plan improves the existing single Next.js application. It does not require a new framework, service boundary, cache tier or queue. The evidence and priority for each item are in `ARCHITECTURE_REVIEW.md`; current request paths and module ownership are in `ARCHITECTURE.md` and `CODEBASE_MAP.md`. Production topology, traffic and provider limits are **Unknown / needs verification**. Prioritize by observed risk and workload, not account count alone.
+This plan improves the existing single Next.js application. It does not require a new framework, service boundary, cache tier or queue. The evidence and priority for each item are in `ARCHITECTURE_REVIEW.md`; current request paths and module ownership are in `ARCHITECTURE.md` and `CODEBASE_MAP.md`. Prioritize by observed risk and workload, not account count alone.
+
+## Current completion summary
+
+**Reviewed against the codebase on 2026-09-14.** Security workflow fixes are mostly complete at the application layer, the dependency-boundary cleanup is complete, and the focused test/check baseline exists. Infrastructure follow-up has been removed from this plan. The remaining code work is concentrated in scalability: admin contact/subscriber pagination.
+
+| Area | Current status | Notes |
+|---|---|---|
+| Phase 0 test/check baseline | Done locally | Vitest/Postgres harness and focused workflow tests exist; documented checks were green on 2026-09-13. |
+| 1A verified-admin rule | Done | Elysia admin routes and Better Auth admin wrapper enforce verified-admin access. |
+| 1B durable limits/email throttling | Done at application layer | Public writes and account email sends use durable database-backed budgets. |
+| 2A atomic token/state transitions | Done | Email-change, email-list verification and 2FA transitions use transactional/conditional claims for the identified workflows. |
+| 2B mail-delivery guarantees | Done for current requirements | Required sends have recovery or partial-failure behavior; welcome mail remains intentionally best-effort. |
+| 3A admin pagination | Partially done | Admin users are paginated; contact submissions and email subscribers still return all matching rows. |
+| 3B built-in email-list seeding | Done | Built-in lists are seeded by `pnpm db:seed`; foreground signup and admin reads no longer upsert defaults. |
+| 4A dependency rule cleanup | Done | Reviewed dependency violations are resolved and `pnpm depcruise` was green on 2026-09-13. |
 
 ## Improvement by review dimension
 
 | Aspect | Why it needs work | What should improve | How to judge progress |
 |---|---|---|---|
-| Security | **Complete at the application layer.** Public and email-send limits now use durable application storage; verified-admin and atomic-token protections are complete. | Keep shared abuse budgets and throttled account email sends; revisit trusted client identity after hosting is selected. | Current focused tests pass; provider-specific two-instance trust assumptions remain part of Phase 0 hosting verification. |
-| Scalability | Admin inboxes read all rows, built-in lists are upserted on requests, and DB connection/query costs are unmeasured. | Bounded pages, one-time seeding, connection and query budgets. | Fixed response/page bounds, no foreground seed writes, measured p95/query plans. |
+| Security | **Complete at the application layer.** Public and email-send limits now use durable application storage; verified-admin and atomic-token protections are complete. | Keep shared abuse budgets and throttled account email sends. | Current focused tests pass. |
+| Scalability | Admin inboxes read all rows, and built-in lists are upserted on requests. | Bounded pages and one-time seeding. | Fixed response/page bounds and no foreground seed writes. |
 | Maintainability | **Partially complete.** Focused workflow modules and tests exist; some broader DAL/data-lifecycle cleanup remains. | Keep simple SQL in DAL; move only growing workflows/contracts to focused modules. | A change to admin UI query controls does not require a DAL import from `components`; focused workflow tests exist. |
 | Separation of concerns | **Complete for the reviewed dependency violations.** Direct Drizzle/schema violations are resolved and DAL modules no longer import UI query contracts. | Keep neutral contracts in server-safe modules without generic repositories. | `pnpm depcruise` remains green and DAL modules do not depend on UI folders. |
-| Developer experience | Focused tests and green local checks now exist; a deployment runbook still depends on the first hosting setup. | Keep checks green and document production operations when the host is selected. | `pnpm test`, `pnpm lint`, `pnpm depcruise`, and `pnpm build` pass, and a new engineer can execute the release/rollback runbook. |
+| Developer experience | Focused tests and green local checks now exist. | Keep checks green. | `pnpm test`, `pnpm lint`, `pnpm depcruise`, and `pnpm build` pass. |
 
 ## Order of work
 
 | Phase | Outcome | Depends on |
 |---|---|---|
-| 0. Establish a baseline | Know the deployed trust boundary, check state and critical workflow behavior | Access to deployment settings and a test database |
-| 1. Close access and abuse gaps | Consistent verified-admin policy and durable rate limits | Phase 0 proxy/header facts |
+| 0. Establish a baseline | Know the check state and critical workflow behavior | Access to a test database |
+| 1. Close access and abuse gaps | Consistent verified-admin policy and durable rate limits | Phase 0 test baseline |
 | 2. Make state changes safe | Atomic email/2FA transitions and retryable delivery | Focused concurrency tests |
 | 3. Bound data paths | Paginated admin inboxes and intentional list seeding | Current UI/filter behavior |
-| 4. Align modules and operations | Passing architecture checks, useful observability and measured query tuning | Earlier behavioral changes |
+| 4. Align modules | Passing architecture checks | Earlier behavioral changes |
 
-These are deployable slices, not a single rewrite. Fixes within a phase can be separate PRs. Keep the current schemas and URLs unless a specific slice requires a change. Do not edit committed migrations by hand; if a schema change is needed, change `src/server/db/schema` and run `pnpm db:generate` as required by `AGENTS.md`.
+These are small slices, not a single rewrite. Fixes within a phase can be separate PRs. Keep the current schemas and URLs unless a specific slice requires a change. Do not edit committed migrations by hand; if a schema change is needed, change `src/server/db/schema` and run `pnpm db:generate` as required by `AGENTS.md`.
+
+## Done / not done summary
+
+**Done:** The focused local test/check baseline is in place; verified-admin access is enforced for admin API entry points; public and account email limits use durable application storage; email-change, email-list verification and 2FA state transitions are atomic for the reviewed workflows; current required email-delivery failure paths are explicit; and the reviewed dependency-boundary violations are resolved.
+
+**Partially done:** Admin pagination exists for the user list only. Contact submissions and email subscribers still need bounded list reads and UI pagination.
+
+**Not done yet:** Contact/subscriber admin pagination.
 
 ## Phase 0 — establish the facts and a repeatable check
 
-**Status (2026-09-13):** The isolated Postgres/Vitest harness and critical workflow tests are complete. `pnpm test`, `pnpm lint`, `pnpm depcruise`, and `pnpm build` pass. Hosting facts and the deployment/rollback runbook remain pending until a host is selected.
+**Status (2026-09-13): Complete.** The isolated Postgres/Vitest harness and critical workflow tests are complete. `pnpm test`, `pnpm lint`, `pnpm depcruise`, and `pnpm build` pass.
 
-**Why:** The code can prove application behavior, but it cannot prove how proxy headers, replicas, S3 or database pooling work in production. Security and scaling decisions depend on those facts. The failing lint and dependency checks recorded in the 2026-09-12 baseline have been fixed.
+**Why:** The code can prove application behavior with focused tests and repeatable local checks. The failing lint and dependency checks recorded in the 2026-09-12 baseline have been fixed.
 
-**What:** Record the production host/runtime, replica or invocation model, trusted client-IP source, Postgres connection limit/pooler, Better Auth origin/cookie setup, Resend limits, S3 bucket/public URL policy, migration order and backup/restore owner. Preserve a dated check baseline, and add a small test harness for the behavior being changed first.
+**What:** Preserve a dated check baseline, and add a small test harness for the behavior being changed first.
 
-**How:** Add a deployment runbook under `docs/architecture` after inspecting actual infrastructure; mark any unavailable fact **Unknown / needs verification**. Use an isolated test Postgres database and Vitest or another focused runner for custom route/workflow tests. First write tests for unverified-admin access, duplicate token use, 2FA failure counts and public limit identity. Do not make a broad test framework project. Fix the two non-generated lint files through Biome; handle the generated `drizzle/meta/_journal.json` formatting problem by configuration/tooling rather than editing migration output directly. Re-run `pnpm build`, `pnpm lint`, and `pnpm depcruise` after the relevant changes.
+**How:** Use an isolated test Postgres database and Vitest or another focused runner for custom route/workflow tests. First write tests for unverified-admin access, duplicate token use, 2FA failure counts and public limit identity. Do not make a broad test framework project. Fix the two non-generated lint files through Biome; handle the generated `drizzle/meta/_journal.json` formatting problem by configuration/tooling rather than editing migration output directly. Re-run `pnpm build`, `pnpm lint`, and `pnpm depcruise` after the relevant changes.
 
-**Done when:** The deployment trust facts have an owner and source, critical existing behavior is covered by focused tests, and check failures are either fixed or explicitly isolated with a narrow documented exception.
+**Done when:** Critical existing behavior is covered by focused tests, and check failures are either fixed or explicitly isolated with a narrow documented exception.
 
 ## Phase 1 — access and abuse boundaries
 
@@ -52,13 +75,13 @@ These are deployable slices, not a single rewrite. Fixes within a phase can be s
 
 ### 1B. Replace process-local limits and throttle email sends
 
-**Status (2026-09-13): Complete at the application layer.** Public contact and signup budgets are stored in Postgres and shared by all app instances. Account verification, both stages of email-change delivery, and 2FA sends have durable per-account and per-destination cooldowns. Better Auth's client-request limiter also uses database storage instead of process memory. All custom-route `429` responses include `Retry-After`, application limiter identifiers are keyed digests, and expired application counters are pruned in bounded batches. Because no host is selected yet, forwarded IP headers remain deliberately untrusted; each public flow also has a generous global ceiling until Phase 0 records a provider-verified client identity.
+**Status (2026-09-13): Complete at the application layer.** Public contact and signup budgets are stored in Postgres and shared by all app instances. Account verification, both stages of email-change delivery, and 2FA sends have durable per-account and per-destination cooldowns. Better Auth's client-request limiter also uses database storage instead of process memory. All custom-route `429` responses include `Retry-After`, application limiter identifiers are keyed digests, and expired application counters are pruned in bounded batches.
 
 **Why:** Public contact and signup limits are local Maps and use forwarded headers; custom 2FA/email-change sends have no application throttle (`src/server/routes/contact.ts`, `email-list.ts`, `account.ts`, `src/server/account/two-factor.ts`). Replicas or restarts make Map limits unreliable, and header spoofing depends on proxy behavior.
 
 **What:** Enforce a shared budget for public writes and a per-account/per-destination cooldown for email-sending actions. Define separate thresholds for contact, list signup and 2FA/account email to avoid one flow starving another.
 
-**How:** Prefer the deployed edge's rate-limit capability if it exposes a trusted client identity and covers all instances. If it cannot express the needed per-account/email rules, use a small durable database-backed counter or an already available shared service; do not add Redis solely by convention. Trust only the IP field documented in Phase 0, normalize it once, and keep Zod validation, origin/referrer checks and honeypots. Return `429` with a retry hint. Exercise two replicas, restarts, forged `x-forwarded-for`, a shared NAT IP, and parallel requests. Avoid storing raw email addresses in rate-limit keys or logs where a keyed digest suffices.
+**How:** Use durable database-backed counters for public writes and account/email sends; do not add Redis solely by convention. Keep Zod validation, origin/referrer checks and honeypots. Return `429` with a retry hint. Exercise restarts, forged `x-forwarded-for`, a shared NAT IP, and parallel requests. Avoid storing raw email addresses in rate-limit keys or logs where a keyed digest suffices.
 
 **Done when:** The same budget applies across instances, forged headers do not change identity, repeated sends are capped, and legitimate retries remain possible after the window.
 
@@ -104,17 +127,17 @@ These are deployable slices, not a single rewrite. Fixes within a phase can be s
 
 ### 3B. Seed built-in email lists once
 
-**Status (2026-09-13): Pending.** `ensureDefaultEmailLists()` still runs on foreground signup and admin email-list read paths, so this phase is not complete.
+**Status (2026-09-14): Complete.** Built-in lists are created by the explicit `pnpm db:seed` command. Foreground signup and admin email-list read paths no longer upsert defaults.
 
-**Why:** `ensureDefaultEmailLists` upserts waitlist/newsletter on every signup and admin list read, and changes their status back to `active` (`src/server/db/dal/email-list.ts`). This couples requests to extra writes and defeats archiving.
+**Why:** Request-time default-list upserts coupled normal reads and signups to extra writes and changed archived built-in lists back to `active`. The seed now preserves admin status changes.
 
-**What:** Decide whether built-in lists may be archived. Move built-in row creation to a deliberate release/setup step and remove foreground upserts from read/signup functions.
+**What:** Decide whether built-in lists may be archived. Move built-in row creation to a deliberate setup step and remove foreground upserts from read/signup functions.
 
-**How:** Add an idempotent `db:seed` command or equivalent release task that runs after migrations; use insert-on-conflict behavior that does not overwrite admin status unless policy explicitly requires it. Add a smoke check that a fresh database has the two lists before accepting signup traffic. Deploy seed first, then remove the request-time calls. Do not hand-edit existing migration files.
+**How:** Add an idempotent `db:seed` command or equivalent setup task that runs after migrations; use insert-on-conflict behavior that does not overwrite admin status unless policy explicitly requires it. Add a smoke check that a fresh database has the two lists before accepting signup traffic. Do not hand-edit existing migration files.
 
 **Done when:** Public signup performs no default-list write, a fresh environment is seeded predictably, and list status changes persist according to policy.
 
-## Phase 4 — module boundaries, measurement and operations
+## Phase 4 — module boundaries
 
 ### 4A. Make the dependency rule truthful
 
@@ -128,18 +151,6 @@ These are deployable slices, not a single rewrite. Fixes within a phase can be s
 
 **Done when:** The four violations are gone, server data modules do not depend on UI folders, and the dependency check passes without broad exclusions.
 
-### 4B. Measure before database or caching changes
-
-**Status (2026-09-13): Pending.** There is no production p95/query-plan evidence, request-ID/metrics layer, connection budget, or deployment/backup/restore runbook yet.
-
-**Why:** Admin user `ILIKE`, flexible sorts and `OFFSET`/`COUNT(*)` may become slow, but table sizes and p95 latency are unknown (`src/server/db/dal/admin-users.ts`, `SCALABILITY.md`). Session checks are repeated, but their actual request cost is unmeasured.
-
-**What:** Establish p95 route latency, query duration/count, DB connection usage and email-send latency/failure metrics. Tune only slow paths. Record a production connection budget based on replicas × pool max (`src/server/db/index.ts`).
-
-**How:** Add request IDs and structured errors around Elysia and Better Auth boundaries without logging tokens, secrets or full contact messages. Run `EXPLAIN ANALYZE` on representative filters with realistic rows. Add a targeted index or search change only when a query plan justifies it; reduce duplicate session reads if tracing shows material cost. If a host needs readiness, provide a separate bounded DB check; keep `/api/health` a clear liveness endpoint. Add a migration/backup/restore runbook and an observed deployment smoke test.
-
-**Done when:** Slow paths have before/after measurements, DB connections stay within the service limit, and operators can distinguish app liveness from DB/provider readiness.
-
 ## Later, only if the trigger appears
 
 | Aspect | Why/trigger | What and how |
@@ -152,4 +163,4 @@ These are deployable slices, not a single rewrite. Fixes within a phase can be s
 
 ## Leave alone
 
-Keep the single Next.js deployable and existing Better Auth/Elysia split (`src/app/(backend)/api`), Drizzle with focused DAL functions (`src/server/db/dal`), local MDX for the small content set (`content/`, `src/lib/content-source.ts`), PostgreSQL-backed sessions, and signed direct-to-S3 avatar uploads (`src/lib/uploads`). No current evidence warrants microservices, a general DDD/Clean Architecture/repository framework, Redis for every read, or a queue for every email.
+Keep the single Next.js app and existing Better Auth/Elysia split (`src/app/(backend)/api`), Drizzle with focused DAL functions (`src/server/db/dal`), local MDX for the small content set (`content/`, `src/lib/content-source.ts`), PostgreSQL-backed sessions, and signed direct-to-S3 avatar uploads (`src/lib/uploads`). No current evidence warrants microservices, a general DDD/Clean Architecture/repository framework, Redis for every read, or a queue for every email.

@@ -2,13 +2,15 @@ import { randomUUID } from "node:crypto";
 
 import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import db from "@/server/db";
+import { seedDefaultEmailLists } from "@/server/db/dal/email-list";
 import {
   applicationRateLimit,
   contactSubmission,
   emailContact,
+  emailList,
   emailSubscription,
   verification,
 } from "@/server/db/schema";
@@ -90,6 +92,10 @@ async function subscriptionFor(address: string) {
 }
 
 describe("public contact and email signup", () => {
+  beforeEach(async () => {
+    await seedDefaultEmailLists();
+  });
+
   it("rejects untrusted origins and malformed form data", async () => {
     const address = email();
     expect(
@@ -291,6 +297,24 @@ describe("public contact and email signup", () => {
     ).toBe(200);
     expect(await verify(latestSignupToken(address))).toBe("success");
     expect((await subscriptionFor(address))?.status).toBe("subscribed");
+  });
+
+  it("does not reactivate archived built-in lists when seeding", async () => {
+    await db
+      .update(emailList)
+      .set({ status: "archived" })
+      .where(eq(emailList.key, "waitlist"));
+
+    await seedDefaultEmailLists();
+
+    const [list] = await db
+      .select()
+      .from(emailList)
+      .where(eq(emailList.key, "waitlist"));
+    expect(list?.status).toBe("archived");
+    expect(
+      (await formRequest("/email-list/", signupBody(email()))).status,
+    ).toBe(400);
   });
 
   it("does not delete another request's pending signup when one email send fails", async () => {

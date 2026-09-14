@@ -1,6 +1,6 @@
 # Architecture review
 
-**Current-state update (2026-09-13):** Phase 0 added focused integration tests and resolved the verified-admin API gap, non-atomic token transitions, and direct Drizzle dependency violations described in the 2026-09-12 baseline. Resolved findings remain below as an audit trail and are labeled accordingly.
+**Current-state update (2026-09-14):** Phase 0 added focused integration tests and resolved the verified-admin API gap, non-atomic token transitions, direct Drizzle dependency violations, and request-time default email-list seeding described in the 2026-09-12 baseline. Resolved findings remain below as an audit trail and are labeled accordingly.
 
 ## Verdict and scores
 
@@ -9,7 +9,7 @@ This is a coherent single-deployable starter, not an overengineered system. App 
 | Dimension | Score / 10 | Basis |
 |---|---:|---|
 | Maintainability | 7 | Clear feature folders and Zod contracts; some large mixed modules and reversed DAL-to-UI type dependencies. |
-| Scalability | 6 | Direct S3 upload, bounded DB pools, and shared rate limits help; unbounded admin reads and per-request upserts remain. |
+| Scalability | 6 | Direct S3 upload, bounded DB pools, shared rate limits, and explicit default-list seeding help; unbounded admin contact/subscriber reads remain. |
 | Security | 8 | Verified-admin checks, atomic security transitions, shared public budgets, and account email-send cooldowns are covered by integration tests; trusted client-IP configuration remains deployment-dependent. |
 | Developer experience | 7 | Local Compose, migrations, typed APIs, and focused Vitest coverage are present; local lint/build/dependency checks pass, while production operations remain undocumented. |
 | Separation of concerns | 7 | Direct Drizzle imports moved behind focused DAL functions; email-list workflow and DAL-to-UI query-type dependencies remain. |
@@ -88,17 +88,17 @@ This is a coherent single-deployable starter, not an overengineered system. App 
 
 **Priority: Medium**
 
-### 7. Default email-list seeding happens during foreground requests
+### 7. Default email-list seeding happens during foreground requests — resolved 2026-09-14
 
-**Problem:** Built-in waitlist/newsletter rows are upserted during signup and list reads.
+**Resolution:** Built-in waitlist/newsletter rows are seeded by an explicit `pnpm db:seed` command, and foreground signup/list reads no longer upsert defaults.
 
-**Evidence / affected files:** `src/server/db/dal/email-list.ts` `ensureDefaultEmailLists` is called by `subscribeEmailToList`, `listEmailSubscribers` and `listActiveEmailLists`.
+**Evidence / affected files:** `scripts/seed.ts` calls `seedDefaultEmailLists`. `src/server/db/dal/email-list.ts` no longer calls that seed function from `subscribeEmailToList`, `listEmailSubscribers`, `listEmailLists`, or `listActiveEmailLists`.
 
-**Why it matters:** Every request performs extra writes and can contend on two rows. The upsert also restores built-in lists to `active`, so admin status changes to those lists do not persist.
+**Result:** Normal requests no longer perform default-list writes. The seed upsert preserves built-in list status, so admin archive changes persist.
 
-**Recommended change:** Create/update defaults through a deliberate migration or deployment seed. Define whether built-ins may be archived, then remove request-time upserts.
+**Follow-up:** Keep `pnpm db:seed` in fresh database setup workflows.
 
-**Priority: Medium**
+**Priority: Resolved**
 
 ### 8. DAL imports UI query contracts and business policy
 
