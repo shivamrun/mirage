@@ -11,7 +11,7 @@ This is a coherent single-deployable starter, not an overengineered system. App 
 | Maintainability | 7 | Clear feature folders and Zod contracts; some large mixed modules and reversed DAL-to-UI type dependencies. |
 | Scalability | 6 | Direct S3 upload, bounded DB pools, shared rate limits, and explicit default-list seeding help; unbounded admin contact/subscriber reads remain. |
 | Security | 8 | Verified-admin checks, atomic security transitions, shared public budgets, and account email-send cooldowns are covered by integration tests; trusted client-IP configuration remains deployment-dependent. |
-| Developer experience | 7 | Local Compose, migrations, typed APIs, and focused Vitest coverage are present; local lint/build/dependency checks pass, while production operations remain undocumented. |
+| Developer experience | 7 | Local Compose, migrations, typed APIs, focused Vitest coverage, request IDs, health/metrics endpoints and an operations runbook are present; production p95/query-plan evidence still depends on the deployed environment. |
 | Separation of concerns | 7 | Direct Drizzle imports moved behind focused DAL functions; email-list workflow and DAL-to-UI query-type dependencies remain. |
 
 ## Findings
@@ -150,13 +150,13 @@ This is a coherent single-deployable starter, not an overengineered system. App 
 
 ### 12. Limited observability and production contract
 
-**Problem:** The repository has console logs and a constant health endpoint but no visible structured request logs, metrics, tracing, alerting, CI, production deploy manifest, or backup/migration runbook.
+**Problem:** The repository now has request IDs, JSON request logs, process-local request metrics, a database-backed health endpoint, a smoke-test script and an operations runbook. It still has no visible distributed metrics backend, tracing, alerting, CI, production deploy manifest, production p95 measurements or query-plan evidence.
 
-**Evidence / affected files:** `src/server/routes/index.ts`, `src/server/email/send-email.tsx`, `src/server/routes/uploads.ts`, `package.json`, `docker-compose.yml`, and `README.md`. A dedicated test Compose file, Vitest harness, and 29 critical workflow tests now exist. On 2026-09-13, `pnpm test`, `pnpm lint`, `pnpm depcruise`, and `pnpm build` pass.
+**Evidence / affected files:** `src/server/routes/index.ts`, `src/server/operations`, `scripts/smoke-test.ts`, `docs/operations/RUNBOOK.md`, `docs/operations/MEASUREMENT.md`, `package.json`, `docker-compose.yml`, and `README.md`. A dedicated test Compose file, Vitest harness, and critical workflow tests now exist. On 2026-09-13, `pnpm test`, `pnpm lint`, `pnpm depcruise`, and `pnpm build` pass.
 
 **Why it matters:** Latency, error rates and regressions will be difficult to measure before scaling or incident response. These may exist outside this repository: **Unknown / needs verification**.
 
-**Recommended change:** Document the deployed runtime and migration/backup procedure; add request IDs, structured error logs and a small set of critical auth/email/database metrics. Add focused tests for security-sensitive transitions and deployment smoke checks.
+**Recommended change:** Connect the JSON logs and metrics to the selected production observability backend, document the deployed runtime, run `pnpm smoke` after deployments, and capture p95 latency plus `EXPLAIN (ANALYZE, BUFFERS)` evidence for representative production data sizes.
 
 **Priority: Medium**
 

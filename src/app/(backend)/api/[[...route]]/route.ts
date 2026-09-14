@@ -1,6 +1,8 @@
+import { observeRequest } from "@/server/operations/request-observability";
 import { app } from "@/server/routes";
 
-const handler = (request: Request) => app.fetch(request);
+const handler = (request: Request) =>
+  observeRequest(request, (observedRequest) => app.fetch(observedRequest));
 
 export const GET = handler;
 export const POST = handler;

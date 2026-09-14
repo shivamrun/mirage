@@ -3,6 +3,7 @@ import { toNextJsHandler } from "better-auth/next-js";
 import { auth } from "@/lib/auth";
 import { evaluateAdminAccess } from "@/lib/auth/admin-access";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { observeRequest } from "@/server/operations/request-observability";
 
 const handlers = toNextJsHandler(auth.handler);
 
@@ -30,9 +31,13 @@ async function handleAdminRequest(
 }
 
 export function GET(request: Request) {
-  return handleAdminRequest(request, handlers.GET);
+  return observeRequest(request, (observedRequest) =>
+    handleAdminRequest(observedRequest, handlers.GET),
+  );
 }
 
 export function POST(request: Request) {
-  return handleAdminRequest(request, handlers.POST);
+  return observeRequest(request, (observedRequest) =>
+    handleAdminRequest(observedRequest, handlers.POST),
+  );
 }

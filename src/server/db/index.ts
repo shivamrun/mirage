@@ -22,7 +22,7 @@ declare global {
 }
 
 const getConnectionOptions = () => ({
-  max: env.NODE_ENV === "production" ? 10 : 5,
+  max: env.DB_POOL_MAX ?? (env.NODE_ENV === "production" ? 10 : 5),
   prepare: false,
 });
 

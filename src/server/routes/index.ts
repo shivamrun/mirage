@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 
 import { authActionRoutes } from "@/server/auth-actions/routes";
+import { checkDatabaseHealth } from "@/server/db/dal/health";
 import { apiErrors } from "@/server/http/errors";
 import { accountRoutes } from "./account";
 import { adminRoutes } from "./admin";
@@ -11,7 +12,25 @@ import { uploadsRoutes } from "./uploads";
 export const app = new Elysia({ prefix: "/api" })
   .use(apiErrors)
   .get("/", () => "Hello Elysia")
-  .get("/health", () => ({ ok: true }))
+  .get("/health", async ({ status }) => {
+    try {
+      await checkDatabaseHealth();
+
+      return {
+        checks: {
+          database: "ok",
+        },
+        ok: true,
+      };
+    } catch {
+      return status(503, {
+        checks: {
+          database: "error",
+        },
+        ok: false,
+      });
+    }
+  })
   .use(accountRoutes)
   .use(authActionRoutes)
   .use(contactRoutes)

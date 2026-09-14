@@ -23,7 +23,7 @@ The documents give a useful, mostly accurate picture of the actual application. 
 - The 10k/100k/1M+ sections of `SCALABILITY.md` are prompts to inspect workload, not capacity forecasts. A mostly idle million-account installation can be easier to serve than a small installation with intense writes. Use request concurrency, row counts, query plans and provider throughput for actual sizing.
 - Better Auth's limiter now uses database storage, but its trusted-IP and cookie behavior must still be verified against the deployed proxy/runtime. Verified-email enforcement for Better Auth admin routes is provided by `src/app/(backend)/api/auth/[...all]/route.ts` and covered by integration tests.
 - The repo proves an S3 signing path, but not bucket ACL, CDN behavior, object retention, managed Postgres topology, backup strategy or deployment host. Keep these marked **Unknown / needs verification** rather than replacing them with assumptions (`src/lib/uploads/server`, `docker-compose.yml`, `src/lib/env.ts`).
-- The focused executable test suite is now present. The documents still do not replace an operational runbook; that remains pending until the actual deployment is known.
+- The focused executable test suite and repository-level operations runbook are now present. Provider-specific backup settings, production p95/query-plan evidence, alerting and deployment topology remain pending until the actual deployment is known.
 
 ## How to keep these docs useful
 
