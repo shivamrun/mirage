@@ -3,11 +3,13 @@ import "server-only";
 import { defineAssets } from "@marinedotsh/upload-sdk";
 
 import { uploadAssetKeys } from "@/lib/uploads/asset-keys";
+import {
+  avatarExtensions,
+  avatarServerMaxFileSize,
+  avatarServerMimeTypes,
+} from "@/lib/uploads/policies/avatar";
 
 import type { createStorageProfiles } from "./storage";
-
-const avatarMimeTypes = ["image/png", "image/jpeg", "image/webp"] as const;
-const avatarExtensions = [".png", ".jpg", ".jpeg", ".webp"] as const;
 
 function createUploadAssets(
   storageProfiles: ReturnType<typeof createStorageProfiles>,
@@ -16,7 +18,7 @@ function createUploadAssets(
     avatar: {
       accept: {
         extensions: avatarExtensions,
-        mimeTypes: avatarMimeTypes,
+        mimeTypes: avatarServerMimeTypes,
       },
       expiresIn: {
         value: 5,
@@ -24,10 +26,7 @@ function createUploadAssets(
       },
       keyPrefix: "avatars",
       limits: {
-        maxFileSize: {
-          value: 2,
-          unit: "MB",
-        },
+        maxFileSize: avatarServerMaxFileSize,
       },
       storageProfile: "s3",
     },
@@ -36,7 +35,7 @@ function createUploadAssets(
 
 export {
   avatarExtensions,
-  avatarMimeTypes,
+  avatarServerMimeTypes as avatarMimeTypes,
   createUploadAssets,
   uploadAssetKeys,
 };

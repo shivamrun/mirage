@@ -1,6 +1,12 @@
 import { uploadFile } from "@marinedotsh/upload-sdk";
 
 import { api } from "@/lib/api/client";
+import {
+  avatarAcceptedMimeTypes,
+  avatarCropMaxFileSize,
+  avatarCropOutputType,
+  avatarSourceMaxFileSize,
+} from "@/lib/uploads/policies/avatar";
 import type { PrepareUploadResponse } from "@/zod/uploads";
 
 type PrepareAvatarUploadResponse = PrepareUploadResponse;
@@ -8,11 +14,6 @@ type PrepareAvatarUploadResponse = PrepareUploadResponse;
 type UploadAvatarFileOptions = {
   onProgress?: (progress: { percent?: number }) => void;
 };
-
-const avatarCropMaxFileSize = 2 * 1024 * 1024;
-const avatarSourceMaxFileSize = 10 * 1024 * 1024;
-const avatarCropOutputType = "image/jpeg";
-const avatarAcceptedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
 
 async function prepareAvatarUpload(file: File) {
   const { data, error } = await api.api.uploads.post({
