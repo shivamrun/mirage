@@ -2,7 +2,10 @@ import { Elysia } from "elysia";
 
 import { createContactSubmission } from "@/server/db/dal/contact-submission";
 import { requestPolicy } from "@/server/http/request-policy";
-import { consumePublicWriteLimit } from "@/server/rate-limit";
+import {
+  consumePublicWriteLimit,
+  getPublicClientIdentifier,
+} from "@/server/rate-limit";
 import {
   contactSubmissionSchema,
   contactSuccessResponseSchema,
@@ -13,12 +16,13 @@ export const contactRoutes = new Elysia({ prefix: "/contact" })
   .use(requestPolicy)
   .post(
     "/",
-    async ({ body, set, status }) => {
+    async ({ body, request, set, status }) => {
       if (body.website) {
         return { status: true as const };
       }
 
       const rateLimit = await consumePublicWriteLimit({
+        clientIdentifier: getPublicClientIdentifier(request.headers),
         destination: body.email,
         flow: "contact",
       });

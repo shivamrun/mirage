@@ -15,6 +15,10 @@ import {
   verification,
 } from "@/server/db/schema";
 import { apiErrors } from "@/server/http/errors";
+import {
+  consumePublicWriteLimit,
+  getPublicClientIdentifier,
+} from "@/server/rate-limit";
 import { contactRoutes } from "@/server/routes/contact";
 import { emailListRoutes } from "@/server/routes/email-list";
 import { EMAIL_LIST_METADATA_VALUE_MAX_LENGTH } from "@/zod";
@@ -168,7 +172,7 @@ describe("public contact and email signup", () => {
     });
   });
 
-  it("rate-limits repeated requests despite changing client IP headers", async () => {
+  it("rate-limits repeated requests despite changing unconfigured client IP headers", async () => {
     const secondAppInstance = createApp();
     const contactEmail = email();
     for (let index = 0; index < 5; index++) {
@@ -192,6 +196,18 @@ describe("public contact and email signup", () => {
     expect(Number(limitedContact.headers.get("retry-after"))).toBeGreaterThan(
       0,
     );
+
+    expect(
+      (
+        await formRequest(
+          "/contact/",
+          contactBody(email()),
+          { "x-forwarded-for": "192.0.2.11" },
+          secondAppInstance,
+        )
+      ).status,
+    ).toBe(200);
+
     const signupEmail = email();
     for (let index = 0; index < 8; index++) {
       expect(
@@ -212,6 +228,75 @@ describe("public contact and email signup", () => {
         )
       ).status,
     ).toBe(429);
+  });
+
+  it("supports opt-in contact client rate limiting from one trusted header", async () => {
+    const clientIp = "198.51.100.20";
+
+    for (let index = 0; index < 5; index++) {
+      const clientIdentifier = getPublicClientIdentifier(
+        new Headers({
+          "x-forwarded-for": `${clientIp}, 203.0.113.${index}`,
+          "x-real-ip": `203.0.113.${index}`,
+        }),
+        "x-forwarded-for",
+      );
+
+      expect(clientIdentifier).toBe(clientIp);
+      expect(
+        await consumePublicWriteLimit({
+          clientIdentifier,
+          destination: email(),
+          flow: "contact",
+        }),
+      ).toEqual({ allowed: true });
+    }
+
+    const limitedClient = getPublicClientIdentifier(
+      new Headers({
+        "x-forwarded-for": `${clientIp}, 203.0.113.99`,
+        "x-real-ip": "203.0.113.99",
+      }),
+      "x-forwarded-for",
+    );
+
+    const limited = await consumePublicWriteLimit({
+      clientIdentifier: limitedClient,
+      destination: email(),
+      flow: "contact",
+    });
+
+    expect(limited.allowed).toBe(false);
+  });
+
+  it("does not spend contact email quota when another bucket rejects", async () => {
+    const limitedIp = "198.51.100.20";
+    const address = email();
+
+    for (let index = 0; index < 5; index++) {
+      expect(
+        await consumePublicWriteLimit({
+          clientIdentifier: limitedIp,
+          destination: email(),
+          flow: "contact",
+        }),
+      ).toEqual({ allowed: true });
+    }
+
+    const limited = await consumePublicWriteLimit({
+      clientIdentifier: limitedIp,
+      destination: address,
+      flow: "contact",
+    });
+    expect(limited.allowed).toBe(false);
+
+    expect(
+      await consumePublicWriteLimit({
+        clientIdentifier: "198.51.100.21",
+        destination: address,
+        flow: "contact",
+      }),
+    ).toEqual({ allowed: true });
   });
 
   it("enforces one shared budget for parallel requests", async () => {

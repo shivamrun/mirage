@@ -11,6 +11,7 @@ const { url } = getSafeTestDatabaseUrl();
 process.env.DATABASE_URL = url;
 process.env.RESEND_API_KEY = "";
 process.env.EMAIL_FROM = "";
+delete process.env.TRUSTED_CLIENT_IP_HEADER;
 process.env.BETTER_AUTH_SECRET ??= "test-only-secret-at-least-32-characters";
 process.env.BETTER_AUTH_URL ??= "http://localhost:3000";
 process.env.NEXT_PUBLIC_BASE_URL ??= "http://localhost:3000";

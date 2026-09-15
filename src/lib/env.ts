@@ -47,6 +47,9 @@ export const env = createEnv({
     BETTER_AUTH_URL: z.url(),
     EMAIL_FROM: optionalEnvString,
     EMAIL_REPLY_TO: optionalEnvString,
+    TRUSTED_CLIENT_IP_HEADER: z
+      .enum(["cf-connecting-ip", "forwarded", "x-forwarded-for", "x-real-ip"])
+      .optional(),
     AWS_UPLOAD_ACCESS_KEY_ID: optionalEnvString,
     AWS_UPLOAD_BUCKET: optionalEnvString,
     AWS_UPLOAD_REGION: optionalEnvString,
@@ -74,6 +77,7 @@ export const env = createEnv({
     AWS_UPLOAD_SESSION_TOKEN: process.env.AWS_UPLOAD_SESSION_TOKEN,
     EMAIL_FROM: process.env.EMAIL_FROM,
     EMAIL_REPLY_TO: process.env.EMAIL_REPLY_TO,
+    TRUSTED_CLIENT_IP_HEADER: process.env.TRUSTED_CLIENT_IP_HEADER,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     RESEND_API_KEY: process.env.RESEND_API_KEY,

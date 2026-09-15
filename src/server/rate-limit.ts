@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 
 import { env } from "@/lib/env";
 import {
-  consumeRateLimit,
+  consumeRateLimitPolicy,
   pruneExpiredRateLimits,
   type RateLimitResult,
 } from "@/server/db/dal/rate-limit";
@@ -11,7 +11,7 @@ const PUBLIC_WINDOW_MS = 15 * 60 * 1000;
 const EMAIL_SEND_COOLDOWN_MS = 60 * 1000;
 
 const publicPolicies = {
-  contact: { perDestination: 5, global: 250 },
+  contact: { perClient: 5, perDestination: 5, global: 250 },
   "email-list": { perDestination: 8, global: 500 },
 } as const;
 
@@ -23,36 +23,121 @@ function digestIdentifier(kind: string, value: string) {
     .digest("hex");
 }
 
+function headerValue(headers: Headers, name: string) {
+  return headers.get(name)?.trim() || null;
+}
+
+function firstForwardedFor(value: string) {
+  return value.split(",")[0]?.trim() || null;
+}
+
+function forwardedFor(value: string) {
+  for (const part of value.split(";")) {
+    const [key, rawValue] = part.split("=", 2);
+
+    if (key?.trim().toLowerCase() !== "for" || !rawValue) {
+      continue;
+    }
+
+    return rawValue.trim().replace(/^"|"$/g, "") || null;
+  }
+
+  return null;
+}
+
+type TrustedClientIpHeader =
+  | "cf-connecting-ip"
+  | "forwarded"
+  | "x-forwarded-for"
+  | "x-real-ip";
+
+export function getPublicClientIdentifier(
+  headers: Headers,
+  trustedHeader:
+    | TrustedClientIpHeader
+    | undefined = env.TRUSTED_CLIENT_IP_HEADER,
+) {
+  if (!trustedHeader) {
+    return null;
+  }
+
+  const value = headerValue(headers, trustedHeader);
+
+  if (!value) {
+    return null;
+  }
+
+  if (trustedHeader === "forwarded") {
+    return forwardedFor(value);
+  }
+
+  if (trustedHeader === "x-forwarded-for") {
+    return firstForwardedFor(value);
+  }
+
+  return value;
+}
+
 export async function consumePublicWriteLimit({
+  clientIdentifier,
   destination,
   flow,
 }: {
+  clientIdentifier?: string | null;
   destination: string;
   flow: PublicFlow;
 }): Promise<RateLimitResult> {
   await pruneExpiredRateLimits();
 
-  const policy = publicPolicies[flow];
-  const destinationResult = await consumeRateLimit({
-    identifierHash: digestIdentifier("email", destination),
-    limit: policy.perDestination,
-    scope: `public:${flow}:destination`,
-    windowMs: PUBLIC_WINDOW_MS,
-  });
+  if (flow === "contact") {
+    const policy = publicPolicies.contact;
+    const clientBucket = clientIdentifier
+      ? [
+          {
+            identifierHash: digestIdentifier("client", clientIdentifier),
+            limit: policy.perClient,
+            scope: "public:contact:client",
+            windowMs: PUBLIC_WINDOW_MS,
+          },
+        ]
+      : [];
 
-  if (!destinationResult.allowed) {
-    return destinationResult;
+    return consumeRateLimitPolicy([
+      ...clientBucket,
+      {
+        identifierHash: digestIdentifier("email", destination),
+        limit: policy.perDestination,
+        scope: "public:contact:destination",
+        windowMs: PUBLIC_WINDOW_MS,
+      },
+      {
+        identifierHash: digestIdentifier("global", flow),
+        limit: policy.global,
+        scope: "public:contact:global",
+        windowMs: PUBLIC_WINDOW_MS,
+      },
+    ]);
   }
+
+  const policy = publicPolicies[flow];
 
   // Until a hosting provider supplies a verified client-IP field, a generous
   // per-flow ceiling prevents rotating caller-supplied emails from being
   // completely unbounded without trusting spoofable forwarding headers.
-  return consumeRateLimit({
-    identifierHash: digestIdentifier("global", flow),
-    limit: policy.global,
-    scope: `public:${flow}:global`,
-    windowMs: PUBLIC_WINDOW_MS,
-  });
+  return consumeRateLimitPolicy([
+    {
+      identifierHash: digestIdentifier("email", destination),
+      limit: policy.perDestination,
+      scope: `public:${flow}:destination`,
+      windowMs: PUBLIC_WINDOW_MS,
+    },
+    {
+      identifierHash: digestIdentifier("global", flow),
+      limit: policy.global,
+      scope: `public:${flow}:global`,
+      windowMs: PUBLIC_WINDOW_MS,
+    },
+  ]);
 }
 
 export async function consumeAccountEmailSendLimit({
@@ -69,27 +154,24 @@ export async function consumeAccountEmailSendLimit({
   await pruneExpiredRateLimits();
 
   const identitySuffix = variant ? `:${variant}` : "";
-  const accountResult = await consumeRateLimit({
-    identifierHash: digestIdentifier(
-      "account",
-      `${accountId}${identitySuffix}`,
-    ),
-    limit: 1,
-    scope: `email:${flow}:account`,
-    windowMs: EMAIL_SEND_COOLDOWN_MS,
-  });
-
-  if (!accountResult.allowed) {
-    return accountResult;
-  }
-
-  return consumeRateLimit({
-    identifierHash: digestIdentifier(
-      "email",
-      `${destination}${identitySuffix}`,
-    ),
-    limit: 1,
-    scope: `email:${flow}:destination`,
-    windowMs: EMAIL_SEND_COOLDOWN_MS,
-  });
+  return consumeRateLimitPolicy([
+    {
+      identifierHash: digestIdentifier(
+        "account",
+        `${accountId}${identitySuffix}`,
+      ),
+      limit: 1,
+      scope: `email:${flow}:account`,
+      windowMs: EMAIL_SEND_COOLDOWN_MS,
+    },
+    {
+      identifierHash: digestIdentifier(
+        "email",
+        `${destination}${identitySuffix}`,
+      ),
+      limit: 1,
+      scope: `email:${flow}:destination`,
+      windowMs: EMAIL_SEND_COOLDOWN_MS,
+    },
+  ]);
 }
