@@ -53,14 +53,3 @@ GOOGLE_CLIENT_SECRET=...
 pnpm lint
 pnpm build
 ```
-
-## Operations
-
-After deploying, run the smoke test against the deployed origin:
-
-```bash
-SMOKE_TEST_BASE_URL=https://example.com pnpm smoke
-```
-
-See `docs/operations/RUNBOOK.md` for migration, backup, restore, request ID,
-admin metrics and database connection-budget guidance.
