@@ -9,6 +9,8 @@ import {
 import type { AuthSession } from "@/lib/auth/current-user";
 import { env } from "@/lib/env";
 import { siteConfig } from "@/lib/metadata";
+import type { AccountMutationResult } from "@/server/account/results";
+import { createTwoFactorEmailCodeValue } from "@/server/account/verification-schemas";
 import {
   createVerification,
   deleteVerificationsByIdentifierPatterns,
@@ -37,19 +39,7 @@ const TOTP_WINDOW_STEPS = 1;
 type TwoFactorAction = "enable" | "disable";
 
 type TwoFactorMutationResult<T extends object = object> =
-  | {
-      kind: "error";
-      message: string;
-      recovery?: "try-delivered-code";
-      retryAfterSeconds?: number;
-      statusCode: number;
-    }
-  | ({ kind: "success" } & T);
-
-type EmailCodeValue = {
-  codeHash: string;
-  failedAttempts: number;
-};
+  AccountMutationResult<T>;
 
 function getTwoFactorEnabled(authSession: AuthSession) {
   return Boolean(
@@ -95,13 +85,6 @@ async function verifyTotpCode(secret: string, code: string) {
   }).verify(normalizedCode, { window: TOTP_WINDOW_STEPS });
 }
 
-function createEmailCodeValue(codeHash: string): EmailCodeValue {
-  return {
-    codeHash,
-    failedAttempts: 0,
-  };
-}
-
 async function clearEmailCodes(userId: string) {
   await deleteVerificationsByIdentifierPatterns([
     `${EMAIL_CODE_PREFIX}:${userId}:%`,
@@ -139,16 +122,16 @@ export async function sendAccountTwoFactorEmailCode({
   if (action === "enable" && isEnabled) {
     return {
       kind: "error",
+      code: "invalid",
       message: "Authenticator app sign-in is already enabled.",
-      statusCode: 400,
     };
   }
 
   if (action === "disable" && !isEnabled) {
     return {
       kind: "error",
+      code: "invalid",
       message: "Authenticator app sign-in is already disabled.",
-      statusCode: 400,
     };
   }
 
@@ -161,9 +144,9 @@ export async function sendAccountTwoFactorEmailCode({
   if (!rateLimit.allowed) {
     return {
       kind: "error",
+      code: "rate-limited",
       message: "Please wait before requesting another two-factor email code.",
       retryAfterSeconds: rateLimit.retryAfterSeconds,
-      statusCode: 429,
     };
   }
 
@@ -176,7 +159,7 @@ export async function sendAccountTwoFactorEmailCode({
     id: randomUUID(),
     identifier,
     value: JSON.stringify(
-      createEmailCodeValue(hashEmailCode({ code, identifier })),
+      createTwoFactorEmailCodeValue(hashEmailCode({ code, identifier })),
     ),
     expiresAt,
   });
@@ -194,10 +177,10 @@ export async function sendAccountTwoFactorEmailCode({
     // valid, and never restore the old code after a replacement request.
     return {
       kind: "error",
+      code: "delivery-failed",
       message:
         "We could not confirm code delivery. Your previous code is no longer valid; wait a minute and request a new code if this one does not arrive.",
       recovery: "try-delivered-code",
-      statusCode: 503,
     };
   }
 
@@ -214,8 +197,8 @@ export async function startAccountTwoFactorSetup({
   if (getTwoFactorEnabled(authSession)) {
     return {
       kind: "error",
+      code: "invalid",
       message: "Authenticator app sign-in is already enabled.",
-      statusCode: 400,
     };
   }
 
@@ -228,8 +211,8 @@ export async function startAccountTwoFactorSetup({
   if (!isVerified) {
     return {
       kind: "error",
+      code: "invalid",
       message: "That email code is invalid or expired.",
-      statusCode: 400,
     };
   }
 
@@ -272,8 +255,8 @@ export async function verifyAccountTwoFactorSetup({
   if (!pendingSetup) {
     return {
       kind: "error",
+      code: "invalid",
       message: "Start setup again before verifying an authenticator code.",
-      statusCode: 400,
     };
   }
 
@@ -285,8 +268,8 @@ export async function verifyAccountTwoFactorSetup({
   if (!(await verifyTotpCode(secret, code))) {
     return {
       kind: "error",
+      code: "invalid",
       message: "That authenticator code is invalid.",
-      statusCode: 400,
     };
   }
 
@@ -297,8 +280,8 @@ export async function verifyAccountTwoFactorSetup({
   if (!completed) {
     return {
       kind: "error",
+      code: "invalid",
       message: "Start setup again before verifying an authenticator code.",
-      statusCode: 400,
     };
   }
 
@@ -318,8 +301,8 @@ export async function disableAccountTwoFactor({
   if (!getTwoFactorEnabled(authSession)) {
     return {
       kind: "error",
+      code: "invalid",
       message: "Authenticator app sign-in is already disabled.",
-      statusCode: 400,
     };
   }
 
@@ -332,8 +315,8 @@ export async function disableAccountTwoFactor({
   if (!isVerified) {
     return {
       kind: "error",
+      code: "invalid",
       message: "That email code is invalid or expired.",
-      statusCode: 400,
     };
   }
 

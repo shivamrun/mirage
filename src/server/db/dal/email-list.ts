@@ -1,17 +1,6 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  gt,
-  ilike,
-  lte,
-  or,
-  type SQL,
-  sql,
-} from "drizzle-orm";
+import { and, asc, desc, eq, gt, ilike, or, type SQL, sql } from "drizzle-orm";
 
 import db, { type DBClient } from "@/server/db";
 import {
@@ -20,6 +9,12 @@ import {
   emailSubscription,
   verification,
 } from "@/server/db/schema";
+import {
+  canDeleteEmailList,
+  defaultEmailLists,
+  isDefaultEmailListKey,
+} from "@/server/email-list/config";
+import { getEmailListVerificationIdentifier } from "@/server/email-list/verification";
 import type {
   AdminCreateEmailListValues,
   AdminEmailSubscriberQueryState,
@@ -31,72 +26,6 @@ type UpdateEmailListStatusOptions = {
   key: string;
   status: EmailListStatus;
 };
-
-type EmailListVerificationPayload = {
-  email: string;
-  listKey: string;
-  subscriptionId: string;
-  token: string;
-};
-
-const EMAIL_LIST_VERIFICATION_PREFIX = "email-list";
-const EMAIL_LIST_VERIFICATION_EXPIRES_IN_MS = 1000 * 60 * 60 * 24;
-const EMAIL_LIST_VERIFICATION_TOKEN_PATTERN = /^[a-f0-9]{64}$/;
-
-const defaultEmailListKeys = ["waitlist", "newsletter"] as const;
-const defaultEmailLists = [
-  {
-    description: "Early access requests and launch updates.",
-    emailVerificationRequired: true,
-    key: "waitlist",
-    name: "Waitlist",
-    status: "active",
-  },
-  {
-    description: "Product news and occasional announcements.",
-    emailVerificationRequired: true,
-    key: "newsletter",
-    name: "Newsletter",
-    status: "active",
-  },
-] satisfies {
-  description: string;
-  emailVerificationRequired: boolean;
-  key: (typeof defaultEmailListKeys)[number];
-  name: string;
-  status: EmailListStatus;
-}[];
-
-function createEmailListVerificationToken() {
-  return randomBytes(32).toString("hex");
-}
-
-function getEmailListVerificationIdentifier(token: string) {
-  return `${EMAIL_LIST_VERIFICATION_PREFIX}:${token}`;
-}
-
-function parseEmailListVerificationPayload(value: string | null) {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(value) as Partial<EmailListVerificationPayload>;
-
-    if (
-      typeof parsed.email !== "string" ||
-      typeof parsed.listKey !== "string" ||
-      typeof parsed.subscriptionId !== "string" ||
-      typeof parsed.token !== "string"
-    ) {
-      return null;
-    }
-
-    return parsed as EmailListVerificationPayload;
-  } catch {
-    return null;
-  }
-}
 
 export async function seedDefaultEmailLists(executor: DBClient = db) {
   await executor
@@ -111,16 +40,6 @@ export async function seedDefaultEmailLists(executor: DBClient = db) {
         updatedAt: new Date(),
       },
     });
-}
-
-export function isDefaultEmailListKey(key: string) {
-  return defaultEmailListKeys.includes(
-    key as (typeof defaultEmailListKeys)[number],
-  );
-}
-
-export function canDeleteEmailList(key: string) {
-  return !isDefaultEmailListKey(key);
 }
 
 function getSubscriberListCondition(state: AdminEmailSubscriberQueryState) {
@@ -331,7 +250,7 @@ export async function deleteEmailList(key: string) {
       .delete(verification)
       .where(
         and(
-          ilike(verification.identifier, `${EMAIL_LIST_VERIFICATION_PREFIX}:%`),
+          ilike(verification.identifier, "email-list:%"),
           sql`(${verification.value}::jsonb ->> 'listKey') = ${key}`,
         ),
       );
@@ -423,25 +342,14 @@ export async function findEmailContactByEmail(email: string) {
 }
 
 export async function createEmailListVerification({
-  email,
-  listKey,
-  subscriptionId,
+  expiresAt,
+  payload,
+  token,
 }: {
-  email: string;
-  listKey: string;
-  subscriptionId: string;
+  expiresAt: Date;
+  payload: object;
+  token: string;
 }) {
-  const token = createEmailListVerificationToken();
-  const expiresAt = new Date(
-    Date.now() + EMAIL_LIST_VERIFICATION_EXPIRES_IN_MS,
-  );
-  const payload: EmailListVerificationPayload = {
-    email,
-    listKey,
-    subscriptionId,
-    token,
-  };
-
   await db.insert(verification).values({
     id: randomUUID(),
     identifier: getEmailListVerificationIdentifier(token),
@@ -449,10 +357,7 @@ export async function createEmailListVerification({
     expiresAt,
   });
 
-  return {
-    expiresAt,
-    token,
-  };
+  return { expiresAt, token };
 }
 
 export async function deleteEmailListVerification(token: string) {
@@ -463,20 +368,26 @@ export async function deleteEmailListVerification(token: string) {
     );
 }
 
-export async function confirmEmailListVerification(token: string) {
-  if (!EMAIL_LIST_VERIFICATION_TOKEN_PATTERN.test(token)) {
-    return { status: "invalid" as const };
-  }
-
+export async function deleteExpiredEmailListVerifications() {
   await db
     .delete(verification)
     .where(
       and(
-        ilike(verification.identifier, `${EMAIL_LIST_VERIFICATION_PREFIX}:%`),
-        lte(verification.expiresAt, new Date()),
+        ilike(verification.identifier, "email-list:%"),
+        sql`${verification.expiresAt} <= now()`,
       ),
     );
+}
 
+export async function confirmEmailListVerificationTransaction<
+  TPayload extends { listKey: string; subscriptionId: string },
+>({
+  confirmPayload,
+  token,
+}: {
+  confirmPayload: (value: string | null) => TPayload | null;
+  token: string;
+}) {
   return db.transaction(async (tx) => {
     const [record] = await tx
       .delete(verification)
@@ -489,9 +400,12 @@ export async function confirmEmailListVerification(token: string) {
           gt(verification.expiresAt, new Date()),
         ),
       )
-      .returning();
-    const payload = parseEmailListVerificationPayload(record?.value ?? null);
-    if (!record || !payload || payload.token !== token) {
+      .returning({
+        value: verification.value,
+      });
+    const payload = confirmPayload(record?.value ?? null);
+
+    if (!record || !payload) {
       return { status: "invalid" as const };
     }
 
@@ -510,11 +424,12 @@ export async function confirmEmailListVerification(token: string) {
       )
       .returning({ id: emailSubscription.id });
 
-    if (!updated) return { status: "invalid" as const };
+    if (!updated) {
+      return { status: "invalid" as const };
+    }
 
     return {
-      email: payload.email,
-      listKey: payload.listKey,
+      payload,
       status: "success" as const,
     };
   });

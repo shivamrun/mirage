@@ -66,43 +66,6 @@ export type AdminUserDetail = NonNullable<
   Awaited<ReturnType<typeof getAdminUserDetail>>
 >;
 
-export async function getAdminLinkedAccountForDeletion(
-  userId: string,
-  accountRowId: string,
-) {
-  const [account] = await db
-    .select({
-      accountId: accountTable.accountId,
-      id: accountTable.id,
-      providerId: accountTable.providerId,
-    })
-    .from(accountTable)
-    .where(
-      and(eq(accountTable.id, accountRowId), eq(accountTable.userId, userId)),
-    )
-    .limit(1);
-
-  if (!account) {
-    return { status: "not-found" } as const;
-  }
-
-  if (account.providerId === "credential") {
-    return { status: "credential" } as const;
-  }
-
-  const [signInMethodMetrics] = await db
-    .select({ total: count() })
-    .from(accountTable)
-    .where(eq(accountTable.userId, userId));
-  const remainingSignInMethods = (signInMethodMetrics?.total ?? 0) - 1;
-
-  if (remainingSignInMethods < 1) {
-    return { account, remainingSignInMethods, status: "last-method" } as const;
-  }
-
-  return { account, remainingSignInMethods, status: "deletable" } as const;
-}
-
 export async function deleteAdminLinkedAccount(
   userId: string,
   accountRowId: string,

@@ -1,11 +1,7 @@
 import { Elysia } from "elysia";
 
-import { createContactSubmission } from "@/server/db/dal/contact-submission";
+import { submitContactForm } from "@/server/contact/service";
 import { requestPolicy } from "@/server/http/request-policy";
-import {
-  consumePublicWriteLimit,
-  getPublicClientIdentifier,
-} from "@/server/rate-limit";
 import {
   contactSubmissionSchema,
   contactSuccessResponseSchema,
@@ -17,23 +13,17 @@ export const contactRoutes = new Elysia({ prefix: "/contact" })
   .post(
     "/",
     async ({ body, request, set, status }) => {
-      if (body.website) {
-        return { status: true as const };
-      }
-
-      const rateLimit = await consumePublicWriteLimit({
-        clientIdentifier: getPublicClientIdentifier(request.headers),
-        destination: body.email,
-        flow: "contact",
+      const result = await submitContactForm({
+        headers: request.headers,
+        values: body,
       });
-      if (!rateLimit.allowed) {
-        set.headers["Retry-After"] = String(rateLimit.retryAfterSeconds);
+
+      if (result.status === "rate-limited") {
+        set.headers["Retry-After"] = String(result.retryAfterSeconds);
         return status(429, {
           message: "Too many contact submissions. Please try again later.",
         });
       }
-
-      await createContactSubmission(body);
 
       return { status: true as const };
     },

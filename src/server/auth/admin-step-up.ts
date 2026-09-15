@@ -4,6 +4,7 @@ import { symmetricDecrypt } from "better-auth/crypto";
 import type { AuthSession } from "@/lib/auth/current-user";
 import { normalizeRoles } from "@/lib/auth/roles";
 import { env } from "@/lib/env";
+import type { AccountMutationResult } from "@/server/account/results";
 import { markAdminSessionAssurance } from "@/server/db/dal/admin-session-assurance";
 import { getAuthUserById } from "@/server/db/dal/auth";
 import {
@@ -19,22 +20,7 @@ const TOTP_DIGITS = 6;
 const TOTP_PERIOD_SECONDS = 30;
 const TOTP_WINDOW_STEPS = 1;
 
-type AdminStepUpResult =
-  | {
-      kind: "error";
-      message: string;
-      retryAfterSeconds?: number;
-      statusCode: 400 | 403;
-    }
-  | {
-      kind: "error";
-      message: string;
-      retryAfterSeconds: number;
-      statusCode: 429;
-    }
-  | {
-      kind: "success";
-    };
+type AdminStepUpResult = AccountMutationResult;
 
 function normalizeCode(code: string) {
   return code.replace(/\s/g, "");
@@ -69,8 +55,8 @@ export async function completeAdminTotpStepUp({
   ) {
     return {
       kind: "error",
+      code: "forbidden",
       message: "Two-factor authentication is required.",
-      statusCode: 403,
     };
   }
 
@@ -79,8 +65,8 @@ export async function completeAdminTotpStepUp({
   if (!twoFactor) {
     return {
       kind: "error",
+      code: "forbidden",
       message: "Two-factor authentication is required.",
-      statusCode: 403,
     };
   }
 
@@ -89,10 +75,10 @@ export async function completeAdminTotpStepUp({
   if (lockState) {
     return {
       kind: "error",
+      code: "rate-limited",
       message:
         "Too many invalid authenticator codes. Wait before trying again.",
       retryAfterSeconds: lockState.retryAfterSeconds,
-      statusCode: 429,
     };
   }
 
@@ -110,8 +96,8 @@ export async function completeAdminTotpStepUp({
 
     return {
       kind: "error",
+      code: "invalid",
       message: "That authenticator code is invalid.",
-      statusCode: 400,
     };
   }
 

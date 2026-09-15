@@ -1,36 +1,13 @@
 import { timingSafeEqual } from "node:crypto";
 
 import { and, eq, sql } from "drizzle-orm";
-
+import { parseTwoFactorEmailCodeValue } from "@/server/account/verification-schemas";
 import db from "@/server/db";
 import {
   twoFactor as twoFactorTable,
   user as userTable,
   verification,
 } from "@/server/db/schema";
-
-function parseEmailCodeValue(value: string) {
-  try {
-    const parsed = JSON.parse(value) as {
-      codeHash?: unknown;
-      failedAttempts?: unknown;
-    };
-    if (
-      typeof parsed.codeHash === "string" &&
-      typeof parsed.failedAttempts === "number" &&
-      Number.isInteger(parsed.failedAttempts) &&
-      parsed.failedAttempts >= 0
-    ) {
-      return {
-        codeHash: parsed.codeHash,
-        failedAttempts: parsed.failedAttempts,
-      };
-    }
-  } catch {
-    // Older in-flight records stored only the code hash.
-  }
-  return { codeHash: value, failedAttempts: 0 };
-}
 
 export async function verifyAndConsumeEmailCode({
   expectedHash,
@@ -51,7 +28,7 @@ export async function verifyAndConsumeEmailCode({
 
     if (!record) return false;
 
-    const value = parseEmailCodeValue(record.value);
+    const value = parseTwoFactorEmailCodeValue(record.value);
     if (
       record.expiresAt <= new Date() ||
       value.failedAttempts >= maxFailedAttempts

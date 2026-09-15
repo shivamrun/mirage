@@ -1,5 +1,14 @@
 import { auth } from "@/lib/auth";
+import {
+  canDeleteLinkedAccount,
+  canDeleteUserSession,
+} from "@/lib/auth/admin-access";
+import type { CurrentUser } from "@/lib/auth/current-user";
 import { env } from "@/lib/env";
+import {
+  deleteAdminLinkedAccount,
+  getAdminUserSessionForDeletion,
+} from "@/server/db/dal/admin-user-detail";
 import {
   getUserForPasswordReset,
   revokeAllSessions,
@@ -23,6 +32,143 @@ type ForcePasswordResetResult =
       targetEmail: string;
       user: NonNullable<Awaited<ReturnType<typeof getUserForPasswordReset>>>;
     };
+
+type UnlinkAdminLinkedAccountResult =
+  | {
+      status: "not-found";
+    }
+  | {
+      status: "credential";
+    }
+  | {
+      status: "last-method";
+    }
+  | {
+      message: string;
+      status: "denied";
+      statusCode: 403 | 404;
+    }
+  | {
+      account: Extract<
+        Awaited<ReturnType<typeof deleteAdminLinkedAccount>>,
+        { status: "deleted" }
+      >["account"];
+      status: "deleted";
+    };
+
+type RevokeAdminUserSessionResult =
+  | {
+      status: "not-found";
+    }
+  | {
+      message: string;
+      status: "denied";
+      statusCode: 403 | 404;
+    }
+  | {
+      session: {
+        id: string;
+        userId: string;
+      };
+      status: "revoked";
+    };
+
+export async function unlinkAdminLinkedAccount({
+  accountRowId,
+  actor,
+  userId,
+}: {
+  accountRowId: string;
+  actor: CurrentUser;
+  userId: string;
+}): Promise<UnlinkAdminLinkedAccountResult> {
+  const actorDecision = canDeleteLinkedAccount({
+    actor,
+    remainingSignInMethods: 1,
+  });
+
+  if (!actorDecision.allowed) {
+    return {
+      message: actorDecision.message,
+      status: "denied",
+      statusCode: actorDecision.statusCode,
+    };
+  }
+
+  const result = await deleteAdminLinkedAccount(userId, accountRowId);
+
+  if (result.status === "not-found" || result.status === "credential") {
+    return result;
+  }
+
+  const decision = canDeleteLinkedAccount({
+    actor,
+    remainingSignInMethods: result.remainingSignInMethods,
+  });
+
+  if (!decision.allowed) {
+    return {
+      message: decision.message,
+      status: "denied",
+      statusCode: decision.statusCode,
+    };
+  }
+
+  if (result.status === "last-method") {
+    return { status: "last-method" };
+  }
+
+  return {
+    account: result.account,
+    status: "deleted",
+  };
+}
+
+export async function revokeAdminUserSession({
+  actor,
+  headers,
+  sessionId,
+  userId,
+}: {
+  actor: CurrentUser;
+  headers: Headers;
+  sessionId: string;
+  userId: string;
+}): Promise<RevokeAdminUserSessionResult> {
+  const userSession = await getAdminUserSessionForDeletion(userId, sessionId);
+
+  if (!userSession) {
+    return { status: "not-found" };
+  }
+
+  const decision = canDeleteUserSession({
+    actor,
+    targetSessionUserId: userSession.userId,
+  });
+
+  if (!decision.allowed) {
+    return {
+      message: decision.message,
+      status: "denied",
+      statusCode: decision.statusCode,
+    };
+  }
+
+  await auth.api.revokeUserSession({
+    body: {
+      sessionToken: userSession.token,
+    },
+    headers,
+  });
+
+  return {
+    session: {
+      id: userSession.id,
+      userId: userSession.userId,
+    },
+    status: "revoked",
+  };
+}
 
 export async function forcePasswordReset({
   email,

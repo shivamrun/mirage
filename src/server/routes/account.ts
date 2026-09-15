@@ -20,6 +20,7 @@ import {
 import { completeAdminTotpStepUp } from "@/server/auth/admin-step-up";
 import { elysiaAuth } from "@/server/http/auth";
 import { requestPolicy } from "@/server/http/request-policy";
+import { accountErrorResponse } from "@/server/http/result-response";
 import {
   accountEmailMutationResponseSchema,
   accountEmailStateResponseSchema,
@@ -101,11 +102,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       });
 
       if (result.kind === "error") {
-        if (result.statusCode === 429 && result.retryAfterSeconds) {
-          set.headers["Retry-After"] = String(result.retryAfterSeconds);
-        }
-
-        return status(result.statusCode, { message: result.message });
+        return accountErrorResponse({ error: result, set, status });
       }
 
       return { status: true as const };
@@ -138,12 +135,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
         });
       }
       if (result.kind === "error") {
-        if (result.statusCode === 429 && result.retryAfterSeconds) {
-          set.headers["Retry-After"] = String(result.retryAfterSeconds);
-          return status(429, { message: result.message });
-        }
-
-        return status(400, { message: result.message });
+        return accountErrorResponse({ error: result, set, status });
       }
 
       return { status: true as const };
@@ -173,12 +165,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       });
 
       if (result.kind === "error") {
-        if (result.statusCode === 429 && result.retryAfterSeconds) {
-          set.headers["Retry-After"] = String(result.retryAfterSeconds);
-          return status(429, { message: result.message });
-        }
-
-        return status(400, { message: result.message });
+        return accountErrorResponse({ error: result, set, status });
       }
 
       return {
@@ -210,12 +197,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       });
 
       if (result.kind === "error") {
-        if (result.statusCode === 429 && result.retryAfterSeconds) {
-          set.headers["Retry-After"] = String(result.retryAfterSeconds);
-          return status(429, { message: result.message });
-        }
-
-        return status(400, { message: result.message });
+        return accountErrorResponse({ error: result, set, status });
       }
 
       return {
@@ -247,12 +229,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       });
 
       if (result.kind === "error") {
-        if (result.statusCode === 429 && result.retryAfterSeconds) {
-          set.headers["Retry-After"] = String(result.retryAfterSeconds);
-          return status(429, { message: result.message });
-        }
-
-        return status(400, { message: result.message });
+        return accountErrorResponse({ error: result, set, status });
       }
 
       return {
@@ -385,18 +362,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       });
 
       if (result.kind === "error") {
-        if (result.statusCode === 429 && result.retryAfterSeconds) {
-          set.headers["Retry-After"] = String(result.retryAfterSeconds);
-          return status(429, { message: result.message });
-        }
-        if (result.statusCode === 409) {
-          return status(409, { message: result.message });
-        }
-        if (result.statusCode === 503) {
-          return status(503, { message: result.message });
-        }
-
-        return status(400, { message: result.message });
+        return accountErrorResponse({ error: result, set, status });
       }
 
       return {
@@ -428,15 +394,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       });
 
       if (result.kind === "error") {
-        if (result.statusCode === 429 && result.retryAfterSeconds) {
-          set.headers["Retry-After"] = String(result.retryAfterSeconds);
-          return status(429, { message: result.message });
-        }
-        if (result.statusCode === 409) {
-          return status(409, { message: result.message });
-        }
-
-        return status(400, { message: result.message });
+        return accountErrorResponse({ error: result, set, status });
       }
 
       return {
@@ -467,15 +425,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       });
 
       if (result.kind === "error") {
-        if (result.statusCode === 429 && result.retryAfterSeconds) {
-          set.headers["Retry-After"] = String(result.retryAfterSeconds);
-          return status(429, { message: result.message });
-        }
-        if (result.statusCode === 409) {
-          return status(409, { message: result.message });
-        }
-
-        return status(400, { message: result.message });
+        return accountErrorResponse({ error: result, set, status });
       }
 
       return {
@@ -505,18 +455,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       });
 
       if (result.kind === "error") {
-        if (result.statusCode === 429 && result.retryAfterSeconds) {
-          set.headers["Retry-After"] = String(result.retryAfterSeconds);
-          return status(429, { message: result.message });
-        }
-        if (result.statusCode === 409) {
-          return status(409, { message: result.message });
-        }
-        if (result.statusCode === 503) {
-          return status(503, { message: result.message });
-        }
-
-        return status(400, { message: result.message });
+        return accountErrorResponse({ error: result, set, status });
       }
 
       return {

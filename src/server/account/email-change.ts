@@ -3,6 +3,11 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { auth } from "@/lib/auth";
 import type { AuthSession } from "@/lib/auth/current-user";
 import { env } from "@/lib/env";
+import type { AccountMutationResult } from "@/server/account/results";
+import {
+  type PendingEmailChange,
+  parsePendingEmailChange,
+} from "@/server/account/verification-schemas";
 import {
   consumePendingAndUpdateUserEmail,
   createVerification,
@@ -23,13 +28,6 @@ const EMAIL_CHANGE_APPROVAL_PREFIX = "account-email-change-approval";
 const EMAIL_CHANGE_EXPIRES_IN_MS = 1000 * 60 * 60;
 const EMAIL_CHANGE_TOKEN_PATTERN = /^[a-f0-9]{64}$/;
 
-type PendingEmailChange = {
-  currentEmail: string;
-  newEmail: string;
-  token: string;
-  userId: string;
-};
-
 type AccountEmailState = {
   kind: "success";
   value: {
@@ -41,23 +39,15 @@ type AccountEmailState = {
   };
 };
 
-type AccountEmailMutationResult =
-  | {
-      kind: "error";
-      message: string;
-      retryAfterSeconds?: number;
-      statusCode: number;
-    }
-  | {
-      kind: "success";
-      value: {
-        email: string;
-        emailVerified: boolean;
-        pendingEmail: string | null;
-        pendingEmailStep: "approve-current" | "verify-new" | null;
-        pendingEmailExpiresAt: string | null;
-      };
-    };
+type AccountEmailMutationResult = AccountMutationResult<{
+  value: {
+    email: string;
+    emailVerified: boolean;
+    pendingEmail: string | null;
+    pendingEmailStep: "approve-current" | "verify-new" | null;
+    pendingEmailExpiresAt: string | null;
+  };
+}>;
 
 type EmailChangeConfirmationResult = {
   deliveryFailed?: boolean;
@@ -89,29 +79,6 @@ function getApprovalIdentifierPrefix(userId: string) {
 
 function getApprovalIdentifier(userId: string, token: string) {
   return `${getApprovalIdentifierPrefix(userId)}${token}`;
-}
-
-function parsePendingEmailChange(value: string | null) {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(value) as Partial<PendingEmailChange>;
-
-    if (
-      typeof parsed.currentEmail !== "string" ||
-      typeof parsed.newEmail !== "string" ||
-      typeof parsed.token !== "string" ||
-      typeof parsed.userId !== "string"
-    ) {
-      return null;
-    }
-
-    return parsed as PendingEmailChange;
-  } catch {
-    return null;
-  }
 }
 
 async function getPendingEmailChange(userId: string) {
@@ -313,8 +280,8 @@ export async function changeAccountEmail({
   if (body.newEmail === authSession.user.email) {
     return {
       kind: "error",
+      code: "invalid",
       message: "New email must be different from your current email.",
-      statusCode: 400,
     };
   }
 
@@ -323,8 +290,8 @@ export async function changeAccountEmail({
   if (existingUser) {
     return {
       kind: "error",
+      code: "conflict",
       message: "That email is already in use.",
-      statusCode: 409,
     };
   }
 
@@ -340,9 +307,9 @@ export async function changeAccountEmail({
   if (!rateLimit.allowed) {
     return {
       kind: "error",
+      code: "rate-limited",
       message: "Please wait before requesting another email change message.",
       retryAfterSeconds: rateLimit.retryAfterSeconds,
-      statusCode: 429,
     };
   }
 
@@ -358,10 +325,10 @@ export async function changeAccountEmail({
   if (pendingChange.deliveryFailed) {
     return {
       kind: "error",
+      code: "delivery-failed",
       message: authSession.user.emailVerified
         ? "We could not confirm email delivery. Your change is pending; wait a minute, then start it again from your account if the approval message does not arrive."
         : "We could not confirm email delivery. Your change is pending; wait a minute, then resend verification from your account if the message does not arrive.",
-      statusCode: 503,
     };
   }
 
@@ -518,8 +485,8 @@ export async function resendPendingEmailChangeVerification({
   if (!pendingChange || pendingChange.step !== "verify-new") {
     return {
       kind: "error",
+      code: "invalid",
       message: "No pending email verification is ready to resend.",
-      statusCode: 400,
     };
   }
 
@@ -532,9 +499,9 @@ export async function resendPendingEmailChangeVerification({
   if (!rateLimit.allowed) {
     return {
       kind: "error",
+      code: "rate-limited",
       message: "Please wait before requesting another email change message.",
       retryAfterSeconds: rateLimit.retryAfterSeconds,
-      statusCode: 429,
     };
   }
 
@@ -544,9 +511,9 @@ export async function resendPendingEmailChangeVerification({
     logEmailDeliveryFailure("email-change-resend", error);
     return {
       kind: "error",
+      code: "delivery-failed",
       message:
         "We could not confirm email delivery. Your verification is still pending; wait a minute and resend if the message does not arrive.",
-      statusCode: 503,
     };
   }
 
@@ -572,8 +539,8 @@ export async function resendAccountVerification({
   if (authSession.user.emailVerified) {
     return {
       kind: "error",
+      code: "invalid",
       message: "Email is already verified.",
-      statusCode: 400,
     };
   }
 
@@ -585,9 +552,9 @@ export async function resendAccountVerification({
   if (!rateLimit.allowed) {
     return {
       kind: "error",
+      code: "rate-limited",
       message: "Please wait before requesting another verification email.",
       retryAfterSeconds: rateLimit.retryAfterSeconds,
-      statusCode: 429,
     };
   }
 

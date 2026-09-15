@@ -1,8 +1,10 @@
 import { Elysia } from "elysia";
 
 import { env } from "@/lib/env";
-import { confirmEmailListVerification } from "@/server/db/dal/email-list";
-import { subscribeToEmailList } from "@/server/email-list/service";
+import {
+  confirmEmailListVerification,
+  subscribeToEmailList,
+} from "@/server/email-list/service";
 import { requestPolicy } from "@/server/http/request-policy";
 import {
   emailListSignupSuccessResponseSchema,

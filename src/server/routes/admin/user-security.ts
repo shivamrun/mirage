@@ -1,20 +1,12 @@
 import { Elysia } from "elysia";
 
-import { auth } from "@/lib/auth";
-import {
-  canDeleteLinkedAccount,
-  canDeleteUserSession,
-} from "@/lib/auth/admin-access";
 import type { CurrentUser } from "@/lib/auth/current-user";
 import {
   forcePasswordReset,
+  revokeAdminUserSession,
   revokeEverySession,
+  unlinkAdminLinkedAccount,
 } from "@/server/admin/security";
-import {
-  deleteAdminLinkedAccount,
-  getAdminLinkedAccountForDeletion,
-  getAdminUserSessionForDeletion,
-} from "@/server/db/dal/admin-user-detail";
 import { requestPolicy } from "@/server/http/request-policy";
 import {
   adminPasswordResetPartialFailureResponseSchema,
@@ -37,36 +29,11 @@ export const adminUserSecurityRoutes = new Elysia()
     "/users/:userId/accounts/:accountRowId",
     async (context) => {
       const { params, status } = context;
-      const target = await getAdminLinkedAccountForDeletion(
-        params.userId,
-        params.accountRowId,
-      );
-
-      if (target.status === "not-found") {
-        return status(404, { message: "Linked account not found." });
-      }
-
-      if (target.status === "credential") {
-        return status(400, {
-          message: "Password credentials cannot be unlinked here.",
-        });
-      }
-
-      const decision = canDeleteLinkedAccount({
+      const result = await unlinkAdminLinkedAccount({
+        accountRowId: params.accountRowId,
         actor: getAdminRouteUser(context),
-        remainingSignInMethods: target.remainingSignInMethods,
+        userId: params.userId,
       });
-
-      if (!decision.allowed) {
-        const denial = decision;
-
-        return status(denial.statusCode, { message: denial.message });
-      }
-
-      const result = await deleteAdminLinkedAccount(
-        params.userId,
-        params.accountRowId,
-      );
 
       if (result.status === "not-found") {
         return status(404, { message: "Linked account not found." });
@@ -82,6 +49,10 @@ export const adminUserSecurityRoutes = new Elysia()
         return status(403, {
           message: "Cannot unlink the user's last sign-in method.",
         });
+      }
+
+      if (result.status === "denied") {
+        return status(result.statusCode, { message: result.message });
       }
 
       return {
@@ -105,38 +76,23 @@ export const adminUserSecurityRoutes = new Elysia()
     "/users/:userId/sessions/:sessionId",
     async (context) => {
       const { params, request, status } = context;
-      const userSession = await getAdminUserSessionForDeletion(
-        params.userId,
-        params.sessionId,
-      );
+      const result = await revokeAdminUserSession({
+        actor: getAdminRouteUser(context),
+        headers: request.headers,
+        sessionId: params.sessionId,
+        userId: params.userId,
+      });
 
-      if (!userSession) {
+      if (result.status === "not-found") {
         return status(404, { message: "Session not found." });
       }
 
-      const decision = canDeleteUserSession({
-        actor: getAdminRouteUser(context),
-        targetSessionUserId: userSession.userId,
-      });
-
-      if (!decision.allowed) {
-        const denial = decision;
-
-        return status(denial.statusCode, { message: denial.message });
+      if (result.status === "denied") {
+        return status(result.statusCode, { message: result.message });
       }
 
-      await auth.api.revokeUserSession({
-        body: {
-          sessionToken: userSession.token,
-        },
-        headers: request.headers,
-      });
-
       return {
-        session: {
-          id: userSession.id,
-          userId: userSession.userId,
-        },
+        session: result.session,
         status: true as const,
       };
     },
