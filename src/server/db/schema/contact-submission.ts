@@ -1,6 +1,6 @@
 import { text } from "drizzle-orm/pg-core";
 
-import { contactSubmissionStatusValues } from "@/zod/contact-submission";
+import { contactSubmissionStatusValues } from "@/lib/contact-submission/status";
 
 import { auditTimestamps, emailColumn, idColumn } from "../helpers/base-column";
 import { createTable } from "../helpers/create-table";

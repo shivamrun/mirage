@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+import {
+  emailListStatusValues,
+  emailSubscriptionStatusValues,
+} from "@/lib/email-list/status";
+
 import { statusSuccessResponseSchema } from "./api";
 import { emailSchema } from "./helpers";
 
@@ -126,13 +131,10 @@ export const emailListVerifyQuerySchema = z.object({
   token: z.string().optional(),
 });
 
-export const emailListStatusSchema = z.enum(["active", "archived"]);
-export const emailSubscriptionStatusSchema = z.enum([
-  "subscribed",
-  "unsubscribed",
-  "pending",
-  "bounced",
-]);
+export const emailListStatusSchema = z.enum(emailListStatusValues);
+export const emailSubscriptionStatusSchema = z.enum(
+  emailSubscriptionStatusValues,
+);
 
 export const adminCreateEmailListSchema = z.object({
   key: emailListKeySchema,

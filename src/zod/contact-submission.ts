@@ -1,10 +1,6 @@
 import { z } from "zod";
 
-export const contactSubmissionStatusValues = [
-  "new",
-  "read",
-  "archived",
-] as const;
+import { contactSubmissionStatusValues } from "@/lib/contact-submission/status";
 
 export const contactSubmissionStatusSchema = z.enum(
   contactSubmissionStatusValues,

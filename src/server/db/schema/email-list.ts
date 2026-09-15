@@ -8,6 +8,11 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import {
+  emailListStatusValues,
+  emailSubscriptionStatusValues,
+} from "@/lib/email-list/status";
+
 import { auditTimestamps, emailColumn, idColumn } from "../helpers/base-column";
 import { createTable } from "../helpers/create-table";
 
@@ -16,7 +21,7 @@ export const emailList = createTable("email_list", {
   name: text("name").notNull(),
   description: text("description"),
   status: text("status", {
-    enum: ["active", "archived"],
+    enum: emailListStatusValues,
   })
     .notNull()
     .default("active"),
@@ -43,7 +48,7 @@ export const emailSubscription = createTable(
       .notNull()
       .references(() => emailList.key, { onDelete: "restrict" }),
     status: text("status", {
-      enum: ["subscribed", "unsubscribed", "pending", "bounced"],
+      enum: emailSubscriptionStatusValues,
     })
       .notNull()
       .default("subscribed"),
