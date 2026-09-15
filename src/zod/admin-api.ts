@@ -5,7 +5,7 @@ import {
   adminCreateEmailListSchema,
   emailListKeySchema,
   emailListStatusSchema,
-} from "./contact";
+} from "./email-list";
 import { emailSchema } from "./helpers";
 
 export const forcePasswordResetSchema = z.object({
