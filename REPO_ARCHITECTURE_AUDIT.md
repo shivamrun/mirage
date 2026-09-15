@@ -43,8 +43,8 @@ Last updated: 2026-09-15
 | A07 | Auth resolution consolidation | P1 | Done | Current-user/session resolution now has an explicit cache policy, with shared Elysia and Next admin access adapters. |
 | A08 | Admin query contracts | P1 | Done | Admin query parsing/building now lives under `src/lib/admin`; component query files are compatibility re-exports and users UI filter config is presentation-owned. |
 | A09 | Admin presentation/DAL coupling | P1 | Done | Admin pages consume feature-level `src/server/admin/*` read functions and user-detail components depend on view-model types instead of DAL types. |
-| A10 | Upload validation contract | P1 | Not started | Upload request/response contracts still route-local/client-duplicated. |
-| A11 | Unused auth-record schemas | P2 | Not started | Unused Zod mirror remains. |
+| A10 | Upload validation contract | P1 | Done | Upload request/response contracts now live in `src/zod/uploads.ts`; route and client infer from the shared contract. |
+| A11 | Unused auth-record schemas | P2 | Done | Unused auth-record Zod mirror was removed; Zod helpers now expose only active email normalization helpers. |
 | A12 | Pagination helper cleanup | P2 | Done | Admin users now uses `totalCountWindow` in the DAL and `resolveOffsetPagination` in the admin users feature reader. |
 | A13 | Shared admin formatters | P2 | Done | Cross-feature admin date/value formatters moved to `src/components/admin/shared/formatters.ts`; provider formatting remains user-detail-specific. |
 | A14 | Contact-submission status validation | P1 | Done | Contact-submission status values and action/search parsing now share the canonical Zod contract in `src/zod/contact-submission.ts`. |

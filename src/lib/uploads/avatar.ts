@@ -1,12 +1,9 @@
-import { type PrepareUploadOutput, uploadFile } from "@marinedotsh/upload-sdk";
+import { uploadFile } from "@marinedotsh/upload-sdk";
 
 import { api } from "@/lib/api/client";
+import type { PrepareUploadResponse } from "@/zod/uploads";
 
-type PrepareAvatarUploadResponse = {
-  key: string;
-  publicUrl: string;
-  upload: PrepareUploadOutput;
-};
+type PrepareAvatarUploadResponse = PrepareUploadResponse;
 
 type UploadAvatarFileOptions = {
   onProgress?: (progress: { percent?: number }) => void;

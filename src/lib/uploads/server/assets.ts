@@ -2,9 +2,9 @@ import "server-only";
 
 import { defineAssets } from "@marinedotsh/upload-sdk";
 
-import type { createStorageProfiles } from "./storage";
+import { uploadAssetKeys } from "@/lib/uploads/asset-keys";
 
-const uploadAssetKeys = ["avatar"] as const;
+import type { createStorageProfiles } from "./storage";
 
 const avatarMimeTypes = ["image/png", "image/jpeg", "image/webp"] as const;
 const avatarExtensions = [".png", ".jpg", ".jpeg", ".webp"] as const;
@@ -34,12 +34,9 @@ function createUploadAssets(
   });
 }
 
-type UploadAssetKey = (typeof uploadAssetKeys)[number];
-
 export {
   avatarExtensions,
   avatarMimeTypes,
   createUploadAssets,
-  type UploadAssetKey,
   uploadAssetKeys,
 };
