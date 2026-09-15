@@ -5,12 +5,12 @@ import {
   type AdminEmailListPageSearchParams,
   parseAdminEmailListSearchParams,
 } from "@/lib/admin/email-list-query";
-import { requireAdmin } from "@/lib/auth/access";
 import { getPageMetadata } from "@/lib/metadata";
 import {
   listAdminEmailListsView,
   listAdminEmailSubscribersView,
 } from "@/server/admin/email-list";
+import { requireAdmin } from "@/server/auth/access";
 
 export const metadata = getPageMetadata("Email Submissions", {
   path: "/admin/email-list/submissions",

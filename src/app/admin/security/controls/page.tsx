@@ -2,9 +2,9 @@ import { headers } from "next/headers";
 
 import { SecurityControls } from "@/components/admin";
 import { HeadingBlock } from "@/components/heading-block";
-import { requireAdmin } from "@/lib/auth/access";
 import { getPageMetadata } from "@/lib/metadata";
 import { getAdminSecurityControlSummaryView } from "@/server/admin/security";
+import { requireAdmin } from "@/server/auth/access";
 
 export const metadata = getPageMetadata("Security Controls", {
   path: "/admin/security/controls",

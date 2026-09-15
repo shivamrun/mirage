@@ -2,10 +2,10 @@ import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { admin, twoFactor } from "better-auth/plugins";
 
-import { authHooks } from "@/lib/auth/hooks";
 import { authAccessControl, authRolePermissions } from "@/lib/auth/roles";
 import { env } from "@/lib/env";
 import { siteConfig } from "@/lib/metadata";
+import { authHooks } from "@/server/auth/hooks";
 import { createAuthDatabaseAdapter } from "@/server/db/dal/auth";
 import {
   sendVerificationEmail as sendAuthVerificationEmail,

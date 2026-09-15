@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { auth } from "@/lib/auth";
+import { auth } from "@/server/auth/better-auth";
 import { createTestActor } from "./infra/admin-actor";
 
 const origin = "http://localhost:3000";

@@ -1,15 +1,15 @@
 import { headers as requestHeaders } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
-import { evaluateAdminAccess } from "@/lib/auth/admin-access";
+import { getLoginRedirectPath } from "@/lib/auth/redirect";
+import { evaluateAdminAccess } from "@/server/auth/admin-access";
 import {
   type AuthRole,
   type CurrentUser,
   type RequestHeaders as CurrentUserHeaders,
   getCurrentUser as getCurrentUserFromHeaders,
   type SessionCookieCachePolicy,
-} from "@/lib/auth/current-user";
-import { getLoginRedirectPath } from "@/lib/auth/redirect";
+} from "@/server/auth/current-user";
 
 export type RequestHeaders =
   | Headers

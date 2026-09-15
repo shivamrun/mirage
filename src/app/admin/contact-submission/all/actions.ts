@@ -3,11 +3,11 @@
 import { revalidatePath } from "next/cache";
 
 import { ADMIN_CONTACT_SUBMISSION_PAGE_PATH } from "@/lib/admin/contact-submission-query";
-import { requireVerifiedAdmin } from "@/lib/auth/access";
 import {
   bulkUpdateAdminContactSubmissionStatus,
   updateAdminContactSubmissionStatus,
 } from "@/server/admin/contact-submission";
+import { requireVerifiedAdmin } from "@/server/auth/access";
 import {
   bulkUpdateContactSubmissionStatusActionSchema,
   updateContactSubmissionStatusActionSchema,

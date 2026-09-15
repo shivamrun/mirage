@@ -14,8 +14,8 @@ import {
   bulkUpdateContactSubmissionStatusAction,
   updateContactSubmissionStatusAction,
 } from "@/app/admin/contact-submission/all/actions";
-import { auth } from "@/lib/auth";
 import { env } from "@/lib/env";
+import { auth } from "@/server/auth/better-auth";
 import db from "@/server/db";
 import {
   account,

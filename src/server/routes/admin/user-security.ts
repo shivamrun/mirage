@@ -1,12 +1,11 @@
 import { Elysia } from "elysia";
-
-import type { CurrentUser } from "@/lib/auth/current-user";
 import {
   forcePasswordReset,
   revokeAdminUserSession,
   revokeEverySession,
   unlinkAdminLinkedAccount,
 } from "@/server/admin/security";
+import type { CurrentUser } from "@/server/auth/current-user";
 import { requestPolicy } from "@/server/http/request-policy";
 import {
   adminPasswordResetPartialFailureResponseSchema,

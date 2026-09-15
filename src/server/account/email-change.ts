@@ -1,13 +1,12 @@
 import { randomBytes, randomUUID } from "node:crypto";
-
-import { auth } from "@/lib/auth";
-import type { AuthSession } from "@/lib/auth/current-user";
 import { env } from "@/lib/env";
 import type { AccountMutationResult } from "@/server/account/results";
 import {
   type PendingEmailChange,
   parsePendingEmailChange,
 } from "@/server/account/verification-schemas";
+import { auth } from "@/server/auth/better-auth";
+import type { AuthSession } from "@/server/auth/current-user";
 import {
   consumePendingAndUpdateUserEmail,
   createVerification,

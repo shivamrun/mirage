@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { eq } from "drizzle-orm";
 
-import { auth } from "@/lib/auth";
+import { auth } from "@/server/auth/better-auth";
 import db from "@/server/db";
 import { markAdminSessionAssurance } from "@/server/db/dal/admin-session-assurance";
 import { user } from "@/server/db/schema";

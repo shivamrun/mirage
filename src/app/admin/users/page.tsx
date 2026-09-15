@@ -14,9 +14,9 @@ import {
   parseAdminUsersSearchParams,
   usersPageHref,
 } from "@/lib/admin/users-query";
-import { requireAdmin } from "@/lib/auth/access";
 import { getPageMetadata } from "@/lib/metadata";
 import { listAdminUsersView } from "@/server/admin/users";
+import { requireAdmin } from "@/server/auth/access";
 
 export const metadata = getPageMetadata("Users", {
   path: "/admin/users",

@@ -3,8 +3,8 @@ import Link from "next/link";
 import AuthContainer from "@/components/auth/auth-container";
 import { AuthFormShell } from "@/components/auth/auth-form-shell";
 import { Button } from "@/components/ui/button";
-import { requireAuth } from "@/lib/auth/access";
 import { getPageMetadata, siteConfig } from "@/lib/metadata";
+import { requireAuth } from "@/server/auth/access";
 
 export const metadata = getPageMetadata("Welcome", { path: "/welcome" });
 

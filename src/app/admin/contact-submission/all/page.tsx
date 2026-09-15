@@ -12,9 +12,9 @@ import {
   contactSubmissionsPageHref,
   parseAdminContactSubmissionSearchParams,
 } from "@/lib/admin/contact-submission-query";
-import { requireAdmin } from "@/lib/auth/access";
 import { getPageMetadata } from "@/lib/metadata";
 import { listAdminContactSubmissionsView } from "@/server/admin/contact-submission";
+import { requireAdmin } from "@/server/auth/access";
 
 import {
   bulkUpdateContactSubmissionStatusAction,

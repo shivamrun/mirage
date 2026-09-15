@@ -6,11 +6,11 @@ import {
   symmetricDecrypt,
   symmetricEncrypt,
 } from "better-auth/crypto";
-import type { AuthSession } from "@/lib/auth/current-user";
 import { env } from "@/lib/env";
 import { siteConfig } from "@/lib/metadata";
 import type { AccountMutationResult } from "@/server/account/results";
 import { createTwoFactorEmailCodeValue } from "@/server/account/verification-schemas";
+import type { AuthSession } from "@/server/auth/current-user";
 import {
   TOTP_DIGITS,
   TOTP_PERIOD_SECONDS,

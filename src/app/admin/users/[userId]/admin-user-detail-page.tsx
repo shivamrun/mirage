@@ -5,8 +5,8 @@ import {
   type AdminUserDetailSection,
   AdminUserDetailView,
 } from "@/components/admin";
-import { requireAdmin } from "@/lib/auth/access";
 import { getAdminUserDetailView } from "@/server/admin/user-detail";
+import { requireAdmin } from "@/server/auth/access";
 
 type AdminUserDetailRouteProps = {
   params: Promise<{

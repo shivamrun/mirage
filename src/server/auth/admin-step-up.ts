@@ -1,9 +1,8 @@
 import { symmetricDecrypt } from "better-auth/crypto";
-
-import type { AuthSession } from "@/lib/auth/current-user";
 import { normalizeRoles } from "@/lib/auth/roles";
 import { env } from "@/lib/env";
 import type { AccountMutationResult } from "@/server/account/results";
+import type { AuthSession } from "@/server/auth/current-user";
 import { verifyTotpCode } from "@/server/auth/totp";
 import { markAdminSessionAssurance } from "@/server/db/dal/admin-session-assurance";
 import { getAuthUserById } from "@/server/db/dal/auth";

@@ -1,10 +1,10 @@
-import { auth } from "@/lib/auth";
+import { env } from "@/lib/env";
 import {
   canDeleteLinkedAccount,
   canDeleteUserSession,
-} from "@/lib/auth/admin-access";
-import type { CurrentUser } from "@/lib/auth/current-user";
-import { env } from "@/lib/env";
+} from "@/server/auth/admin-access";
+import { auth } from "@/server/auth/better-auth";
+import type { CurrentUser } from "@/server/auth/current-user";
 import {
   deleteAdminLinkedAccount,
   getAdminUserSessionForDeletion,

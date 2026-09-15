@@ -1,5 +1,5 @@
-import { auth } from "@/lib/auth";
 import { type AuthRole, normalizeRoles } from "@/lib/auth/roles";
+import { auth } from "@/server/auth/better-auth";
 import { type AuthUserRecord, getAuthUserById } from "@/server/db/dal/auth";
 
 export type RequestHeaders = Headers;

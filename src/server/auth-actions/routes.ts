@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
-
-import { auth } from "@/lib/auth";
 import { env } from "@/lib/env";
+import { auth } from "@/server/auth/better-auth";
 import { elysiaAuth } from "@/server/http/auth";
 import { requestPolicy } from "@/server/http/request-policy";
 import {

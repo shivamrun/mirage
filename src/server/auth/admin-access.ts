@@ -1,4 +1,4 @@
-import type { CurrentUser } from "@/lib/auth/current-user";
+import type { CurrentUser } from "@/server/auth/current-user";
 import { hasAdminSessionAssurance } from "@/server/db/dal/admin-session-assurance";
 
 export const adminAccessMessages = {

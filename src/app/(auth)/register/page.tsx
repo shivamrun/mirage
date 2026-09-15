@@ -2,9 +2,9 @@ import { BadgeCheck, Database, KeyRound } from "lucide-react";
 import Image from "next/image";
 
 import { RegisterForm } from "@/components/auth";
-import { isGoogleAuthConfigured } from "@/lib/auth";
 import { getSafeAuthRedirect } from "@/lib/auth/redirect";
 import { getPageMetadata, siteConfig } from "@/lib/metadata";
+import { isGoogleAuthConfigured } from "@/server/auth/better-auth";
 
 export const metadata = getPageMetadata("Create Account", {
   path: "/register",

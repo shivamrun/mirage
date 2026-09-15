@@ -6,13 +6,13 @@ import AuthContainer from "@/components/auth/auth-container";
 import { AuthFormShell } from "@/components/auth/auth-form-shell";
 import { TwoFactorForm } from "@/components/auth/two-factor-form";
 import { VerifyEmailRequired } from "@/components/auth/verify-email-required";
+import { getLoginRedirectPath, getSafeAuthRedirect } from "@/lib/auth/redirect";
 import {
   type AuthRole,
   getCurrentUser,
   type RequestHeaders,
-} from "@/lib/auth/access";
-import { evaluateAdminAccess } from "@/lib/auth/admin-access";
-import { getLoginRedirectPath, getSafeAuthRedirect } from "@/lib/auth/redirect";
+} from "@/server/auth/access";
+import { evaluateAdminAccess } from "@/server/auth/admin-access";
 
 const fallbackCallbackURLByRole: Record<AuthRole, string> = {
   admin: "/admin",
