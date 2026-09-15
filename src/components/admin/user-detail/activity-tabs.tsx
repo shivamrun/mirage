@@ -1,6 +1,7 @@
 import { CheckCircle2, Fingerprint, XCircle } from "lucide-react";
 
 import type { AdminUserDetail } from "@/server/db/dal/admin-user-detail";
+import { formatDate, formatValue, isFutureDate } from "../shared/formatters";
 import { CopyableId } from "./copyable-id";
 import {
   AdminUserAccountManageDialog,
@@ -11,12 +12,7 @@ import {
   AdminUserSessionManageDialog,
   AdminUserSessionsRevokeDialog,
 } from "./dialogs/session-management-dialog";
-import {
-  formatDate,
-  formatProviderName,
-  formatValue,
-  isFutureDate,
-} from "./formatters";
+import { formatProviderName } from "./formatters";
 import { DetailPanel, EmptyState, StatusBadge } from "./primitives";
 
 type AccountRecord = AdminUserDetail["accounts"][number];

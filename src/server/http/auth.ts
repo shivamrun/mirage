@@ -1,6 +1,5 @@
 import { Elysia } from "elysia";
 
-import { auth } from "@/lib/auth";
 import {
   adminAccessMessages,
   evaluateAdminAccess,
@@ -13,27 +12,37 @@ import {
   type AuthSession,
   type CurrentUser,
   getCurrentUserFromAuthSession,
+  resolveAuthSession,
 } from "@/lib/auth/current-user";
 
 export type { AuthSession };
-
-async function resolveAuthSession(headers: Headers) {
-  return auth.api.getSession({
-    headers,
-    query: {
-      disableCookieCache: true,
-    },
-  });
-}
 
 function getAuthUserFromContext(context: unknown) {
   return (context as { authUser?: CurrentUser }).authUser ?? null;
 }
 
+async function resolveRequestAuth(headers: Headers) {
+  const authSession = await resolveAuthSession({
+    headers,
+    sessionCookieCache: "bypass",
+  });
+  const authUser = authSession
+    ? await getCurrentUserFromAuthSession(authSession)
+    : null;
+
+  return {
+    authSession,
+    authUser,
+  };
+}
+
 export const elysiaAuth = new Elysia({ name: "better-auth" }).macro({
   auth: {
     async resolve({ request, status }) {
-      const authSession = await resolveAuthSession(request.headers);
+      const authSession = await resolveAuthSession({
+        headers: request.headers,
+        sessionCookieCache: "bypass",
+      });
 
       if (!authSession) {
         return status(401, { message: "Unauthorized" });
@@ -48,10 +57,9 @@ export const elysiaAuth = new Elysia({ name: "better-auth" }).macro({
   },
   currentUser: {
     async resolve({ request, status }) {
-      const authSession = await resolveAuthSession(request.headers);
-      const authUser = authSession
-        ? await getCurrentUserFromAuthSession(authSession)
-        : null;
+      const { authSession, authUser } = await resolveRequestAuth(
+        request.headers,
+      );
 
       if (!authSession || !authUser) {
         return status(401, { message: "Unauthorized" });
@@ -67,10 +75,9 @@ export const elysiaAuth = new Elysia({ name: "better-auth" }).macro({
   },
   admin: {
     async resolve({ request, status }) {
-      const authSession = await resolveAuthSession(request.headers);
-      const authUser = authSession
-        ? await getCurrentUserFromAuthSession(authSession)
-        : null;
+      const { authSession, authUser } = await resolveRequestAuth(
+        request.headers,
+      );
 
       const decision = evaluateAdminRole(authUser);
 
@@ -88,10 +95,9 @@ export const elysiaAuth = new Elysia({ name: "better-auth" }).macro({
   },
   adminAccess: {
     async resolve({ request, status }) {
-      const authSession = await resolveAuthSession(request.headers);
-      const authUser = authSession
-        ? await getCurrentUserFromAuthSession(authSession)
-        : null;
+      const { authSession, authUser } = await resolveRequestAuth(
+        request.headers,
+      );
 
       const decision = await evaluateAdminAccess(authUser);
 

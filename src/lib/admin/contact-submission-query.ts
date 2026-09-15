@@ -1,3 +1,10 @@
+import {
+  adminContactSubmissionSearchParamsSchema,
+  type ContactSubmissionStatus,
+} from "@/zod/contact-submission";
+
+export type { ContactSubmissionStatus };
+
 export type ContactSubmissionSearchParamValue = string | string[] | undefined;
 
 export type AdminContactSubmissionPageSearchParams = {
@@ -8,7 +15,6 @@ export type AdminContactSubmissionPageSearchParams = {
   q?: ContactSubmissionSearchParamValue;
 };
 
-export type ContactSubmissionStatus = "new" | "read" | "archived";
 export type ContactSubmissionFilterField = "status";
 
 export type AdminContactSubmissionQueryState = {
@@ -40,17 +46,15 @@ function firstParamValue(value?: ContactSubmissionSearchParamValue) {
 export function parseAdminContactSubmissionSearchParams(
   params: AdminContactSubmissionPageSearchParams,
 ): AdminContactSubmissionQueryState {
-  const filterValue = firstParamValue(params.filterValue);
+  const parsed = adminContactSubmissionSearchParamsSchema.parse({
+    filterField: firstParamValue(params.filterField),
+    filterValue: firstParamValue(params.filterValue),
+    q: firstParamValue(params.q),
+  });
 
   return {
     filterField: "status",
-    filterValue:
-      firstParamValue(params.filterField) === "status" &&
-      (filterValue === "new" ||
-        filterValue === "read" ||
-        filterValue === "archived")
-        ? filterValue
-        : "",
-    query: firstParamValue(params.q)?.trim() ?? "",
+    filterValue: parsed.filterField === "status" ? parsed.filterValue : "",
+    query: parsed.q,
   };
 }

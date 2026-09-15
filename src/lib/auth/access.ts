@@ -7,6 +7,7 @@ import {
   type CurrentUser,
   type RequestHeaders as CurrentUserHeaders,
   getCurrentUser as getCurrentUserFromHeaders,
+  type SessionCookieCachePolicy,
 } from "@/lib/auth/current-user";
 import { getLoginRedirectPath } from "@/lib/auth/redirect";
 
@@ -18,6 +19,7 @@ export type { AuthRole };
 type AccessOptions = {
   callbackUrl?: string;
   headers?: RequestHeaders;
+  sessionCookieCache?: SessionCookieCachePolicy;
 };
 
 export type { CurrentUser };
@@ -33,6 +35,7 @@ export async function getCurrentUser(
 ): Promise<CurrentUser | null> {
   return getCurrentUserFromHeaders({
     headers: await getHeaders(options.headers),
+    sessionCookieCache: options.sessionCookieCache,
   });
 }
 

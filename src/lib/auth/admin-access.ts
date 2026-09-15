@@ -7,7 +7,7 @@ export const adminAccessMessages = {
   twoFactorRequired: "Two-factor authentication required",
 } as const;
 
-type AuthPolicyReason =
+export type AuthPolicyReason =
   | "email-verification-required"
   | "last-sign-in-method"
   | "not-found"

@@ -2,7 +2,7 @@ import { Archive, CheckCircle2, Mail, Search } from "lucide-react";
 import Link from "next/link";
 
 import { ContactSubmissionCopyButton } from "@/components/admin/contact-submission/copy-button";
-import { formatDate } from "@/components/admin/user-detail/formatters";
+import { formatDate } from "@/components/admin/shared/formatters";
 import { StatusBadge } from "@/components/admin/user-detail/primitives";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

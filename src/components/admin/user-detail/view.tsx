@@ -1,6 +1,6 @@
 import type { AdminUserDetail } from "@/server/db/dal/admin-user-detail";
+import { isFutureDate } from "../shared/formatters";
 import { AdminUserAccountsTab, AdminUserSessionsTab } from "./activity-tabs";
-import { isFutureDate } from "./formatters";
 import { AdminUserDetailHeader } from "./header";
 import { AdminUserDetailOverview } from "./overview";
 

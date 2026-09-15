@@ -35,7 +35,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { formatDate } from "../user-detail/formatters";
+import { formatDate } from "../shared/formatters";
 import { RecordField, RecordGrid } from "../user-detail/primitives";
 import { ContactSubmissionCopyButton } from "./copy-button";
 import type {

@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { normalizeRoles } from "@/lib/auth/roles";
 import type { AdminUserDetail } from "@/server/db/dal/admin-user-detail";
+import { formatDate, formatValue } from "../shared/formatters";
 import { formatRoleName } from "../shared/user-display";
 import { AdminUserImpersonateDialog } from "./dialogs/impersonation-dialog";
 import {
@@ -20,7 +21,6 @@ import {
   AdminUserRemoveDialog,
   AdminUserRoleUpdateDialog,
 } from "./dialogs/user-management-dialogs";
-import { formatDate, formatValue } from "./formatters";
 import {
   DetailPanel,
   DetailRow,

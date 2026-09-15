@@ -16,12 +16,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatDate, isFutureDate } from "../shared/formatters";
 import {
   formatJoinedDate,
   RoleBadges,
   UserAvatar,
 } from "../shared/user-display";
-import { formatDate, isFutureDate } from "../user-detail/formatters";
 import { ADMIN_USERS_PAGE_PATH, type AdminUserListItem } from "./query";
 
 type AdminUsersTableProps = {
