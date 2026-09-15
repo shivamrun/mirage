@@ -4,8 +4,8 @@ import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { seedDefaultEmailLists } from "@/server/admin/email-list";
 import db from "@/server/db";
-import { seedDefaultEmailLists } from "@/server/db/dal/email-list";
 import {
   applicationRateLimit,
   contactSubmission,

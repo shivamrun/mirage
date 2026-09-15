@@ -10,6 +10,8 @@ import { sendEmailListVerificationEmail } from "@/server/email";
 import {
   createEmailListVerificationToken,
   EMAIL_LIST_VERIFICATION_EXPIRES_IN_MS,
+  EMAIL_LIST_VERIFICATION_PREFIX,
+  getEmailListVerificationIdentifier,
   isValidEmailListVerificationToken,
   parseEmailListVerificationPayload,
 } from "@/server/email-list/verification";
@@ -18,8 +20,10 @@ import type { EmailSubscriptionValues } from "@/zod";
 
 type SubscribeToEmailListResult =
   | {
-      status: "success";
-      verificationRequired: boolean;
+      status: "subscribed";
+    }
+  | {
+      status: "pending-verification";
     }
   | {
       status: "ignored";
@@ -101,8 +105,7 @@ export async function subscribeToEmailList(
 
   if (!verificationRequired) {
     return {
-      status: "success",
-      verificationRequired,
+      status: "subscribed",
     };
   }
 
@@ -113,6 +116,7 @@ export async function subscribeToEmailList(
   });
   const createdVerification = await createEmailListVerification({
     expiresAt: new Date(Date.now() + EMAIL_LIST_VERIFICATION_EXPIRES_IN_MS),
+    identifier: getEmailListVerificationIdentifier(verification.token),
     payload: verification.payload,
     token: verification.token,
   });
@@ -127,13 +131,14 @@ export async function subscribeToEmailList(
       ),
     });
   } catch {
-    await deleteEmailListVerification(createdVerification.token);
+    await deleteEmailListVerification(
+      getEmailListVerificationIdentifier(createdVerification.token),
+    );
     return { status: "delivery-failed" };
   }
 
   return {
-    status: "success",
-    verificationRequired,
+    status: "pending-verification",
   };
 }
 
@@ -144,7 +149,7 @@ export async function confirmEmailListVerification(
     return { status: "invalid" };
   }
 
-  await deleteExpiredEmailListVerifications();
+  await deleteExpiredEmailListVerifications(EMAIL_LIST_VERIFICATION_PREFIX);
 
   const result = await confirmEmailListVerificationTransaction({
     confirmPayload(value) {
@@ -152,7 +157,7 @@ export async function confirmEmailListVerification(
 
       return payload?.token === token ? payload : null;
     },
-    token,
+    identifier: getEmailListVerificationIdentifier(token),
   });
 
   if (result.status === "invalid") {

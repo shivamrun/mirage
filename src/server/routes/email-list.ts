@@ -51,7 +51,7 @@ export const emailListRoutes = new Elysia({ prefix: "/email-list" })
 
       return {
         status: true as const,
-        verificationRequired: result.verificationRequired,
+        verificationRequired: result.status === "pending-verification",
       };
     },
     {

@@ -1,11 +1,11 @@
 import { Elysia } from "elysia";
 
 import {
-  createEmailList,
-  deleteEmailList,
-  updateEmailList,
-  updateEmailListStatus,
-} from "@/server/db/dal/email-list";
+  createAdminEmailList,
+  deleteAdminEmailList,
+  updateAdminEmailList,
+  updateAdminEmailListStatus,
+} from "@/server/admin/email-list";
 import { requestPolicy } from "@/server/http/request-policy";
 import {
   adminCreateEmailListSchema,
@@ -20,11 +20,15 @@ export const adminEmailListRoutes = new Elysia()
   .use(requestPolicy)
   .post(
     "/email-list",
-    async ({ body }) => {
-      const list = await createEmailList(body);
+    async ({ body, status }) => {
+      const result = await createAdminEmailList(body);
+
+      if (result.status === "failed") {
+        return status(500, { message: "Email list could not be created." });
+      }
 
       return {
-        list,
+        list: result.list,
         status: true as const,
       };
     },
@@ -42,17 +46,17 @@ export const adminEmailListRoutes = new Elysia()
   .patch(
     "/email-list/:key",
     async ({ body, params, status }) => {
-      const list = await updateEmailList({
+      const result = await updateAdminEmailList({
         ...body,
         key: params.key,
       });
 
-      if (!list) {
+      if (result.status === "not-found") {
         return status(404, { message: "Email list not found." });
       }
 
       return {
-        list,
+        list: result.list,
         status: true as const,
       };
     },
@@ -72,12 +76,12 @@ export const adminEmailListRoutes = new Elysia()
   .patch(
     "/email-list/:key/status",
     async ({ body, params, status }) => {
-      const list = await updateEmailListStatus({
+      const result = await updateAdminEmailListStatus({
         key: params.key,
         status: body.status,
       });
 
-      if (!list) {
+      if (result.status === "not-found") {
         return status(404, { message: "Email list not found." });
       }
 
@@ -101,7 +105,7 @@ export const adminEmailListRoutes = new Elysia()
   .delete(
     "/email-list/:key",
     async ({ params, status }) => {
-      const result = await deleteEmailList(params.key);
+      const result = await deleteAdminEmailList(params.key);
 
       if (result.status === "protected") {
         return status(400, {

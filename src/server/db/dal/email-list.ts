@@ -9,12 +9,6 @@ import {
   emailSubscription,
   verification,
 } from "@/server/db/schema";
-import {
-  canDeleteEmailList,
-  defaultEmailLists,
-  isDefaultEmailListKey,
-} from "@/server/email-list/config";
-import { getEmailListVerificationIdentifier } from "@/server/email-list/verification";
 import type {
   AdminCreateEmailListValues,
   AdminEmailSubscriberQueryState,
@@ -27,10 +21,21 @@ type UpdateEmailListStatusOptions = {
   status: EmailListStatus;
 };
 
-export async function seedDefaultEmailLists(executor: DBClient = db) {
+type SeedEmailListValues = {
+  description: string | null;
+  emailVerificationRequired: boolean;
+  key: string;
+  name: string;
+  status: EmailListStatus;
+};
+
+export async function seedEmailLists(
+  lists: SeedEmailListValues[],
+  executor: DBClient = db,
+) {
   await executor
     .insert(emailList)
-    .values(defaultEmailLists)
+    .values(lists)
     .onConflictDoUpdate({
       target: emailList.key,
       set: {
@@ -147,8 +152,8 @@ export async function subscribeEmailToList(values: EmailSubscriptionValues) {
     return {
       contact,
       list,
-      status: "subscribed" as const,
       subscription,
+      status: "created" as const,
     };
   });
 }
@@ -224,11 +229,13 @@ export async function updateEmailListStatus({
   return list ?? null;
 }
 
-export async function deleteEmailList(key: string) {
-  if (isDefaultEmailListKey(key)) {
-    return { status: "protected" as const };
-  }
-
+export async function deleteEmailList({
+  key,
+  verificationIdentifierPrefix,
+}: {
+  key: string;
+  verificationIdentifierPrefix: string;
+}) {
   const [list] = await db
     .select({
       key: emailList.key,
@@ -250,7 +257,7 @@ export async function deleteEmailList(key: string) {
       .delete(verification)
       .where(
         and(
-          ilike(verification.identifier, "email-list:%"),
+          ilike(verification.identifier, `${verificationIdentifierPrefix}:%`),
           sql`(${verification.value}::jsonb ->> 'listKey') = ${key}`,
         ),
       );
@@ -260,7 +267,7 @@ export async function deleteEmailList(key: string) {
 }
 
 export async function listEmailLists() {
-  const lists = await db
+  return db
     .select({
       activeSubscribers: sql<number>`count(${emailSubscription.id}) filter (where ${emailSubscription.status} = 'subscribed')::int`,
       createdAt: emailList.createdAt,
@@ -276,11 +283,6 @@ export async function listEmailLists() {
     .leftJoin(emailSubscription, eq(emailSubscription.listKey, emailList.key))
     .groupBy(emailList.key)
     .orderBy(asc(emailList.key));
-
-  return lists.map((list) => ({
-    ...list,
-    canDelete: canDeleteEmailList(list.key),
-  }));
 }
 
 export async function listEmailSubscribers({
@@ -343,16 +345,18 @@ export async function findEmailContactByEmail(email: string) {
 
 export async function createEmailListVerification({
   expiresAt,
+  identifier,
   payload,
   token,
 }: {
   expiresAt: Date;
+  identifier: string;
   payload: object;
   token: string;
 }) {
   await db.insert(verification).values({
     id: randomUUID(),
-    identifier: getEmailListVerificationIdentifier(token),
+    identifier,
     value: JSON.stringify(payload),
     expiresAt,
   });
@@ -360,20 +364,16 @@ export async function createEmailListVerification({
   return { expiresAt, token };
 }
 
-export async function deleteEmailListVerification(token: string) {
-  await db
-    .delete(verification)
-    .where(
-      eq(verification.identifier, getEmailListVerificationIdentifier(token)),
-    );
+export async function deleteEmailListVerification(identifier: string) {
+  await db.delete(verification).where(eq(verification.identifier, identifier));
 }
 
-export async function deleteExpiredEmailListVerifications() {
+export async function deleteExpiredEmailListVerifications(prefix: string) {
   await db
     .delete(verification)
     .where(
       and(
-        ilike(verification.identifier, "email-list:%"),
+        ilike(verification.identifier, `${prefix}:%`),
         sql`${verification.expiresAt} <= now()`,
       ),
     );
@@ -383,20 +383,17 @@ export async function confirmEmailListVerificationTransaction<
   TPayload extends { listKey: string; subscriptionId: string },
 >({
   confirmPayload,
-  token,
+  identifier,
 }: {
   confirmPayload: (value: string | null) => TPayload | null;
-  token: string;
+  identifier: string;
 }) {
   return db.transaction(async (tx) => {
     const [record] = await tx
       .delete(verification)
       .where(
         and(
-          eq(
-            verification.identifier,
-            getEmailListVerificationIdentifier(token),
-          ),
+          eq(verification.identifier, identifier),
           gt(verification.expiresAt, new Date()),
         ),
       )
