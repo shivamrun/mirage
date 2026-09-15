@@ -6,7 +6,7 @@ import {
   ShieldOff,
 } from "lucide-react";
 import { normalizeRoles } from "@/lib/auth/roles";
-import type { AdminUserDetail } from "@/server/db/dal/admin-user-detail";
+import type { AdminUserDetailUser } from "@/server/admin/user-detail";
 import { formatDate, formatValue } from "../shared/formatters";
 import { formatRoleName } from "../shared/user-display";
 import { AdminUserImpersonateDialog } from "./dialogs/impersonation-dialog";
@@ -32,7 +32,7 @@ type AdminUserDetailOverviewProps = {
   currentUserId: string;
   hasActiveBan: boolean;
   isBanned: boolean;
-  user: AdminUserDetail["user"];
+  user: AdminUserDetailUser;
 };
 
 export function AdminUserDetailOverview({

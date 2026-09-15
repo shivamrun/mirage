@@ -1,4 +1,4 @@
-import type { AdminUserDetail } from "@/server/db/dal/admin-user-detail";
+import type { AdminUserDetailViewModel } from "@/server/admin/user-detail";
 import { isFutureDate } from "../shared/formatters";
 import { AdminUserAccountsTab, AdminUserSessionsTab } from "./activity-tabs";
 import { AdminUserDetailHeader } from "./header";
@@ -12,7 +12,7 @@ export function AdminUserDetailView({
   section = "overview",
 }: {
   currentUserId: string;
-  detail: AdminUserDetail;
+  detail: AdminUserDetailViewModel;
   section?: AdminUserDetailSection;
 }) {
   const { accounts, sessions, user } = detail;

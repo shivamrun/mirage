@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { usersPageHref } from "@/components/admin";
+import { usersPageHref } from "@/lib/admin/users-query";
 
 const recentlyJoinedWindowDays = 3;
 

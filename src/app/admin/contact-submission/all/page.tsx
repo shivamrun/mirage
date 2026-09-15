@@ -2,17 +2,19 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import {
-  type AdminContactSubmissionPageSearchParams,
   AdminContactSubmissionTable,
   AdminContactSubmissionToolbar,
+} from "@/components/admin";
+import {
+  type AdminContactSubmissionPageSearchParams,
   adminContactSubmissionHrefFromSearchParams,
   adminContactSubmissionRawHrefFromSearchParams,
   contactSubmissionsPageHref,
   parseAdminContactSubmissionSearchParams,
-} from "@/components/admin";
+} from "@/lib/admin/contact-submission-query";
 import { requireAdmin } from "@/lib/auth/access";
 import { getPageMetadata } from "@/lib/metadata";
-import { listContactSubmissions } from "@/server/db/dal/contact-submission";
+import { listAdminContactSubmissionsView } from "@/server/admin/contact-submission";
 
 import {
   bulkUpdateContactSubmissionStatusAction,
@@ -47,7 +49,7 @@ export default async function AdminContactSubmissionAllPage({
     filterField: state.filterField,
     filterValue: state.filterValue,
   });
-  const submissions = await listContactSubmissions({
+  const submissions = await listAdminContactSubmissionsView({
     state,
   });
 

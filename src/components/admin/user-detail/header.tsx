@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { normalizeRoles } from "@/lib/auth/roles";
 import { resolveUploadPublicUrl } from "@/lib/uploads/server";
 import { cn } from "@/lib/utils";
-import type { AdminUserDetail } from "@/server/db/dal/admin-user-detail";
+import type { AdminUserDetailUser } from "@/server/admin/user-detail";
 import { getInitials } from "../shared/user-display";
 import type { AdminUserDetailSection } from "./view";
 
@@ -15,7 +15,7 @@ type AdminUserDetailHeaderProps = {
   hasActiveBan: boolean;
   isBanned: boolean;
   sessionsLength: number;
-  user: AdminUserDetail["user"];
+  user: AdminUserDetailUser;
 };
 
 export function AdminUserDetailHeader({

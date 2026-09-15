@@ -10,6 +10,7 @@ import {
   getAdminUserSessionForDeletion,
 } from "@/server/db/dal/admin-user-detail";
 import {
+  getSecurityControlSummary,
   getUserForPasswordReset,
   revokeAllSessions,
   revokeUserSessions,
@@ -218,4 +219,8 @@ export async function revokeEverySession() {
     revokedSessions: revokedSessions.length,
     status: true as const,
   };
+}
+
+export async function getAdminSecurityControlSummaryView() {
+  return getSecurityControlSummary();
 }

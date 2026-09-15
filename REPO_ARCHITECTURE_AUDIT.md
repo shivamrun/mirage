@@ -41,11 +41,11 @@ Last updated: 2026-09-15
 | A05 | Account result mapping cleanup | P1 | Done | Account/admin-step-up services now return semantic error codes; shared Elysia mapper handles status/retry responses. |
 | A06 | Stored verification payload schemas | P1 | Done | Internal Zod schemas now validate email-change, two-factor email-code, and email-list verification payloads. |
 | A07 | Auth resolution consolidation | P1 | Done | Current-user/session resolution now has an explicit cache policy, with shared Elysia and Next admin access adapters. |
-| A08 | Admin query contracts | P1 | Not started | Query parsing/building still split across lib/components/Zod patterns. |
-| A09 | Admin presentation/DAL coupling | P1 | Not started | Admin pages/components still depend on DAL shapes/direct reads. |
+| A08 | Admin query contracts | P1 | Done | Admin query parsing/building now lives under `src/lib/admin`; component query files are compatibility re-exports and users UI filter config is presentation-owned. |
+| A09 | Admin presentation/DAL coupling | P1 | Done | Admin pages consume feature-level `src/server/admin/*` read functions and user-detail components depend on view-model types instead of DAL types. |
 | A10 | Upload validation contract | P1 | Not started | Upload request/response contracts still route-local/client-duplicated. |
 | A11 | Unused auth-record schemas | P2 | Not started | Unused Zod mirror remains. |
-| A12 | Pagination helper cleanup | P2 | Not started | Existing helper still unused while manual pagination remains. |
+| A12 | Pagination helper cleanup | P2 | Done | Admin users now uses `totalCountWindow` in the DAL and `resolveOffsetPagination` in the admin users feature reader. |
 | A13 | Shared admin formatters | P2 | Done | Cross-feature admin date/value formatters moved to `src/components/admin/shared/formatters.ts`; provider formatting remains user-detail-specific. |
 | A14 | Contact-submission status validation | P1 | Done | Contact-submission status values and action/search parsing now share the canonical Zod contract in `src/zod/contact-submission.ts`. |
 

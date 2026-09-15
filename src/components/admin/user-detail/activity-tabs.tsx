@@ -1,6 +1,9 @@
 import { CheckCircle2, Fingerprint, XCircle } from "lucide-react";
 
-import type { AdminUserDetail } from "@/server/db/dal/admin-user-detail";
+import type {
+  AdminUserDetailAccount,
+  AdminUserDetailSession,
+} from "@/server/admin/user-detail";
 import { formatDate, formatValue, isFutureDate } from "../shared/formatters";
 import { CopyableId } from "./copyable-id";
 import {
@@ -15,14 +18,14 @@ import {
 import { formatProviderName } from "./formatters";
 import { DetailPanel, EmptyState, StatusBadge } from "./primitives";
 
-type AccountRecord = AdminUserDetail["accounts"][number];
-type SessionRecord = AdminUserDetail["sessions"][number];
+type AccountRecord = AdminUserDetailAccount;
+type SessionRecord = AdminUserDetailSession;
 
 export function AdminUserAccountsTab({
   accounts,
   userId,
 }: {
-  accounts: AdminUserDetail["accounts"];
+  accounts: AccountRecord[];
   userId: string;
 }) {
   return (
@@ -48,7 +51,7 @@ export function AdminUserSessionsTab({
   userId,
 }: {
   now: Date;
-  sessions: AdminUserDetail["sessions"];
+  sessions: SessionRecord[];
   userId: string;
 }) {
   return (

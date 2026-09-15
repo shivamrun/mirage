@@ -2,12 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 
-import { ADMIN_CONTACT_SUBMISSION_PAGE_PATH } from "@/components/admin/contact-submission/query";
+import { ADMIN_CONTACT_SUBMISSION_PAGE_PATH } from "@/lib/admin/contact-submission-query";
 import { requireVerifiedAdmin } from "@/lib/auth/access";
 import {
-  bulkUpdateContactSubmissionStatus,
-  updateContactSubmissionStatus,
-} from "@/server/db/dal/contact-submission";
+  bulkUpdateAdminContactSubmissionStatus,
+  updateAdminContactSubmissionStatus,
+} from "@/server/admin/contact-submission";
 import {
   bulkUpdateContactSubmissionStatusActionSchema,
   updateContactSubmissionStatusActionSchema,
@@ -27,7 +27,7 @@ export async function updateContactSubmissionStatusAction(formData: FormData) {
     status: formString(formData, "status"),
   });
 
-  await updateContactSubmissionStatus({ id, status });
+  await updateAdminContactSubmissionStatus({ id, status });
   revalidatePath(ADMIN_CONTACT_SUBMISSION_PAGE_PATH);
 }
 
@@ -44,7 +44,7 @@ export async function bulkUpdateContactSubmissionStatusAction(
     status: formString(formData, "status"),
   });
 
-  await bulkUpdateContactSubmissionStatus({
+  await bulkUpdateAdminContactSubmissionStatus({
     fromStatus: values.fromStatus,
     state: {
       filterField: "status",

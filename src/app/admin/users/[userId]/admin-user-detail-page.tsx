@@ -6,7 +6,7 @@ import {
   AdminUserDetailView,
 } from "@/components/admin";
 import { requireAdmin } from "@/lib/auth/access";
-import { getAdminUserDetail } from "@/server/db/dal/admin-user-detail";
+import { getAdminUserDetailView } from "@/server/admin/user-detail";
 
 type AdminUserDetailRouteProps = {
   params: Promise<{
@@ -27,7 +27,7 @@ export async function AdminUserDetailPage({
     headers: requestHeaders,
   });
 
-  const detail = await getAdminUserDetail(userId);
+  const detail = await getAdminUserDetailView(userId);
 
   if (!detail) {
     notFound();

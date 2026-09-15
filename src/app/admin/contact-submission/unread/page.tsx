@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import {
   type AdminContactSubmissionPageSearchParams,
   adminContactSubmissionStatusHrefFromSearchParams,
-} from "@/components/admin";
+} from "@/lib/admin/contact-submission-query";
 import { getPageMetadata } from "@/lib/metadata";
 
 export const metadata = getPageMetadata("Unread Contact Submissions", {

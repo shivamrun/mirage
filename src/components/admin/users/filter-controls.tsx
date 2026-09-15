@@ -18,9 +18,9 @@ import type {
 } from "./query";
 import {
   ADMIN_USERS_FILTER_FIELDS,
-  getAdminUsersFilterFieldConfig,
+  getAdminUsersFilterControlConfig,
   getAdminUsersFilterOperatorLabel,
-  getAdminUsersFilterOperatorOptions,
+  getAdminUsersFilterOperatorOptionsForControls,
   getDefaultAdminUsersFilterOperator,
 } from "./query";
 
@@ -53,9 +53,9 @@ export function AdminUsersFilterControls({
     setFilterValue(state.filterValue);
   }, [state.filterField, state.filterOperator, state.filterValue]);
 
-  const fieldConfig = getAdminUsersFilterFieldConfig(field);
+  const fieldConfig = getAdminUsersFilterControlConfig(field);
   const operatorOptions = useMemo(
-    () => getAdminUsersFilterOperatorOptions(field),
+    () => getAdminUsersFilterOperatorOptionsForControls(field),
     [field],
   );
   const hasSingleOperator = operatorOptions.length === 1;

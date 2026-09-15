@@ -2,20 +2,21 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import {
-  ADMIN_USERS_PAGE_SIZE,
-  type AdminUsersPageSearchParams,
   AdminUsersPagination,
   AdminUsersTable,
   AdminUsersToolbar,
+} from "@/components/admin";
+import {
+  type AdminUsersPageSearchParams,
   adminUsersHrefFromSearchParams,
   adminUsersRawHrefFromSearchParams,
   getAdminUsersFilterStatus,
   parseAdminUsersSearchParams,
   usersPageHref,
-} from "@/components/admin";
+} from "@/lib/admin/users-query";
 import { requireAdmin } from "@/lib/auth/access";
 import { getPageMetadata } from "@/lib/metadata";
-import { listAdminUsers } from "@/server/db/dal/admin-users";
+import { listAdminUsersView } from "@/server/admin/users";
 
 export const metadata = getPageMetadata("Users", {
   path: "/admin/users",
@@ -32,7 +33,6 @@ export default async function AdminUsersPage({
   const { page, ...listState } = parseAdminUsersSearchParams(params);
   const canonicalHref = adminUsersHrefFromSearchParams(params);
   const filterStatus = getAdminUsersFilterStatus(listState);
-  const offset = (page - 1) * ADMIN_USERS_PAGE_SIZE;
   const requestHeaders = await headers();
 
   await requireAdmin({
@@ -43,21 +43,15 @@ export default async function AdminUsersPage({
     redirect(canonicalHref);
   }
 
-  const users = await listAdminUsers({
-    limit: ADMIN_USERS_PAGE_SIZE,
-    offset,
+  const users = await listAdminUsersView({
+    page,
     state: listState,
   });
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(users.total / ADMIN_USERS_PAGE_SIZE),
-  );
-
-  if (page > totalPages) {
+  if (page !== users.page) {
     redirect(
       usersPageHref({
-        page: totalPages,
+        page: users.page,
         ...listState,
       }),
     );
@@ -102,10 +96,10 @@ export default async function AdminUsersPage({
       />
 
       <AdminUsersPagination
-        page={page}
+        page={users.page}
         state={listState}
         total={users.total}
-        totalPages={totalPages}
+        totalPages={users.totalPages}
       />
     </div>
   );

@@ -1,7 +1,6 @@
 import {
   and,
   asc,
-  count,
   desc,
   eq,
   gt,
@@ -17,22 +16,36 @@ import {
   sql,
 } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
-
 import type {
-  AdminUserListItem,
   AdminUsersQueryState,
   FilterField,
   FilterOperator,
   SearchOperator,
   SortField,
 } from "@/lib/admin/users-query";
+import type { RoleValue } from "@/lib/auth/roles";
 import db from "@/server/db";
+import { totalCountWindow } from "@/server/db/helpers/paginate";
 import { user as userTable } from "@/server/db/schema";
 
 type ListAdminUsersOptions = {
   limit: number;
   offset: number;
   state: AdminUsersQueryState;
+};
+
+export type AdminUserListItem = {
+  id: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
+  image?: null | string;
+  role?: RoleValue;
+  banned?: boolean | null;
+  banReason?: null | string;
+  banExpires?: Date | string | null;
+  createdAt: Date | string;
+  updatedAt?: Date | string;
 };
 
 type TextFilterField = Exclude<
@@ -249,26 +262,24 @@ export async function listAdminUsers({
   const whereClause = getWhereClause(state);
   const sortColumn = sortColumns[state.sortBy];
   const sortDirection = state.sortDirection === "asc" ? asc : desc;
-  let totalQuery = db.select({ total: count() }).from(userTable).$dynamic();
-  let usersQuery = db.select(userListSelection).from(userTable).$dynamic();
+  let usersQuery = db
+    .select({ ...userListSelection, _total: totalCountWindow })
+    .from(userTable)
+    .$dynamic();
 
   if (whereClause) {
-    totalQuery = totalQuery.where(whereClause);
     usersQuery = usersQuery.where(whereClause);
   }
 
-  const [users, [totalRow]] = await Promise.all([
-    usersQuery
-      .orderBy(sortDirection(sortColumn), asc(userTable.id))
-      .limit(limit)
-      .offset(offset),
-    totalQuery,
-  ]);
+  const rows = await usersQuery
+    .orderBy(sortDirection(sortColumn), asc(userTable.id))
+    .limit(limit)
+    .offset(offset);
 
   return {
     limit,
     offset,
-    total: totalRow?.total ?? 0,
-    users: users satisfies AdminUserListItem[],
+    total: rows[0]?._total ?? 0,
+    users: rows.map(({ _total, ...user }) => user satisfies AdminUserListItem),
   };
 }

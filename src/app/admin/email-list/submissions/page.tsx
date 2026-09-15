@@ -1,16 +1,16 @@
 import { headers } from "next/headers";
 
+import { AdminEmailSubmissionsPanel } from "@/components/admin";
 import {
   type AdminEmailListPageSearchParams,
-  AdminEmailSubmissionsPanel,
   parseAdminEmailListSearchParams,
-} from "@/components/admin";
+} from "@/lib/admin/email-list-query";
 import { requireAdmin } from "@/lib/auth/access";
 import { getPageMetadata } from "@/lib/metadata";
 import {
-  listEmailLists,
-  listEmailSubscribers,
-} from "@/server/db/dal/email-list";
+  listAdminEmailListsView,
+  listAdminEmailSubscribersView,
+} from "@/server/admin/email-list";
 
 export const metadata = getPageMetadata("Email Submissions", {
   path: "/admin/email-list/submissions",
@@ -32,8 +32,8 @@ export default async function AdminEmailListSubmissionsPage({
   });
 
   const [lists, subscribers] = await Promise.all([
-    listEmailLists(),
-    listEmailSubscribers({ state }),
+    listAdminEmailListsView(),
+    listAdminEmailSubscribersView({ state }),
   ]);
 
   return (

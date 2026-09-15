@@ -4,7 +4,7 @@ import { SecurityControls } from "@/components/admin";
 import { HeadingBlock } from "@/components/heading-block";
 import { requireAdmin } from "@/lib/auth/access";
 import { getPageMetadata } from "@/lib/metadata";
-import { getSecurityControlSummary } from "@/server/db/dal/security";
+import { getAdminSecurityControlSummaryView } from "@/server/admin/security";
 
 export const metadata = getPageMetadata("Security Controls", {
   path: "/admin/security/controls",
@@ -17,7 +17,7 @@ export default async function AdminSecurityControlsPage() {
     headers: requestHeaders,
   });
 
-  const summary = await getSecurityControlSummary();
+  const summary = await getAdminSecurityControlSummaryView();
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 pt-6 pb-14 ">
