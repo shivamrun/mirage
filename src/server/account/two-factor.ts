@@ -12,6 +12,11 @@ import { siteConfig } from "@/lib/metadata";
 import type { AccountMutationResult } from "@/server/account/results";
 import { createTwoFactorEmailCodeValue } from "@/server/account/verification-schemas";
 import {
+  TOTP_DIGITS,
+  TOTP_PERIOD_SECONDS,
+  verifyTotpCode,
+} from "@/server/auth/totp";
+import {
   createVerification,
   deleteVerificationsByIdentifierPatterns,
 } from "@/server/db/dal/email-change";
@@ -32,9 +37,6 @@ import { consumeAccountEmailSendLimit } from "@/server/rate-limit";
 const EMAIL_CODE_PREFIX = "account-two-factor-email-code";
 const EMAIL_CODE_EXPIRES_IN_MS = 1000 * 60 * 10;
 const EMAIL_CODE_MAX_FAILED_ATTEMPTS = 5;
-const TOTP_DIGITS = 6;
-const TOTP_PERIOD_SECONDS = 30;
-const TOTP_WINDOW_STEPS = 1;
 
 type TwoFactorAction = "enable" | "disable";
 
@@ -56,7 +58,7 @@ function generateEmailCode() {
   return randomInt(0, 1_000_000).toString().padStart(6, "0");
 }
 
-function normalizeCode(code: string) {
+function normalizeEmailCode(code: string) {
   return code.replace(/\s/g, "");
 }
 
@@ -70,19 +72,6 @@ function hashEmailCode({
   return createHmac("sha256", env.BETTER_AUTH_SECRET)
     .update(`${identifier}:${code}`)
     .digest("hex");
-}
-
-async function verifyTotpCode(secret: string, code: string) {
-  const normalizedCode = normalizeCode(code);
-
-  if (!/^\d{6}$/.test(normalizedCode)) {
-    return false;
-  }
-
-  return createOTP(secret, {
-    digits: TOTP_DIGITS,
-    period: TOTP_PERIOD_SECONDS,
-  }).verify(normalizedCode, { window: TOTP_WINDOW_STEPS });
 }
 
 async function clearEmailCodes(userId: string) {
@@ -104,7 +93,7 @@ async function verifyEmailCode({
 
   const identifier = getEmailCodeIdentifier(userId, action);
   return verifyAndConsumeEmailCode({
-    expectedHash: hashEmailCode({ code: normalizeCode(code), identifier }),
+    expectedHash: hashEmailCode({ code: normalizeEmailCode(code), identifier }),
     identifier,
     maxFailedAttempts: EMAIL_CODE_MAX_FAILED_ATTEMPTS,
   });

@@ -1,10 +1,10 @@
-import { createOTP } from "@better-auth/utils/otp";
 import { symmetricDecrypt } from "better-auth/crypto";
 
 import type { AuthSession } from "@/lib/auth/current-user";
 import { normalizeRoles } from "@/lib/auth/roles";
 import { env } from "@/lib/env";
 import type { AccountMutationResult } from "@/server/account/results";
+import { verifyTotpCode } from "@/server/auth/totp";
 import { markAdminSessionAssurance } from "@/server/db/dal/admin-session-assurance";
 import { getAuthUserById } from "@/server/db/dal/auth";
 import {
@@ -16,28 +16,8 @@ import {
 
 const ACCOUNT_LOCKOUT_MAX_FAILED_ATTEMPTS = 10;
 const ACCOUNT_LOCKOUT_DURATION_MS = 1000 * 60 * 15;
-const TOTP_DIGITS = 6;
-const TOTP_PERIOD_SECONDS = 30;
-const TOTP_WINDOW_STEPS = 1;
 
 type AdminStepUpResult = AccountMutationResult;
-
-function normalizeCode(code: string) {
-  return code.replace(/\s/g, "");
-}
-
-async function verifyTotpCode(secret: string, code: string) {
-  const normalizedCode = normalizeCode(code);
-
-  if (!/^\d{6}$/.test(normalizedCode)) {
-    return false;
-  }
-
-  return createOTP(secret, {
-    digits: TOTP_DIGITS,
-    period: TOTP_PERIOD_SECONDS,
-  }).verify(normalizedCode, { window: TOTP_WINDOW_STEPS });
-}
 
 export async function completeAdminTotpStepUp({
   authSession,
