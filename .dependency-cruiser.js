@@ -31,6 +31,32 @@ module.exports = {
         path: "^src/server/db/index\\.ts$",
       },
     },
+    {
+      name: "db-helpers-only-in-db-layer",
+      comment:
+        "Database helper modules must stay DB-owned. Generic server/view math should live outside src/server/db/helpers.",
+      severity: "error",
+      from: {
+        pathNot: [
+          "^src/server/db/dal/",
+          "^src/server/db/schema/",
+          "^src/server/db/index\\.ts$",
+        ],
+      },
+      to: {
+        path: "^src/server/db/helpers/",
+      },
+    },
+    {
+      name: "lib-auth-browser-safe-only",
+      comment:
+        "src/lib/auth is reserved for browser-safe auth helpers after the server auth move.",
+      severity: "error",
+      from: {},
+      to: {
+        path: "^src/lib/auth/(?!client\\.ts$|roles\\.ts$|redirect\\.ts$)",
+      },
+    },
   ],
   options: {
     tsConfig: {
