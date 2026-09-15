@@ -6,7 +6,7 @@ import {
   type AdminUserListItem,
   listAdminUsers,
 } from "@/server/db/dal/admin-users";
-import { resolveOffsetPagination } from "@/server/db/helpers/paginate";
+import { resolveOffsetPagination } from "./pagination";
 
 export type { AdminUserListItem };
 

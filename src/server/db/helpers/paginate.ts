@@ -17,22 +17,3 @@ import { sql } from "drizzle-orm";
  * const items = rows.map(({ _total: _, ...row }) => row);
  */
 export const totalCountWindow = sql<number>`count(*) over()`.mapWith(Number);
-
-export function resolveOffsetPagination({
-  page,
-  limit,
-  total,
-}: {
-  page: number;
-  limit: number;
-  total: number;
-}) {
-  const totalPages = Math.max(1, Math.ceil(total / limit));
-  const currentPage = Math.min(page, totalPages);
-
-  return {
-    page: currentPage,
-    totalPages,
-    offset: (currentPage - 1) * limit,
-  };
-}
