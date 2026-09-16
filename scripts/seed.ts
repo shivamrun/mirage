@@ -4,7 +4,10 @@ if (!process.env.NODE_ENV) {
 
 async function main() {
   const [{ createDbConnection }, { seedDefaultEmailLists }] = await Promise.all(
-    [import("../src/server/db"), import("../src/server/admin/email-list")],
+    [
+      import("../src/server/db"),
+      import("../src/server/db/services/admin/email-list"),
+    ],
   );
 
   const connection = createDbConnection();

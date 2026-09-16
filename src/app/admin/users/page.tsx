@@ -5,7 +5,7 @@ import {
   AdminUsersPagination,
   AdminUsersTable,
   AdminUsersToolbar,
-} from "@/components/admin";
+} from "@/features/admin/components";
 import {
   type AdminUsersPageSearchParams,
   adminUsersHrefFromSearchParams,
@@ -13,10 +13,10 @@ import {
   getAdminUsersFilterStatus,
   parseAdminUsersSearchParams,
   usersPageHref,
-} from "@/lib/admin/users-query";
-import { getPageMetadata } from "@/lib/metadata";
-import { listAdminUsersView } from "@/server/admin/users";
-import { requireAdmin } from "@/server/auth/access";
+} from "@/features/admin/query/users-query";
+import { listAdminUsersView } from "@/server/db/services/admin/users";
+import { requireAdmin } from "@/server/db/services/auth/access";
+import { getPageMetadata } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Users", {
   path: "/admin/users",

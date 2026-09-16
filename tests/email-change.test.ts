@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import { eq, like } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { describe, expect, it } from "vitest";
-
 import db from "@/server/db";
 import { applicationRateLimit, user, verification } from "@/server/db/schema";
 import { accountRoutes } from "@/server/routes/account";

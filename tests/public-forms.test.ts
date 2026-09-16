@@ -3,8 +3,10 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { beforeEach, describe, expect, it } from "vitest";
-
-import { seedDefaultEmailLists } from "@/server/admin/email-list";
+import {
+  consumePublicWriteLimit,
+  getPublicClientIdentifier,
+} from "@/adapters/rate-limit";
 import db from "@/server/db";
 import {
   applicationRateLimit,
@@ -14,14 +16,11 @@ import {
   emailSubscription,
   verification,
 } from "@/server/db/schema";
+import { seedDefaultEmailLists } from "@/server/db/services/admin/email-list";
 import { apiErrors } from "@/server/http/errors";
-import {
-  consumePublicWriteLimit,
-  getPublicClientIdentifier,
-} from "@/server/rate-limit";
 import { contactRoutes } from "@/server/routes/contact";
 import { emailListRoutes } from "@/server/routes/email-list";
-import { EMAIL_LIST_METADATA_VALUE_MAX_LENGTH } from "@/zod";
+import { EMAIL_LIST_METADATA_VALUE_MAX_LENGTH } from "@/shared/schemas";
 import { setTestEmailDeliveryHook, testEmailOutbox } from "./infra/email-fake";
 
 const origin = "http://localhost:3000";

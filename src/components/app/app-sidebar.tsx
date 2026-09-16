@@ -25,9 +25,9 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { authClient } from "@/lib/auth/client";
-import { normalizeRoles, type RoleValue } from "@/lib/auth/roles";
-import { siteConfig } from "@/lib/metadata";
+import { authClient } from "@/features/auth/client";
+import { normalizeRoles, type RoleValue } from "@/features/auth/roles";
+import { siteConfig } from "@/shared/metadata";
 
 import { NavMain } from "./nav-main";
 

@@ -14,8 +14,6 @@ import {
   bulkUpdateContactSubmissionStatusAction,
   updateContactSubmissionStatusAction,
 } from "@/app/admin/contact-submission/all/actions";
-import { env } from "@/lib/env";
-import { auth } from "@/server/auth/better-auth";
 import db from "@/server/db";
 import {
   account,
@@ -25,8 +23,10 @@ import {
   user,
   verification,
 } from "@/server/db/schema";
+import { auth } from "@/server/db/services/auth/better-auth";
 import { app } from "@/server/routes";
 import { adminRoutes } from "@/server/routes/admin";
+import { env } from "@/shared/env";
 import { createTestActor } from "./infra/admin-actor";
 import { httpRequest } from "./infra/http-request";
 

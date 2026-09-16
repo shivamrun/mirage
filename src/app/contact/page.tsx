@@ -1,10 +1,9 @@
 import { ArrowLeft, Clock, Database, Mail } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-
-import { ContactForm } from "@/components/contact";
 import { Button } from "@/components/ui/button";
-import { getPageMetadata, siteConfig } from "@/lib/metadata";
+import { ContactForm } from "@/features/contact/components";
+import { getPageMetadata, siteConfig } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Contact", {
   description: `Send a message to ${siteConfig.name}.`,

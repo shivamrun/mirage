@@ -1,8 +1,8 @@
-import { LoginForm } from "@/components/auth";
-import AuthContainer from "@/components/auth/auth-container";
-import { getSafeAuthRedirect } from "@/lib/auth/redirect";
-import { getPageMetadata } from "@/lib/metadata";
-import { isGoogleAuthConfigured } from "@/server/auth/better-auth";
+import { LoginForm } from "@/features/auth/components";
+import AuthContainer from "@/features/auth/components/auth-container";
+import { getSafeAuthRedirect } from "@/features/auth/redirect";
+import { isGoogleAuthConfigured } from "@/server/db/services/auth/better-auth";
+import { getPageMetadata } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Sign In", { path: "/login" });
 

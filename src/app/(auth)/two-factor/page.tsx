@@ -1,7 +1,7 @@
-import { TwoFactorForm } from "@/components/auth";
-import AuthContainer from "@/components/auth/auth-container";
-import { getSafeAuthRedirect } from "@/lib/auth/redirect";
-import { getPageMetadata } from "@/lib/metadata";
+import { TwoFactorForm } from "@/features/auth/components";
+import AuthContainer from "@/features/auth/components/auth-container";
+import { getSafeAuthRedirect } from "@/features/auth/redirect";
+import { getPageMetadata } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Two-Factor Authentication", {
   path: "/two-factor",

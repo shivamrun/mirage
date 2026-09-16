@@ -39,8 +39,11 @@ function hasRuntimeServerAuthImport(source: string) {
     importOrExportBlocks.some(
       (block) =>
         !/^(import|export)\s+type\b/.test(block.trim()) &&
-        /from\s+["']@\/server\/auth(?:\/[^"']*)?["']/.test(block),
-    ) || /import\s*\(\s*["']@\/server\/auth(?:\/[^"']*)?["']\s*\)/.test(source)
+        /from\s+["']@\/server\/db\/services\/auth(?:\/[^"']*)?["']/.test(block),
+    ) ||
+    /import\s*\(\s*["']@\/server\/db\/services\/auth(?:\/[^"']*)?["']\s*\)/.test(
+      source,
+    )
   );
 }
 
@@ -58,9 +61,9 @@ describe("architecture boundaries", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("keeps contact Zod contracts free of email-list exports", () => {
+  it("keeps contact Zod schemas free of email-list exports", () => {
     const contactSource = readFileSync(
-      join(sourceRoot, "zod/contact.ts"),
+      join(sourceRoot, "shared/schemas/contact.ts"),
       "utf8",
     );
 

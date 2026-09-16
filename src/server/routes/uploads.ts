@@ -1,7 +1,9 @@
 import { isUploadSDKError } from "@marinedotsh/upload-sdk";
 import { Elysia } from "elysia";
-
-import { createUploadSigner, getUploadPublicUrl } from "@/lib/uploads/server";
+import {
+  createUploadSigner,
+  getUploadPublicUrl,
+} from "@/server/db/services/uploads";
 import { elysiaAuth } from "@/server/http/auth";
 import { requestPolicy } from "@/server/http/request-policy";
 import {
@@ -9,7 +11,7 @@ import {
   prepareUploadRequestSchema,
   prepareUploadResponseSchema,
   uploadErrorResponseSchema,
-} from "@/zod";
+} from "@/shared/schemas";
 
 export const uploadsRoutes = new Elysia({ prefix: "/uploads" })
   .use(elysiaAuth)

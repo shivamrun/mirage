@@ -1,4 +1,4 @@
-import { observeRequest } from "@/server/operations/request-observability";
+import { observeRequest } from "@/adapters/operations/request-observability";
 import { app } from "@/server/routes";
 
 const handler = (request: Request) =>

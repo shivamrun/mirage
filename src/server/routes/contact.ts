@@ -1,12 +1,11 @@
 import { Elysia } from "elysia";
-
-import { submitContactForm } from "@/server/contact/service";
+import { submitContactForm } from "@/server/db/services/contact/service";
 import { requestPolicy } from "@/server/http/request-policy";
 import {
   contactSubmissionSchema,
   contactSuccessResponseSchema,
   messageResponseSchema,
-} from "@/zod";
+} from "@/shared/schemas";
 
 export const contactRoutes = new Elysia({ prefix: "/contact" })
   .use(requestPolicy)

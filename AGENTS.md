@@ -2,9 +2,9 @@
 
 ## Project Structure & Module Organization
 
-This is a Next.js app using the App Router. Application routes and global styles live in `src/app`, with backend route handlers grouped under `src/app/(backend)/api`. Shared utilities and auth setup live in `src/lib`. Elysia API routes are defined in `src/server/routes`, while Drizzle database setup, helpers, and schema live in `src/server/db`. Static assets are kept in `public`.
+This is a Next.js app using the App Router. Application routes and global styles live in `src/app`, with backend route handlers grouped under `src/app/(backend)/api`. Product UI domains live in `src/features`, shared API schemas live in `src/shared/schemas`, and cross-feature utilities live in `src/shared`. Elysia routes live in `src/server/routes`; database schema, DAL, and server services live in `src/server/db`; HTTP helpers live in `src/server/http`; technical adapters such as email, operations, and rate limiting live under `src/adapters`. Static assets are kept in `public`.
 
-There is no dedicated test directory yet. When tests are added, colocate focused unit tests near the code they cover or use a top-level `tests` directory for integration flows.
+Tests live in the top-level `tests` directory. Keep integration helpers there, and colocate narrowly focused unit tests near the code they cover when that makes ownership clearer.
 
 ## Build, Test, and Development Commands
 
@@ -29,15 +29,15 @@ schema first, then generate a new migration with `pnpm db:generate`.
 
 ## Coding Style & Naming Conventions
 
-Use TypeScript with strict mode. Biome is the source of truth for formatting: 2-space indentation, semicolons, organized imports, and recommended React/Next rules. Prefer path aliases like `@/lib/env` over deep relative imports when practical.
+Use TypeScript with strict mode. Biome is the source of truth for formatting: 2-space indentation, semicolons, organized imports, and recommended React/Next rules. Prefer path aliases like `@/shared/env` over deep relative imports when practical.
 
-Use PascalCase for React components, camelCase for functions and variables, and lowercase route filenames following Next conventions. Keep server-only code under `src/server` or server route files.
+Use PascalCase for React components, camelCase for functions and variables, and lowercase route filenames following Next conventions. Keep feature-specific UI code under `src/features`, API routes under `src/server/routes`, and server-side DAL/services under `src/server/db`.
 
 Text links in the UI should use the shared `.link-text` class from `src/app/globals.css`. Add only local utility modifiers when a link needs a different size or emphasis.
 
 ## Testing Guidelines
 
-No test runner is configured yet. Until one is added, validate changes with:
+Vitest is configured for tests. For most changes, validate with:
 
 ```bash
 pnpm lint

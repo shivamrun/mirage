@@ -4,7 +4,7 @@ import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
-import { env, getEnvVariable } from "@/lib/env";
+import { env, getEnvVariable } from "@/shared/env";
 import * as schema from "./schema";
 
 export type DBExecutor = PostgresJsDatabase<typeof schema>;

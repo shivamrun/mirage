@@ -1,4 +1,4 @@
-import type { AccountMutationError } from "@/server/account/results";
+import type { AccountMutationError } from "@/server/db/services/account/results";
 
 type StatusFunction = {
   (code: 400, response: { message: string }): unknown;

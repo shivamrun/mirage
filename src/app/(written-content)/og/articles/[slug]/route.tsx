@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { getContentOgImage } from "@/components/content/content-og-image";
-import { articleSource } from "@/lib/content-source";
+import { articleSource } from "@/shared/content/source";
 
 type ArticleOpenGraphImageProps = {
   params: Promise<{

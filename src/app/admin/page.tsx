@@ -1,8 +1,8 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { getPageMetadata, siteConfig } from "@/lib/metadata";
-import { requireAdmin } from "@/server/auth/access";
+import { requireAdmin } from "@/server/db/services/auth/access";
+import { getPageMetadata, siteConfig } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Admin", { path: "/admin" });
 

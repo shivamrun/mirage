@@ -1,10 +1,10 @@
 import { BadgeCheck } from "lucide-react";
 import Link from "next/link";
-import AuthContainer from "@/components/auth/auth-container";
-import { AuthFormShell } from "@/components/auth/auth-form-shell";
 import { Button } from "@/components/ui/button";
-import { getPageMetadata, siteConfig } from "@/lib/metadata";
-import { requireAuth } from "@/server/auth/access";
+import AuthContainer from "@/features/auth/components/auth-container";
+import { AuthFormShell } from "@/features/auth/components/auth-form-shell";
+import { requireAuth } from "@/server/db/services/auth/access";
+import { getPageMetadata, siteConfig } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Welcome", { path: "/welcome" });
 

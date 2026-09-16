@@ -5,9 +5,9 @@ import {
   bulkUpdateContactSubmissionStatusAction,
   updateContactSubmissionStatusAction,
 } from "@/app/admin/contact-submission/all/actions";
-import { requireAdmin } from "@/server/auth/access";
 import db from "@/server/db";
 import { contactSubmission } from "@/server/db/schema";
+import { requireAdmin } from "@/server/db/services/auth/access";
 import { createTestActor } from "./infra/admin-actor";
 
 let requestHeaders = new Headers();

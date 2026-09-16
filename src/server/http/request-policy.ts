@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 
-import { env } from "@/lib/env";
+import { env } from "@/shared/env";
 
 const trustedOrigin = new URL(env.NEXT_PUBLIC_BASE_URL).origin;
 

@@ -22,8 +22,8 @@ import type {
   FilterOperator,
   SearchOperator,
   SortField,
-} from "@/lib/admin/users-query";
-import type { RoleValue } from "@/lib/auth/roles";
+} from "@/features/admin/query/users-query";
+import type { RoleValue } from "@/features/auth/roles";
 import db from "@/server/db";
 import { totalCountWindow } from "@/server/db/helpers/paginate";
 import { user as userTable } from "@/server/db/schema";

@@ -4,7 +4,7 @@ import {
   EmailConfigurationError,
   EmailDeliveryError,
   logEmailDeliveryFailure,
-} from "@/server/email/errors";
+} from "@/adapters/email/errors";
 
 describe("email delivery diagnostics", () => {
   it("classifies failures without logging provider messages or tokens", () => {

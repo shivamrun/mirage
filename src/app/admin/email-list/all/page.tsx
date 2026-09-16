@@ -1,9 +1,9 @@
 import { headers } from "next/headers";
 
-import { AdminEmailListsPanel } from "@/components/admin";
-import { getPageMetadata } from "@/lib/metadata";
-import { listAdminEmailListsView } from "@/server/admin/email-list";
-import { requireAdmin } from "@/server/auth/access";
+import { AdminEmailListsPanel } from "@/features/admin/components";
+import { listAdminEmailListsView } from "@/server/db/services/admin/email-list";
+import { requireAdmin } from "@/server/db/services/auth/access";
+import { getPageMetadata } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Email Lists", {
   path: "/admin/email-list/all",

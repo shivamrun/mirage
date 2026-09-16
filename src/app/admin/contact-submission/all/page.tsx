@@ -4,17 +4,17 @@ import { redirect } from "next/navigation";
 import {
   AdminContactSubmissionTable,
   AdminContactSubmissionToolbar,
-} from "@/components/admin";
+} from "@/features/admin/components";
 import {
   type AdminContactSubmissionPageSearchParams,
   adminContactSubmissionHrefFromSearchParams,
   adminContactSubmissionRawHrefFromSearchParams,
   contactSubmissionsPageHref,
   parseAdminContactSubmissionSearchParams,
-} from "@/lib/admin/contact-submission-query";
-import { getPageMetadata } from "@/lib/metadata";
-import { listAdminContactSubmissionsView } from "@/server/admin/contact-submission";
-import { requireAdmin } from "@/server/auth/access";
+} from "@/features/admin/query/contact-submission-query";
+import { listAdminContactSubmissionsView } from "@/server/db/services/admin/contact-submission";
+import { requireAdmin } from "@/server/db/services/auth/access";
+import { getPageMetadata } from "@/shared/metadata";
 
 import {
   bulkUpdateContactSubmissionStatusAction,

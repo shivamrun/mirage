@@ -3,6 +3,9 @@
 Mirage is a starter Next.js app with Better Auth, Elysia API routes, Drizzle
 ORM, Tailwind, and a local Postgres database already wired together.
 
+See [source architecture](docs/ARCHITECTURE.md) for the feature, infrastructure,
+schema, and shared-code ownership rules.
+
 ## Development
 
 Install dependencies:

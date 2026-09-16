@@ -1,17 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-
-import { ADMIN_CONTACT_SUBMISSION_PAGE_PATH } from "@/lib/admin/contact-submission-query";
+import { ADMIN_CONTACT_SUBMISSION_PAGE_PATH } from "@/features/admin/query/contact-submission-query";
 import {
   bulkUpdateAdminContactSubmissionStatus,
   updateAdminContactSubmissionStatus,
-} from "@/server/admin/contact-submission";
-import { requireVerifiedAdmin } from "@/server/auth/access";
+} from "@/server/db/services/admin/contact-submission";
+import { requireVerifiedAdmin } from "@/server/db/services/auth/access";
 import {
   bulkUpdateContactSubmissionStatusActionSchema,
   updateContactSubmissionStatusActionSchema,
-} from "@/zod/contact-submission";
+} from "@/shared/schemas/contact-submission";
 
 function formString(formData: FormData, key: string) {
   const value = formData.get(key);

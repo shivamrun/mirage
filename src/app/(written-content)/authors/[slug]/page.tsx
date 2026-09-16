@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { getAuthor, getAuthors } from "@/lib/authors";
-import { getPageMetadata } from "@/lib/metadata";
+import { getAuthor, getAuthors } from "@/shared/content/authors";
+import { getPageMetadata } from "@/shared/metadata";
 
 type AuthorPageProps = {
   params: Promise<{

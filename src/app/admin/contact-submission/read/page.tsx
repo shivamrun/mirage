@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import {
   type AdminContactSubmissionPageSearchParams,
   adminContactSubmissionStatusHrefFromSearchParams,
-} from "@/lib/admin/contact-submission-query";
-import { getPageMetadata } from "@/lib/metadata";
+} from "@/features/admin/query/contact-submission-query";
+import { getPageMetadata } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Read Contact Submissions", {
   path: "/admin/contact-submission/read",

@@ -1,4 +1,4 @@
-import { getPageMetadata } from "@/lib/metadata";
+import { getPageMetadata } from "@/shared/metadata";
 import {
   AdminUserDetailPage,
   type AdminUserDetailRouteProps,

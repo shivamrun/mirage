@@ -1,6 +1,6 @@
 import type * as React from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils";
 
 type HeadingBlockSize = "sm" | "md" | "lg" | "xl";
 type HeadingBlockRoot = "div" | "header";

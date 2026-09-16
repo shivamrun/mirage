@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { getContentOgImage } from "@/components/content/content-og-image";
-import { guideSource } from "@/lib/content-source";
+import { guideSource } from "@/shared/content/source";
 
 type GuideOpenGraphImageProps = {
   params: Promise<{

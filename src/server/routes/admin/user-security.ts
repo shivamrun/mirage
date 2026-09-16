@@ -4,8 +4,8 @@ import {
   revokeAdminUserSession,
   revokeEverySession,
   unlinkAdminLinkedAccount,
-} from "@/server/admin/security";
-import type { CurrentUser } from "@/server/auth/current-user";
+} from "@/server/db/services/admin/security";
+import type { CurrentUser } from "@/server/db/services/auth/current-user";
 import { requestPolicy } from "@/server/http/request-policy";
 import {
   adminPasswordResetPartialFailureResponseSchema,
@@ -16,7 +16,7 @@ import {
   linkedAccountParamsSchema,
   messageResponseSchema,
   userSessionParamsSchema,
-} from "@/zod";
+} from "@/shared/schemas";
 
 function getAdminRouteUser(context: unknown) {
   return (context as { authUser: CurrentUser }).authUser;

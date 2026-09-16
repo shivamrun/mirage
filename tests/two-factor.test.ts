@@ -3,8 +3,6 @@ import { symmetricDecrypt } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { describe, expect, it } from "vitest";
-import { env } from "@/lib/env";
-import { siteConfig } from "@/lib/metadata";
 import db from "@/server/db";
 import {
   applicationRateLimit,
@@ -13,6 +11,8 @@ import {
   verification,
 } from "@/server/db/schema";
 import { accountRoutes } from "@/server/routes/account";
+import { env } from "@/shared/env";
+import { siteConfig } from "@/shared/metadata";
 import { createTestActor } from "./infra/admin-actor";
 import { setTestEmailDeliveryHook, testEmailOutbox } from "./infra/email-fake";
 

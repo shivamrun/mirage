@@ -1,11 +1,10 @@
 import { randomUUID } from "node:crypto";
 
 import { eq } from "drizzle-orm";
-
-import { auth } from "@/server/auth/better-auth";
 import db from "@/server/db";
 import { markAdminSessionAssurance } from "@/server/db/dal/admin-session-assurance";
 import { user } from "@/server/db/schema";
+import { auth } from "@/server/db/services/auth/better-auth";
 
 const password = "TestPassword123!";
 const origin = "http://localhost:3000";

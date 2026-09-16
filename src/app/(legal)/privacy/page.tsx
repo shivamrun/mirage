@@ -1,6 +1,6 @@
 import { LegalPage } from "@/components/legal";
-import { legalLastUpdated, privacySections } from "@/lib/legal";
-import { getPageMetadata, siteConfig } from "@/lib/metadata";
+import { legalLastUpdated, privacySections } from "@/shared/legal";
+import { getPageMetadata, siteConfig } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Privacy Policy", {
   description: `How ${siteConfig.name} collects, uses, and protects information.`,

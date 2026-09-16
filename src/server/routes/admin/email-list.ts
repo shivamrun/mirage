@@ -1,11 +1,10 @@
 import { Elysia } from "elysia";
-
 import {
   createAdminEmailList,
   deleteAdminEmailList,
   updateAdminEmailList,
   updateAdminEmailListStatus,
-} from "@/server/admin/email-list";
+} from "@/server/db/services/admin/email-list";
 import { requestPolicy } from "@/server/http/request-policy";
 import {
   adminCreateEmailListSchema,
@@ -14,7 +13,7 @@ import {
   emailListKeyParamsSchema,
   emailListStatusUpdateBodySchema,
   messageResponseSchema,
-} from "@/zod";
+} from "@/shared/schemas";
 
 export const adminEmailListRoutes = new Elysia()
   .use(requestPolicy)

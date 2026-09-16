@@ -7,13 +7,13 @@ import {
   evaluateAdminSessionAssurance,
   evaluateTwoFactorEnabled,
   evaluateVerifiedEmail,
-} from "@/server/auth/admin-access";
+} from "@/server/db/services/auth/admin-access";
 import {
   type AuthSession,
   type CurrentUser,
   getCurrentUserFromAuthSession,
   resolveAuthSession,
-} from "@/server/auth/current-user";
+} from "@/server/db/services/auth/current-user";
 
 export type { AuthSession };
 

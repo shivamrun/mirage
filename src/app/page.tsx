@@ -7,10 +7,9 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-
-import { EmailSignupForm } from "@/components/email-list";
 import { Button } from "@/components/ui/button";
-import { siteConfig } from "@/lib/metadata";
+import { EmailSignupForm } from "@/features/email-list/components";
+import { siteConfig } from "@/shared/metadata";
 
 const starterModules = [
   {

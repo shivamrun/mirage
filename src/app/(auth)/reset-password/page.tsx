@@ -1,6 +1,6 @@
-import { ResetPasswordForm } from "@/components/auth";
-import AuthContainer from "@/components/auth/auth-container";
-import { getPageMetadata } from "@/lib/metadata";
+import { ResetPasswordForm } from "@/features/auth/components";
+import AuthContainer from "@/features/auth/components/auth-container";
+import { getPageMetadata } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Choose New Password", {
   path: "/reset-password",

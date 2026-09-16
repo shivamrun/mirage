@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { getLoginRedirectPath, getSafeAuthRedirect } from "@/lib/auth/redirect";
+import {
+  getLoginRedirectPath,
+  getSafeAuthRedirect,
+} from "@/features/auth/redirect";
 
 describe("auth redirect policy", () => {
   it.each([

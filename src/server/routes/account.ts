@@ -1,6 +1,4 @@
 import { Elysia } from "elysia";
-
-import { env } from "@/lib/env";
 import {
   cancelPendingEmailChange,
   changeAccountEmail,
@@ -9,18 +7,19 @@ import {
   resendPendingEmailChangeVerification,
   resolveEmailChangeApprovalRedirectURL,
   resolveEmailChangeConfirmationRedirectURL,
-} from "@/server/account/email-change";
-import { getConnectedGoogleAccount } from "@/server/account/google-account";
+} from "@/server/db/services/account/email-change";
+import { getConnectedGoogleAccount } from "@/server/db/services/account/google-account";
 import {
   disableAccountTwoFactor,
   sendAccountTwoFactorEmailCode,
   startAccountTwoFactorSetup,
   verifyAccountTwoFactorSetup,
-} from "@/server/account/two-factor";
-import { completeAdminTotpStepUp } from "@/server/auth/admin-step-up";
+} from "@/server/db/services/account/two-factor";
+import { completeAdminTotpStepUp } from "@/server/db/services/auth/admin-step-up";
 import { elysiaAuth } from "@/server/http/auth";
 import { requestPolicy } from "@/server/http/request-policy";
 import { accountErrorResponse } from "@/server/http/result-response";
+import { env } from "@/shared/env";
 import {
   accountEmailMutationResponseSchema,
   accountEmailStateResponseSchema,
@@ -36,7 +35,7 @@ import {
   twoFactorEmailCodeResponseSchema,
   twoFactorEnabledResponseSchema,
   twoFactorStartSetupResponseSchema,
-} from "@/zod";
+} from "@/shared/schemas";
 
 function emailChangePageURL({
   action,

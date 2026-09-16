@@ -1,12 +1,11 @@
 import { and, asc, desc, eq, ilike, ne, or, type SQL } from "drizzle-orm";
-
 import type {
   AdminContactSubmissionQueryState,
   ContactSubmissionStatus,
-} from "@/lib/admin/contact-submission-query";
+} from "@/features/admin/query/contact-submission-query";
 import db from "@/server/db";
 import { contactSubmission } from "@/server/db/schema";
-import type { ContactSubmissionValues } from "@/zod";
+import type { ContactSubmissionValues } from "@/shared/schemas";
 
 type ListContactSubmissionsOptions = {
   state: AdminContactSubmissionQueryState;

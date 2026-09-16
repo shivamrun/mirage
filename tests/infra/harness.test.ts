@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { sendVerificationEmail } from "@/server/email/senders/send-verification-email";
+import { sendVerificationEmail } from "@/adapters/email/senders/send-verification-email";
 import { testEmailOutbox } from "./email-fake";
 import { getSafeTestDatabaseUrl, openTestDatabase } from "./test-database";
 

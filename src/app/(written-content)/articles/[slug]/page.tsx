@@ -7,8 +7,8 @@ import {
   getContentJsonLd,
   getContentMetadata,
   getJsonLdScriptContent,
-} from "@/lib/content-seo";
-import { articleSource, getArticles } from "@/lib/content-source";
+} from "@/shared/content/seo";
+import { articleSource, getArticles } from "@/shared/content/source";
 
 type ArticlePageProps = {
   params: Promise<{

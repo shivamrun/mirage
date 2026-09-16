@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { siteConfig } from "@/lib/metadata";
+import { siteConfig } from "@/shared/metadata";
 
 export default function WrittenContentLayout({
   children,

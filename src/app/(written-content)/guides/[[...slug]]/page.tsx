@@ -13,9 +13,9 @@ import {
   getContentJsonLd,
   getContentMetadata,
   getJsonLdScriptContent,
-} from "@/lib/content-seo";
-import { getGuides, guideSource } from "@/lib/content-source";
-import { getPageMetadata } from "@/lib/metadata";
+} from "@/shared/content/seo";
+import { getGuides, guideSource } from "@/shared/content/source";
+import { getPageMetadata } from "@/shared/metadata";
 
 type GuidePageProps = {
   params: Promise<{

@@ -1,16 +1,16 @@
 import { headers } from "next/headers";
 
-import { AdminEmailSubmissionsPanel } from "@/components/admin";
+import { AdminEmailSubmissionsPanel } from "@/features/admin/components";
 import {
   type AdminEmailListPageSearchParams,
   parseAdminEmailListSearchParams,
-} from "@/lib/admin/email-list-query";
-import { getPageMetadata } from "@/lib/metadata";
+} from "@/features/admin/query/email-list-query";
 import {
   listAdminEmailListsView,
   listAdminEmailSubscribersView,
-} from "@/server/admin/email-list";
-import { requireAdmin } from "@/server/auth/access";
+} from "@/server/db/services/admin/email-list";
+import { requireAdmin } from "@/server/db/services/auth/access";
+import { getPageMetadata } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Email Submissions", {
   path: "/admin/email-list/submissions",

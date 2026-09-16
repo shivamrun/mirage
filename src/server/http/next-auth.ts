@@ -2,8 +2,8 @@ import {
   type AuthPolicyDecision,
   type AuthPolicyReason,
   evaluateAdminAccess,
-} from "@/server/auth/admin-access";
-import { getCurrentUser } from "@/server/auth/current-user";
+} from "@/server/db/services/auth/admin-access";
+import { getCurrentUser } from "@/server/db/services/auth/current-user";
 
 type NextAuthDenialOptions = {
   reasons?: AuthPolicyReason[];

@@ -1,11 +1,10 @@
 import { toNextJsHandler } from "better-auth/next-js";
-
-import { auth } from "@/server/auth/better-auth";
+import { observeRequest } from "@/adapters/operations/request-observability";
+import { auth } from "@/server/db/services/auth/better-auth";
 import {
   authPolicyDecisionToNextResponse,
   resolveNextAdminAccess,
 } from "@/server/http/next-auth";
-import { observeRequest } from "@/server/operations/request-observability";
 
 const handlers = toNextJsHandler(auth.handler);
 

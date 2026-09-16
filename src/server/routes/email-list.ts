@@ -1,17 +1,16 @@
 import { Elysia } from "elysia";
-
-import { env } from "@/lib/env";
 import {
   confirmEmailListVerification,
   subscribeToEmailList,
-} from "@/server/email-list/service";
+} from "@/server/db/services/email-list/service";
 import { requestPolicy } from "@/server/http/request-policy";
+import { env } from "@/shared/env";
 import {
   emailListSignupSuccessResponseSchema,
   emailListVerifyQuerySchema,
   emailSubscriptionSchema,
   messageResponseSchema,
-} from "@/zod";
+} from "@/shared/schemas";
 
 function createEmailListRedirectUrl(status: "invalid" | "success") {
   const url = new URL("/", env.NEXT_PUBLIC_BASE_URL);

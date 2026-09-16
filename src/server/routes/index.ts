@@ -1,13 +1,12 @@
 import { Elysia } from "elysia";
-
-import { authActionRoutes } from "@/server/auth-actions/routes";
+import { accessVerificationRoutes } from "@/features/auth/access-verification-routes";
 import { checkDatabaseHealth } from "@/server/db/dal/health";
 import { apiErrors } from "@/server/http/errors";
-import { accountRoutes } from "./account";
-import { adminRoutes } from "./admin";
-import { contactRoutes } from "./contact";
-import { emailListRoutes } from "./email-list";
-import { uploadsRoutes } from "./uploads";
+import { accountRoutes } from "@/server/routes/account";
+import { adminRoutes } from "@/server/routes/admin";
+import { contactRoutes } from "@/server/routes/contact";
+import { emailListRoutes } from "@/server/routes/email-list";
+import { uploadsRoutes } from "@/server/routes/uploads";
 
 export const app = new Elysia({ prefix: "/api" })
   .use(apiErrors)
@@ -32,7 +31,7 @@ export const app = new Elysia({ prefix: "/api" })
     }
   })
   .use(accountRoutes)
-  .use(authActionRoutes)
+  .use(accessVerificationRoutes)
   .use(contactRoutes)
   .use(emailListRoutes)
   .use(uploadsRoutes)

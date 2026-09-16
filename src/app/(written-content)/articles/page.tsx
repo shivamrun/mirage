@@ -5,8 +5,8 @@ import {
   getContentCardMeta,
   getContentShortDate,
 } from "@/components/content/content-meta";
-import { getArticles } from "@/lib/content-source";
-import { getPageMetadata } from "@/lib/metadata";
+import { getArticles } from "@/shared/content/source";
+import { getPageMetadata } from "@/shared/metadata";
 
 export const metadata: Metadata = getPageMetadata("Articles", {
   description: "Evergreen industry articles and SEO-focused explainers.",

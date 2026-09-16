@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 
 import { and, asc, desc, eq, gt, ilike, or, type SQL, sql } from "drizzle-orm";
-
 import db, { type DBClient } from "@/server/db";
 import {
   emailContact,
@@ -14,7 +13,7 @@ import type {
   AdminEmailSubscriberQueryState,
   EmailListStatus,
   EmailSubscriptionValues,
-} from "@/zod";
+} from "@/shared/schemas";
 
 type UpdateEmailListStatusOptions = {
   key: string;

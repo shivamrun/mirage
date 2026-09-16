@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { getMetricsSnapshot } from "@/adapters/operations/metrics";
+import { observeRequest } from "@/adapters/operations/request-observability";
 import { GET as metricsRoute } from "@/app/(backend)/api/admin/metrics/route";
-import { getMetricsSnapshot } from "@/server/operations/metrics";
-import { observeRequest } from "@/server/operations/request-observability";
 import { app } from "@/server/routes";
 import { createTestActor } from "./infra/admin-actor";
 import { httpRequest } from "./infra/http-request";

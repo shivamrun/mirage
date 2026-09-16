@@ -16,7 +16,7 @@ process.env.BETTER_AUTH_SECRET ??= "test-only-secret-at-least-32-characters";
 process.env.BETTER_AUTH_URL ??= "http://localhost:3000";
 process.env.NEXT_PUBLIC_BASE_URL ??= "http://localhost:3000";
 
-vi.mock("@/server/email/send-email", () => ({ sendEmail: sendTestEmail }));
+vi.mock("@/adapters/email/send-email", () => ({ sendEmail: sendTestEmail }));
 
 beforeEach(async () => {
   testEmailOutbox.length = 0;

@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 
 import { AppSidebar } from "@/components/app/app-sidebar";
-import { VerifiedRoleGate } from "@/components/auth/verified-role-gate";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { VerifiedRoleGate } from "@/features/auth/components/verified-role-gate";
 
 export default function UserLayout({ children }: { children: ReactNode }) {
   return (

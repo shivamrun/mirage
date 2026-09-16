@@ -4,9 +4,9 @@ import { notFound } from "next/navigation";
 import {
   type AdminUserDetailSection,
   AdminUserDetailView,
-} from "@/components/admin";
-import { getAdminUserDetailView } from "@/server/admin/user-detail";
-import { requireAdmin } from "@/server/auth/access";
+} from "@/features/admin/components";
+import { getAdminUserDetailView } from "@/server/db/services/admin/user-detail";
+import { requireAdmin } from "@/server/db/services/auth/access";
 
 type AdminUserDetailRouteProps = {
   params: Promise<{

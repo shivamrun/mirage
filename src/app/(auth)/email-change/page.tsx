@@ -1,6 +1,6 @@
-import AuthContainer from "@/components/auth/auth-container";
-import { EmailChangeConfirmation } from "@/components/auth/email-change-confirmation";
-import { getPageMetadata } from "@/lib/metadata";
+import AuthContainer from "@/features/auth/components/auth-container";
+import { EmailChangeConfirmation } from "@/features/auth/components/email-change-confirmation";
+import { getPageMetadata } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Confirm Email Change", {
   path: "/email-change",

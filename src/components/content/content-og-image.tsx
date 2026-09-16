@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-import { siteConfig } from "@/lib/metadata";
+import { siteConfig } from "@/shared/metadata";
 
 type ContentOgImageOptions = {
   eyebrow?: string;

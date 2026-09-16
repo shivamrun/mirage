@@ -1,5 +1,5 @@
-import { AccountProfilePage } from "@/components/account";
-import { getPageMetadata } from "@/lib/metadata";
+import { AccountProfilePage } from "@/features/account/components";
+import { getPageMetadata } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Update profile", {
   path: "/account/profile",

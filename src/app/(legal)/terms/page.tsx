@@ -1,6 +1,6 @@
 import { LegalPage } from "@/components/legal";
-import { legalLastUpdated, termsSections } from "@/lib/legal";
-import { getPageMetadata, siteConfig } from "@/lib/metadata";
+import { legalLastUpdated, termsSections } from "@/shared/legal";
+import { getPageMetadata, siteConfig } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Terms of Service", {
   description: `The terms that apply when you use ${siteConfig.name}.`,

@@ -1,6 +1,6 @@
-import { EmailVerificationStatus } from "@/components/auth";
-import AuthContainer from "@/components/auth/auth-container";
-import { getPageMetadata } from "@/lib/metadata";
+import { EmailVerificationStatus } from "@/features/auth/components";
+import AuthContainer from "@/features/auth/components/auth-container";
+import { getPageMetadata } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Verify Email", {
   path: "/email-verification",

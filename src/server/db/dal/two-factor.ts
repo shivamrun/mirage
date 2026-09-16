@@ -1,13 +1,13 @@
 import { timingSafeEqual } from "node:crypto";
 
 import { and, eq, sql } from "drizzle-orm";
-import { parseTwoFactorEmailCodeValue } from "@/server/account/verification-schemas";
 import db from "@/server/db";
 import {
   twoFactor as twoFactorTable,
   user as userTable,
   verification,
 } from "@/server/db/schema";
+import { parseTwoFactorEmailCodeValue } from "@/server/db/services/account/verification-schemas";
 
 export async function verifyAndConsumeEmailCode({
   expectedHash,

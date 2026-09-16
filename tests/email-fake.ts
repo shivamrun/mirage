@@ -1,4 +1,4 @@
-import type { sendEmail } from "@/server/email/send-email";
+import type { sendEmail } from "@/adapters/email/send-email";
 
 type EmailOptions = Parameters<typeof sendEmail>[0];
 

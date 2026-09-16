@@ -11,7 +11,7 @@ import {
 import {
   emailListStatusValues,
   emailSubscriptionStatusValues,
-} from "@/lib/email-list/status";
+} from "@/features/email-list/status";
 
 import { auditTimestamps, emailColumn, idColumn } from "../helpers/base-column";
 import { createTable } from "../helpers/create-table";

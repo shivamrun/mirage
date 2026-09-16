@@ -1,0 +1,64 @@
+import { uploadFile } from "@marinedotsh/upload-sdk";
+import {
+  avatarAcceptedMimeTypes,
+  avatarCropMaxFileSize,
+  avatarCropOutputType,
+  avatarSourceMaxFileSize,
+} from "@/features/uploads/policies/avatar";
+import { api } from "@/shared/api/client";
+import type { PrepareUploadResponse } from "@/shared/schemas/uploads";
+
+type UploadAvatarFileOptions = {
+  onProgress?: (progress: { percent?: number }) => void;
+};
+
+async function prepareAvatarUpload(file: File) {
+  const { data, error } = await api.api.uploads.post({
+    contentType: file.type,
+    filename: file.name,
+    key: "avatar",
+    size: file.size,
+  });
+
+  if (error) {
+    throw new Error(
+      error.value.message || "Could not prepare the avatar upload.",
+    );
+  }
+
+  if (!data) {
+    throw new Error("Could not prepare the avatar upload.");
+  }
+
+  return data;
+}
+
+async function uploadAvatarFile(
+  file: File,
+  { onProgress }: UploadAvatarFileOptions = {},
+) {
+  const prepared = await prepareAvatarUpload(file);
+
+  await uploadFile(prepared.upload, file, {
+    onProgress,
+  });
+
+  return prepared;
+}
+
+function getCroppedAvatarFilename(filename: string) {
+  const basename = filename.replace(/\.[^.]+$/, "");
+
+  return `${basename || "avatar"}-cropped.jpg`;
+}
+
+export {
+  avatarAcceptedMimeTypes,
+  avatarCropMaxFileSize,
+  avatarCropOutputType,
+  avatarSourceMaxFileSize,
+  getCroppedAvatarFilename,
+  prepareAvatarUpload,
+  type PrepareUploadResponse,
+  uploadAvatarFile,
+};

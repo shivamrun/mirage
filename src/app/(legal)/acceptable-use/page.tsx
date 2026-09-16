@@ -1,6 +1,6 @@
 import { LegalPage } from "@/components/legal";
-import { acceptableUseSections, legalLastUpdated } from "@/lib/legal";
-import { getPageMetadata, siteConfig } from "@/lib/metadata";
+import { acceptableUseSections, legalLastUpdated } from "@/shared/legal";
+import { getPageMetadata, siteConfig } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Acceptable Use Policy", {
   description: `Rules for responsible use of ${siteConfig.name}.`,

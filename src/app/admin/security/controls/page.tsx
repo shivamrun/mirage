@@ -1,10 +1,9 @@
 import { headers } from "next/headers";
-
-import { SecurityControls } from "@/components/admin";
 import { HeadingBlock } from "@/components/heading-block";
-import { getPageMetadata } from "@/lib/metadata";
-import { getAdminSecurityControlSummaryView } from "@/server/admin/security";
-import { requireAdmin } from "@/server/auth/access";
+import { SecurityControls } from "@/features/admin/components";
+import { getAdminSecurityControlSummaryView } from "@/server/db/services/admin/security";
+import { requireAdmin } from "@/server/db/services/auth/access";
+import { getPageMetadata } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Security Controls", {
   path: "/admin/security/controls",

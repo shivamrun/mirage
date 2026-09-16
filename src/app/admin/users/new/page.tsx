@@ -1,8 +1,8 @@
 import { headers } from "next/headers";
 
-import { AdminUserCreateForm } from "@/components/admin";
-import { getPageMetadata } from "@/lib/metadata";
-import { requireAdmin } from "@/server/auth/access";
+import { AdminUserCreateForm } from "@/features/admin/components";
+import { requireAdmin } from "@/server/db/services/auth/access";
+import { getPageMetadata } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Create User", {
   path: "/admin/users/new",
