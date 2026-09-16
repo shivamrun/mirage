@@ -1,9 +1,9 @@
-const avatarAcceptedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
 const avatarServerMimeTypes = [
   "image/png",
   "image/jpeg",
   "image/webp",
 ] as const;
+const avatarAcceptedMimeTypes: readonly string[] = avatarServerMimeTypes;
 const avatarExtensions = [".png", ".jpg", ".jpeg", ".webp"] as const;
 
 const avatarCropMaxFileSize = 2 * 1024 * 1024;

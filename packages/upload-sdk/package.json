@@ -1,0 +1,21 @@
+{
+  "name": "@marinedotsh/upload-sdk",
+  "version": "0.0.0-local",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./index.ts",
+      "default": "./index.ts"
+    },
+    "./providers": {
+      "types": "./providers/index.ts",
+      "default": "./providers/index.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}

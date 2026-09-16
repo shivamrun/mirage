@@ -1,4 +1,4 @@
-import type { PrepareUploadOutput } from "@marinedotsh/upload-sdk";
+import { prepareUploadOutputSchema } from "@marinedotsh/upload-sdk";
 import { z } from "zod";
 
 import { uploadAssetKeys } from "@/lib/uploads/asset-keys";
@@ -20,16 +20,6 @@ export const prepareUploadRequestSchema = z.object({
     .int("Size must be a positive integer.")
     .min(1, "Size must be a positive integer."),
 });
-
-export const prepareUploadOutputSchema = z.object({
-  expiresAt: z.string(),
-  fields: z.record(z.string(), z.string()),
-  headers: z.record(z.string(), z.string()),
-  key: z.string(),
-  method: z.literal("POST"),
-  strategy: z.literal("multipart"),
-  url: z.string(),
-}) satisfies z.ZodType<PrepareUploadOutput>;
 
 export const prepareUploadResponseSchema = z.object({
   key: z.string(),

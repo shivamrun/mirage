@@ -1,7 +1,9 @@
 import { createMDX } from "fumadocs-mdx/next";
 
 /** @type {import("next").NextConfig} */
-const nextConfig = {};
+const nextConfig = {
+  transpilePackages: ["@marinedotsh/upload-sdk"],
+};
 
 const withMDX = createMDX({
   configPath: "./source.config.mjs",

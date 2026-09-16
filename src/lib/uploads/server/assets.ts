@@ -2,7 +2,6 @@ import "server-only";
 
 import { defineAssets } from "@marinedotsh/upload-sdk";
 
-import { uploadAssetKeys } from "@/lib/uploads/asset-keys";
 import {
   avatarExtensions,
   avatarServerMaxFileSize,
@@ -33,9 +32,4 @@ function createUploadAssets(
   });
 }
 
-export {
-  avatarExtensions,
-  avatarServerMimeTypes as avatarMimeTypes,
-  createUploadAssets,
-  uploadAssetKeys,
-};
+export { createUploadAssets };

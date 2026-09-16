@@ -9,8 +9,6 @@ import {
 } from "@/lib/uploads/policies/avatar";
 import type { PrepareUploadResponse } from "@/zod/uploads";
 
-type PrepareAvatarUploadResponse = PrepareUploadResponse;
-
 type UploadAvatarFileOptions = {
   onProgress?: (progress: { percent?: number }) => void;
 };
@@ -62,6 +60,6 @@ export {
   avatarSourceMaxFileSize,
   getCroppedAvatarFilename,
   prepareAvatarUpload,
-  type PrepareAvatarUploadResponse,
+  type PrepareUploadResponse,
   uploadAvatarFile,
 };

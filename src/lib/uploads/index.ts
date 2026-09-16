@@ -4,7 +4,7 @@ export {
   avatarCropOutputType,
   avatarSourceMaxFileSize,
   getCroppedAvatarFilename,
-  type PrepareAvatarUploadResponse,
+  type PrepareUploadResponse,
   prepareAvatarUpload,
   uploadAvatarFile,
 } from "./avatar";
