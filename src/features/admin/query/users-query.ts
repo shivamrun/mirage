@@ -1,4 +1,5 @@
 import { authRoles } from "@/features/auth/roles";
+import { DEFAULT_PAGE_SIZE, parsePageParam } from "@/shared/pagination";
 import {
   firstParamValue,
   formString,
@@ -10,7 +11,7 @@ import {
 export type { SearchParamValue } from "./query-params";
 
 export const ADMIN_USERS_PAGE_PATH = "/admin/users";
-export const ADMIN_USERS_PAGE_SIZE = 10;
+export const ADMIN_USERS_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 export const DEFAULT_SEARCH_FIELD = "auto";
 export const DEFAULT_SEARCH_OPERATOR = "contains";
 export const DEFAULT_FILTER_FIELD = "role";
@@ -227,13 +228,6 @@ export const ADMIN_USERS_FILTER_FIELD_CONFIGS = {
 const dateFilterPattern = /^\d{4}-\d{2}-\d{2}$/;
 const roleFilterValues = optionValueSet(ADMIN_USERS_ROLE_FILTER_VALUES);
 
-function parsePage(value?: SearchParamValue) {
-  const pageValue = firstParamValue(value);
-  const page = Number(pageValue);
-
-  return Number.isInteger(page) && page > 0 ? page : 1;
-}
-
 const searchFieldValues = optionValueSet(ADMIN_USERS_SEARCH_FIELD_VALUES);
 const searchOperatorValues = optionValueSet(ADMIN_USERS_SEARCH_OPERATOR_VALUES);
 const filterFieldValues = optionValueSet(ADMIN_USERS_FILTER_FIELD_VALUES);
@@ -375,7 +369,7 @@ export function parseAdminUsersSearchParams(
   );
 
   return {
-    page: parsePage(params.page),
+    page: parsePageParam(params.page),
     query: firstParamValue(params.q)?.trim() ?? "",
     searchField: parseSearchField(params.searchField),
     searchOperator: parseSearchOperator(params.searchOperator),

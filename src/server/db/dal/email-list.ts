@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { and, asc, desc, eq, gt, ilike, or, type SQL, sql } from "drizzle-orm";
 import db, { type DBClient } from "@/server/db";
+import { paginateList, totalCount } from "@/server/db/helpers/paginate";
 import {
   emailContact,
   emailList,
@@ -285,8 +286,12 @@ export async function listEmailLists() {
 }
 
 export async function listEmailSubscribers({
+  limit,
+  offset,
   state,
 }: {
+  limit: number;
+  offset: number;
   state: AdminEmailSubscriberQueryState;
 }) {
   const whereClause = getSubscriberWhereClause(state);
@@ -307,15 +312,34 @@ export async function listEmailSubscribers({
     .innerJoin(emailContact, eq(emailContact.id, emailSubscription.contactId))
     .innerJoin(emailList, eq(emailList.key, emailSubscription.listKey))
     .$dynamic();
+  let totalQuery = db
+    .select({ total: totalCount })
+    .from(emailSubscription)
+    .innerJoin(emailContact, eq(emailContact.id, emailSubscription.contactId))
+    .innerJoin(emailList, eq(emailList.key, emailSubscription.listKey))
+    .$dynamic();
 
   if (whereClause) {
     subscribersQuery = subscribersQuery.where(whereClause);
+    totalQuery = totalQuery.where(whereClause);
   }
 
-  return subscribersQuery.orderBy(
-    desc(emailSubscription.createdAt),
-    asc(emailSubscription.id),
-  );
+  const result = await paginateList({
+    countQuery: totalQuery,
+    limit,
+    offset,
+    query: subscribersQuery.orderBy(
+      desc(emailSubscription.createdAt),
+      asc(emailSubscription.id),
+    ),
+  });
+
+  return {
+    limit,
+    offset,
+    subscribers: result.items,
+    total: result.total,
+  };
 }
 
 export async function listActiveEmailLists() {

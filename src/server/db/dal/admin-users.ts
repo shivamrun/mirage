@@ -25,7 +25,7 @@ import type {
 } from "@/features/admin/query/users-query";
 import type { RoleValue } from "@/features/auth/roles";
 import db from "@/server/db";
-import { totalCountWindow } from "@/server/db/helpers/paginate";
+import { paginateList, totalCount } from "@/server/db/helpers/paginate";
 import { user as userTable } from "@/server/db/schema";
 
 type ListAdminUsersOptions = {
@@ -262,24 +262,25 @@ export async function listAdminUsers({
   const whereClause = getWhereClause(state);
   const sortColumn = sortColumns[state.sortBy];
   const sortDirection = state.sortDirection === "asc" ? asc : desc;
-  let usersQuery = db
-    .select({ ...userListSelection, _total: totalCountWindow })
-    .from(userTable)
-    .$dynamic();
+  let usersQuery = db.select(userListSelection).from(userTable).$dynamic();
+  let totalQuery = db.select({ total: totalCount }).from(userTable).$dynamic();
 
   if (whereClause) {
     usersQuery = usersQuery.where(whereClause);
+    totalQuery = totalQuery.where(whereClause);
   }
 
-  const rows = await usersQuery
-    .orderBy(sortDirection(sortColumn), asc(userTable.id))
-    .limit(limit)
-    .offset(offset);
+  const result = await paginateList({
+    countQuery: totalQuery,
+    limit,
+    offset,
+    query: usersQuery.orderBy(sortDirection(sortColumn), asc(userTable.id)),
+  });
 
   return {
     limit,
     offset,
-    total: rows[0]?._total ?? 0,
-    users: rows.map(({ _total, ...user }) => user satisfies AdminUserListItem),
+    total: result.total,
+    users: result.items.map((user) => user satisfies AdminUserListItem),
   };
 }

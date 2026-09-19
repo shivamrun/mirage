@@ -4,10 +4,13 @@ import type {
   ContactSubmissionStatus,
 } from "@/features/admin/query/contact-submission-query";
 import db from "@/server/db";
+import { paginateList, totalCount } from "@/server/db/helpers/paginate";
 import { contactSubmission } from "@/server/db/schema";
 import type { ContactSubmissionValues } from "@/shared/schemas";
 
 type ListContactSubmissionsOptions = {
+  limit: number;
+  offset: number;
   state: AdminContactSubmissionQueryState;
 };
 
@@ -74,6 +77,8 @@ export async function createContactSubmission(values: ContactSubmissionValues) {
 }
 
 export async function listContactSubmissions({
+  limit,
+  offset,
   state,
 }: ListContactSubmissionsOptions) {
   const whereClause = getWhereClause(state);
@@ -89,15 +94,32 @@ export async function listContactSubmissions({
     })
     .from(contactSubmission)
     .$dynamic();
+  let totalQuery = db
+    .select({ total: totalCount })
+    .from(contactSubmission)
+    .$dynamic();
 
   if (whereClause) {
     submissionsQuery = submissionsQuery.where(whereClause);
+    totalQuery = totalQuery.where(whereClause);
   }
 
-  return submissionsQuery.orderBy(
-    desc(contactSubmission.createdAt),
-    asc(contactSubmission.id),
-  );
+  const result = await paginateList({
+    countQuery: totalQuery,
+    limit,
+    offset,
+    query: submissionsQuery.orderBy(
+      desc(contactSubmission.createdAt),
+      asc(contactSubmission.id),
+    ),
+  });
+
+  return {
+    limit,
+    offset,
+    submissions: result.items,
+    total: result.total,
+  };
 }
 
 export async function updateContactSubmissionStatus({

@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { Pagination } from "@/components/ui/pagination";
 import {
   AdminContactSubmissionTable,
   AdminContactSubmissionToolbar,
@@ -33,7 +34,7 @@ export default async function AdminContactSubmissionAllPage({
   searchParams,
 }: AdminContactSubmissionAllPageProps) {
   const params = await searchParams;
-  const state = parseAdminContactSubmissionSearchParams(params);
+  const { page, ...state } = parseAdminContactSubmissionSearchParams(params);
   const canonicalHref = adminContactSubmissionHrefFromSearchParams(params);
   const requestHeaders = await headers();
 
@@ -50,8 +51,18 @@ export default async function AdminContactSubmissionAllPage({
     filterValue: state.filterValue,
   });
   const submissions = await listAdminContactSubmissionsView({
+    page,
     state,
   });
+
+  if (page !== submissions.page) {
+    redirect(
+      contactSubmissionsPageHref({
+        page: submissions.page,
+        ...state,
+      }),
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -68,7 +79,7 @@ export default async function AdminContactSubmissionAllPage({
       <AdminContactSubmissionToolbar
         bulkAction={bulkUpdateContactSubmissionStatusAction}
         clearSearchHref={clearSearchHref}
-        hasSubmissions={submissions.length > 0}
+        hasSubmissions={submissions.submissions.length > 0}
         state={state}
       />
 
@@ -77,7 +88,18 @@ export default async function AdminContactSubmissionAllPage({
         hasSearch={Boolean(state.query)}
         query={state.query}
         rowAction={updateContactSubmissionStatusAction}
-        submissions={submissions}
+        submissions={submissions.submissions}
+      />
+
+      <Pagination
+        entityLabel="submissions"
+        getPageHref={(page) =>
+          contactSubmissionsPageHref({
+            page,
+            ...state,
+          })
+        }
+        pagination={submissions}
       />
     </div>
   );

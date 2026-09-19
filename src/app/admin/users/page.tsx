@@ -1,8 +1,8 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { Pagination } from "@/components/ui/pagination";
 import {
-  AdminUsersPagination,
   AdminUsersTable,
   AdminUsersToolbar,
 } from "@/features/admin/components";
@@ -95,11 +95,15 @@ export default async function AdminUsersPage({
         users={users.users}
       />
 
-      <AdminUsersPagination
-        page={users.page}
-        state={listState}
-        total={users.total}
-        totalPages={users.totalPages}
+      <Pagination
+        entityLabel="users"
+        getPageHref={(page) =>
+          usersPageHref({
+            page,
+            ...listState,
+          })
+        }
+        pagination={users}
       />
     </div>
   );

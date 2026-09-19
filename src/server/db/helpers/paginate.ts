@@ -1,19 +1,37 @@
 import { sql } from "drizzle-orm";
 
 /**
- * Window expression that returns the total filtered row count alongside each
- * paginated result row, eliminating the need for a separate COUNT query.
- *
- * @example
- * const rows = await db
- *   .select({ ...getTableColumns(table), _total: totalCountWindow })
- *   .from(table)
- *   .where(condition)
- *   .orderBy(orderExpr)
- *   .limit(limit)
- *   .offset(offset);
- *
- * const total = rows[0]?._total ?? 0;
- * const items = rows.map(({ _total: _, ...row }) => row);
+ * Expression for exact filtered counts used by the `countQuery` passed to
+ * `paginateList`.
  */
-export const totalCountWindow = sql<number>`count(*) over()`.mapWith(Number);
+export const totalCount = sql<number>`count(*)`.mapWith(Number);
+
+type LimitOffsetQuery<TRow> = {
+  limit: (limit: number) => {
+    offset: (offset: number) => PromiseLike<TRow[]>;
+  };
+};
+
+type CountQuery = PromiseLike<{ total: number }[]>;
+
+export async function paginateList<TRow>({
+  countQuery,
+  limit,
+  offset,
+  query,
+}: {
+  countQuery: CountQuery;
+  limit: number;
+  offset: number;
+  query: LimitOffsetQuery<TRow>;
+}) {
+  const [items, countRows] = await Promise.all([
+    query.limit(limit).offset(offset),
+    countQuery,
+  ]);
+
+  return {
+    items,
+    total: countRows[0]?.total ?? 0,
+  };
+}

@@ -1,6 +1,5 @@
 export { AdminUserCreateForm } from "./create-user-form";
 export { AdminUsersFilterDialog } from "./filter-dialog";
-export { AdminUsersPagination } from "./pagination";
 export {
   ADMIN_USERS_BOOLEAN_FILTER_VALUES,
   ADMIN_USERS_FILTER_FIELD_CONFIGS,

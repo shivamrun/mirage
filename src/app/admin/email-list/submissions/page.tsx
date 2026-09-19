@@ -1,8 +1,13 @@
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
+import { Pagination } from "@/components/ui/pagination";
 import { AdminEmailSubmissionsPanel } from "@/features/admin/components";
 import {
   type AdminEmailListPageSearchParams,
+  adminEmailListHrefFromSearchParams,
+  adminEmailListRawHrefFromSearchParams,
+  emailListPageHref,
   parseAdminEmailListSearchParams,
 } from "@/features/admin/query/email-list-query";
 import {
@@ -24,17 +29,31 @@ export default async function AdminEmailListSubmissionsPage({
   searchParams,
 }: AdminEmailListSubmissionsPageProps) {
   const params = await searchParams;
-  const state = parseAdminEmailListSearchParams(params);
+  const { page, ...state } = parseAdminEmailListSearchParams(params);
+  const canonicalHref = adminEmailListHrefFromSearchParams(params);
   const requestHeaders = await headers();
 
   await requireAdmin({
     headers: requestHeaders,
   });
 
+  if (adminEmailListRawHrefFromSearchParams(params) !== canonicalHref) {
+    redirect(canonicalHref);
+  }
+
   const [lists, subscribers] = await Promise.all([
     listAdminEmailListsView(),
-    listAdminEmailSubscribersView({ state }),
+    listAdminEmailSubscribersView({ page, state }),
   ]);
+
+  if (page !== subscribers.page) {
+    redirect(
+      emailListPageHref({
+        page: subscribers.page,
+        ...state,
+      }),
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -50,7 +69,18 @@ export default async function AdminEmailListSubmissionsPage({
       <AdminEmailSubmissionsPanel
         lists={lists}
         state={state}
-        subscribers={subscribers}
+        subscribers={subscribers.subscribers}
+      />
+
+      <Pagination
+        entityLabel="submissions"
+        getPageHref={(page) =>
+          emailListPageHref({
+            page,
+            ...state,
+          })
+        }
+        pagination={subscribers}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 export {
   ADMIN_CONTACT_SUBMISSION_PAGE_PATH,
+  ADMIN_CONTACT_SUBMISSION_PAGE_SIZE,
   type AdminContactSubmissionListItem,
   type AdminContactSubmissionPageSearchParams,
   type AdminContactSubmissionQueryState,
@@ -11,5 +12,6 @@ export {
   type ContactSubmissionSearchParamValue,
   type ContactSubmissionStatus,
   contactSubmissionsPageHref,
+  type ParsedAdminContactSubmissionSearchParams,
   parseAdminContactSubmissionSearchParams,
 } from "@/features/admin/query/contact-submission-query";
