@@ -5,10 +5,11 @@ import {
   ShieldCheck,
   User,
 } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
+import { AppHeader } from "@/components/app/app-header";
 import { Button } from "@/components/ui/button";
 import { EmailSignupForm } from "@/features/email-list/components";
+import { getCurrentUser } from "@/server/db/services/auth/access";
 import { siteConfig } from "@/shared/metadata";
 
 const starterModules = [
@@ -65,47 +66,12 @@ const legalLinks = [
   },
 ] as const;
 
-const Page = () => {
+const Page = async () => {
+  const user = await getCurrentUser();
+
   return (
     <main className="min-h-dvh bg-background">
-      <header className="border-border border-b">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-5">
-          <Link
-            className="flex items-center gap-3"
-            href={siteConfig.links.home}
-          >
-            <Image
-              src={siteConfig.logo}
-              alt={`${siteConfig.name} logo`}
-              width={36}
-              height={36}
-              className="size-9"
-              priority
-            />
-            <span className="font-semibold text-lg">{siteConfig.name}</span>
-          </Link>
-          <nav className="flex items-center gap-2" aria-label="Primary">
-            <Button asChild className="hidden md:inline-flex" variant="ghost">
-              <Link href="/guides">Guides</Link>
-            </Button>
-            <Button asChild className="hidden md:inline-flex" variant="ghost">
-              <Link href="/articles">Articles</Link>
-            </Button>
-            <Button asChild className="hidden sm:inline-flex" variant="ghost">
-              <Link href="/contact">Contact</Link>
-            </Button>
-            <Button asChild className="hidden sm:inline-flex" variant="ghost">
-              <Link href="/login">Sign in</Link>
-            </Button>
-            <Button asChild size="sm">
-              <Link href="/register">
-                Create account
-                <ArrowRight data-icon="inline-end" />
-              </Link>
-            </Button>
-          </nav>
-        </div>
-      </header>
+      <AppHeader isAuthenticated={Boolean(user)} />
 
       <section className="mx-auto grid w-full max-w-6xl gap-10 px-6 py-10 sm:py-14 lg:grid-cols-[minmax(0,1fr)_22rem] lg:py-20">
         <div className="flex flex-col gap-8">

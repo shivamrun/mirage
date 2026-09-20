@@ -42,7 +42,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (authRoutes.has(pathname) && session) {
-    return redirectTo("/", request);
+    return redirectTo("/account", request);
   }
 
   return NextResponse.next({

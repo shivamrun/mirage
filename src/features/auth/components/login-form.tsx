@@ -31,7 +31,7 @@ import {
 } from "@/shared/schemas";
 
 function LoginForm({
-  redirectTo = "/",
+  redirectTo = "/account",
   resetSuccess = false,
   googleAuthEnabled = false,
 }: {
@@ -94,7 +94,7 @@ function LoginForm({
           <Link
             className="link-text"
             href={
-              redirectTo === "/"
+              redirectTo === "/account"
                 ? "/register"
                 : `/register?callbackURL=${encodeURIComponent(redirectTo)}`
             }

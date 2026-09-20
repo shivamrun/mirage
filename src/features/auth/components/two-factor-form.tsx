@@ -19,7 +19,7 @@ import { api } from "@/shared/api/client";
 
 function TwoFactorForm({
   mode = "login",
-  redirectTo = "/",
+  redirectTo = "/account",
 }: {
   mode?: "admin-step-up" | "login";
   redirectTo?: string;
