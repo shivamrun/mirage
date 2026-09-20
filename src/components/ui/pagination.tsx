@@ -1,4 +1,8 @@
-import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  MoreHorizontalIcon,
+} from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -81,11 +85,7 @@ function PaginationPageButton({
   );
 }
 
-export function Pagination({
-  entityLabel,
-  getPageHref,
-  pagination,
-}: PaginationProps) {
+function Pagination({ entityLabel, getPageHref, pagination }: PaginationProps) {
   const pages = getPaginationWindow({
     page: pagination.page,
     totalPages: pagination.totalPages,
@@ -108,7 +108,7 @@ export function Pagination({
           href={getPageHref(pagination.page - 1)}
           label="Go to previous page"
         >
-          <ChevronLeft />
+          <ChevronLeftIcon />
         </PaginationLinkButton>
 
         <div className="flex items-center gap-1">
@@ -117,9 +117,9 @@ export function Pagination({
               <span
                 aria-hidden="true"
                 className="flex size-7 items-center justify-center text-muted-foreground"
-                key={`ellipsis-${index}`}
+                key={`ellipsis-${pages[index - 1]}-${pages[index + 1]}`}
               >
-                <MoreHorizontal className="size-3.5" />
+                <MoreHorizontalIcon className="size-3.5" />
               </span>
             ) : (
               <PaginationPageButton
@@ -137,9 +137,11 @@ export function Pagination({
           href={getPageHref(pagination.page + 1)}
           label="Go to next page"
         >
-          <ChevronRight />
+          <ChevronRightIcon />
         </PaginationLinkButton>
       </nav>
     </footer>
   );
 }
+
+export { Pagination };

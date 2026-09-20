@@ -1,6 +1,6 @@
 import { Geist, Geist_Mono } from "next/font/google";
-import { AppThemeProvider } from "@/components/app/app-theme-provider";
 import "./globals.css";
+import AppProvider from "@/components/app/app-provider";
 
 export { metadata, viewport } from "@/shared/metadata";
 
@@ -26,7 +26,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <AppThemeProvider>{children}</AppThemeProvider>
+        <AppProvider>{children}</AppProvider>
       </body>
     </html>
   );
