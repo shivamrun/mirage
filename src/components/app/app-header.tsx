@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { siteConfig } from "@/shared/metadata";
 import { AppHeaderAuthActions } from "./app-header-auth-actions";
+import { AppThemeToggle } from "./app-theme-toggle";
 
 function AppHeader({ isAuthenticated }: { isAuthenticated: boolean }) {
   return (
@@ -30,6 +31,7 @@ function AppHeader({ isAuthenticated }: { isAuthenticated: boolean }) {
           <Button asChild className="hidden sm:inline-flex" variant="ghost">
             <Link href="/contact">Contact</Link>
           </Button>
+          <AppThemeToggle />
           <AppHeaderAuthActions isAuthenticated={isAuthenticated} />
         </nav>
       </div>
