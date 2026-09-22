@@ -1,9 +1,6 @@
 import { isUploadSDKError } from "@marinedotsh/upload-sdk";
 import { Elysia } from "elysia";
-import {
-  createUploadSigner,
-  getUploadPublicUrl,
-} from "@/server/db/services/uploads";
+import { createUploadSigner, getUploadPublicUrl } from "@/adapters/uploads";
 import { elysiaAuth } from "@/server/http/auth";
 import { requestPolicy } from "@/server/http/request-policy";
 import {

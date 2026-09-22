@@ -1,10 +1,10 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
+import { resolveUploadPublicUrl } from "@/adapters/uploads";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { normalizeRoles } from "@/features/auth/roles";
 import type { AdminUserDetailUser } from "@/server/db/services/admin/user-detail";
-import { resolveUploadPublicUrl } from "@/server/db/services/uploads";
 import { cn } from "@/shared/utils";
 import { getInitials } from "../shared/user-display";
 import type { AdminUserDetailSection } from "./view";

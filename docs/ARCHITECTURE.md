@@ -9,7 +9,7 @@ The application is organized by ownership. Keep Next.js route files in
 | `src/server/routes` | Elysia API composition and route handlers | account, auth actions, contact, email list, uploads, admin |
 | `src/server/db` | Database ownership plus server-side DAL and services | Drizzle schema, raw DAL, feature services |
 | `src/server/http` | HTTP helpers for server routes and auth integration | Elysia auth, request policy, response helpers |
-| `src/adapters` | Technical adapters used by multiple capabilities | email delivery, request metrics, rate-limit stores |
+| `src/adapters` | Technical adapters used by multiple capabilities | email delivery, request metrics, rate-limit stores, upload storage |
 | `src/shared/schemas` | Browser/server-shared validation and API shapes | Zod request and response schemas |
 | `src/shared` | Small cross-feature, runtime-safe utilities and site content helpers | environment, metadata, typed API client |
 | `src/components` | App shell and reusable presentation primitives | UI kit, legal and content display |
@@ -27,6 +27,8 @@ The application is organized by ownership. Keep Next.js route files in
 - Keep rate-limit policy code in `src/adapters/rate-limit`. Backing
   implementations live in `src/adapters/rate-limit/stores`, so Redis or Valkey
   can replace the database store without changing callers.
+- Keep upload provider wiring in `src/adapters/uploads`. Browser-safe upload
+  policy and client helpers stay in `src/features/uploads`.
 - Use `schemas` for schemas that both an API and a browser consumer need.
   Do not import server implementations into browser components at runtime.
 - Use `shared` only when there is no natural feature owner. Avoid a generic
