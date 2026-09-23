@@ -15,7 +15,7 @@ import {
   AccountSectionStack,
 } from "@/features/account/components/account-section";
 import { AccountTwoFactorForm } from "@/features/account/components/account-two-factor-form";
-import { authClient } from "@/features/auth/client";
+import { authClient } from "@/features/auth/better-auth/client";
 
 type ImpersonatedSessionData = {
   session?: {

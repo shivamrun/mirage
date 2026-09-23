@@ -14,7 +14,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { authClient } from "@/features/auth/client";
+import { authClient } from "@/features/auth/better-auth/client";
 import { AuthStatusMessage } from "@/features/auth/components";
 import {
   getAuthErrorMessage,

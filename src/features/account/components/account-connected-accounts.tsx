@@ -5,7 +5,7 @@ import * as React from "react";
 import { HeadingBlock } from "@/components/heading-block";
 import { Button } from "@/components/ui/button";
 import { FieldSet } from "@/components/ui/field";
-import { authClient } from "@/features/auth/client";
+import { authClient } from "@/features/auth/better-auth/client";
 import {
   getAuthErrorMessage,
   getUnexpectedAuthErrorMessage,
@@ -156,7 +156,6 @@ function AccountConnectedAccounts({
 
     try {
       const result = await authClient.unlinkAccount({
-        providerId: "google",
         accountId: account.accountId,
       });
 

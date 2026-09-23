@@ -1,5 +1,5 @@
 import { AccountSecurityPage } from "@/features/account/components";
-import { isGoogleAuthConfigured } from "@/server/db/services/auth/better-auth";
+import { isGoogleAuthConfigured } from "@/features/auth/better-auth/server";
 import { getPageMetadata } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Security", {

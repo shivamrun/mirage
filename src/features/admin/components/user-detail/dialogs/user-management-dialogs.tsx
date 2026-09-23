@@ -37,7 +37,7 @@ import {
   FieldTitle,
 } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
-import { authClient } from "@/features/auth/client";
+import { authClient } from "@/features/auth/better-auth/client";
 import {
   AuthInputField,
   AuthStatusMessage,

@@ -7,7 +7,7 @@ import * as React from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
-import { authClient } from "@/features/auth/client";
+import { authClient } from "@/features/auth/better-auth/client";
 import {
   getAuthErrorMessage,
   getUnexpectedAuthErrorMessage,

@@ -14,6 +14,7 @@ import {
   bulkUpdateContactSubmissionStatusAction,
   updateContactSubmissionStatusAction,
 } from "@/app/admin/contact-submission/all/actions";
+import { auth } from "@/features/auth/better-auth/server";
 import db from "@/server/db";
 import {
   account,
@@ -23,7 +24,6 @@ import {
   user,
   verification,
 } from "@/server/db/schema";
-import { auth } from "@/server/db/services/auth/better-auth";
 import { app } from "@/server/routes";
 import { adminRoutes } from "@/server/routes/admin";
 import { env } from "@/shared/env";

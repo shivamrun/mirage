@@ -4,7 +4,7 @@ import { ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { authClient } from "@/features/auth/client";
+import { authClient } from "@/features/auth/better-auth/client";
 import {
   getAuthErrorMessage,
   getUnexpectedAuthErrorMessage,

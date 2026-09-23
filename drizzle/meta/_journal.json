@@ -120,6 +120,34 @@
       "when": 1789315256323,
       "tag": "0016_chemical_william_stryker",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790141512971,
+      "tag": "0017_nervous_black_bird",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790142187745,
+      "tag": "0018_burly_patch",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790144118771,
+      "tag": "0019_red_harry_osborn",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790144275672,
+      "tag": "0020_same_magneto",
+      "breakpoints": true
     }
   ]
 }

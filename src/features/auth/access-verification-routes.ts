@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { auth } from "@/server/db/services/auth/better-auth";
+import { auth } from "@/features/auth/better-auth/server";
 import { elysiaAuth } from "@/server/http/auth";
 import { requestPolicy } from "@/server/http/request-policy";
 import { env } from "@/shared/env";

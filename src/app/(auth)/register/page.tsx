@@ -1,9 +1,8 @@
 import { BadgeCheck, Database, KeyRound } from "lucide-react";
 import Image from "next/image";
-
+import { isGoogleAuthConfigured } from "@/features/auth/better-auth/server";
 import { RegisterForm } from "@/features/auth/components";
 import { getSafeAuthRedirect } from "@/features/auth/redirect";
-import { isGoogleAuthConfigured } from "@/server/db/services/auth/better-auth";
 import { getPageMetadata, siteConfig } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Create Account", {

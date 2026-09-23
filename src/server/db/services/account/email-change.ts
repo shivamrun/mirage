@@ -4,6 +4,7 @@ import {
   sendVerificationEmail,
 } from "@/adapters/email";
 import { consumeAccountEmailSendLimit } from "@/adapters/rate-limit";
+import { auth } from "@/features/auth/better-auth/server";
 import {
   consumePendingAndUpdateUserEmail,
   createVerification,
@@ -20,7 +21,6 @@ import {
   type PendingEmailChange,
   parsePendingEmailChange,
 } from "@/server/db/services/account/verification-schemas";
-import { auth } from "@/server/db/services/auth/better-auth";
 import type { AuthSession } from "@/server/db/services/auth/current-user";
 import { env } from "@/shared/env";
 import type { ChangeEmailValues } from "@/shared/schemas";

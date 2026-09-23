@@ -20,6 +20,7 @@ export const user = pgTable("user", {
   twoFactorEnabled: boolean("two_factor_enabled").default(false).notNull(),
 
   image: text("image"),
+  stripeCustomerId: text("stripe_customer_id"),
 
   role: text("role").default("user"),
   banned: boolean("banned").default(false),
@@ -121,6 +122,42 @@ export const twoFactor = pgTable(
   (table) => [
     index("twoFactor_secret_idx").on(table.secret),
     index("twoFactor_userId_idx").on(table.userId),
+  ],
+);
+
+export const subscription = pgTable(
+  "subscription",
+  {
+    id: text("id").primaryKey(),
+
+    plan: text("plan").notNull(),
+    referenceId: text("reference_id").notNull(),
+
+    stripeCustomerId: text("stripe_customer_id"),
+    stripeSubscriptionId: text("stripe_subscription_id"),
+
+    status: text("status").default("incomplete"),
+
+    periodStart: eventTimestamp("period_start"),
+    periodEnd: eventTimestamp("period_end"),
+    trialStart: eventTimestamp("trial_start"),
+    trialEnd: eventTimestamp("trial_end"),
+
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
+    cancelAt: eventTimestamp("cancel_at"),
+    canceledAt: eventTimestamp("canceled_at"),
+    endedAt: eventTimestamp("ended_at"),
+
+    seats: integer("seats"),
+    billingInterval: text("billing_interval"),
+    stripeScheduleId: text("stripe_schedule_id"),
+  },
+  (table) => [
+    index("subscription_referenceId_idx").on(table.referenceId),
+    index("subscription_stripeCustomerId_idx").on(table.stripeCustomerId),
+    index("subscription_stripeSubscriptionId_idx").on(
+      table.stripeSubscriptionId,
+    ),
   ],
 );
 

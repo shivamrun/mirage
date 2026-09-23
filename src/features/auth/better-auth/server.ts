@@ -1,20 +1,39 @@
+import { type StripePlan, stripe } from "@better-auth/stripe";
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { admin, twoFactor } from "better-auth/plugins";
+import Stripe from "stripe";
 import {
   sendVerificationEmail as sendAuthVerificationEmail,
   sendPasswordResetEmail,
   sendWelcomeEmail,
 } from "@/adapters/email";
+import { authHooks } from "@/features/auth/better-auth/hooks";
 import { authAccessControl, authRolePermissions } from "@/features/auth/roles";
 import { createAuthDatabaseAdapter } from "@/server/db/dal/auth";
-import { authHooks } from "@/server/db/services/auth/hooks";
+import { listActiveBillingPlans } from "@/server/db/dal/billing-plan";
 import { env } from "@/shared/env";
 import { siteConfig } from "@/shared/metadata";
 
 export const isGoogleAuthConfigured = Boolean(
   env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET,
 );
+
+const stripeClient = new Stripe(env.STRIPE_SECRET_KEY, {
+  apiVersion: "2026-08-26.dahlia",
+});
+
+async function listSubscriptionPlans(): Promise<StripePlan[]> {
+  const plans = await listActiveBillingPlans();
+
+  return plans.map((plan) => ({
+    name: plan.name,
+    priceId: plan.stripePriceId,
+    annualDiscountPriceId: plan.stripeAnnualDiscountPriceId ?? undefined,
+    group: plan.group ?? undefined,
+    limits: plan.limits ?? undefined,
+  }));
+}
 
 export const auth = betterAuth({
   appName: siteConfig.name,
@@ -90,5 +109,14 @@ export const auth = betterAuth({
       issuer: siteConfig.name,
     }),
     nextCookies(),
+    stripe({
+      stripeClient,
+      stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET,
+      createCustomerOnSignUp: true,
+      subscription: {
+        enabled: true,
+        plans: listSubscriptionPlans,
+      },
+    }),
   ],
 });

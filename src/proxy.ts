@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { auth } from "@/features/auth/better-auth/server";
 import { getSafeAuthRedirect } from "@/features/auth/redirect";
-import { auth } from "@/server/db/services/auth/better-auth";
 
 const authRoutes = new Set(["/login", "/register"]);
 const protectedRoutePrefixes = ["/account", "/admin"];

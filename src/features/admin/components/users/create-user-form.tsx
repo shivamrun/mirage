@@ -17,7 +17,7 @@ import {
   FieldSet,
   FieldTitle,
 } from "@/components/ui/field";
-import { authClient } from "@/features/auth/client";
+import { authClient } from "@/features/auth/better-auth/client";
 import {
   AuthInputField,
   AuthStatusMessage,

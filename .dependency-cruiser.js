@@ -36,6 +36,22 @@ module.exports = {
       },
     },
     {
+      name: "db-dal-only-in-db-services-and-auth-adapter",
+      comment:
+        "DAL modules should be consumed by database services. Better Auth server setup is a reviewed exception because it wires the auth database adapter.",
+      severity: "error",
+      from: {
+        pathNot: [
+          "^src/server/db/services/",
+          "^src/server/routes/index\\.ts$",
+          "^src/features/auth/better-auth/server\\.ts$",
+        ],
+      },
+      to: {
+        path: "^src/server/db/dal/",
+      },
+    },
+    {
       name: "db-helpers-only-in-db-layer",
       comment:
         "Database helper modules must stay database-owned. Generic feature math belongs with its feature.",

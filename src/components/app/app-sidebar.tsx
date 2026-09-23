@@ -37,7 +37,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { authClient } from "@/features/auth/client";
+import { authClient } from "@/features/auth/better-auth/client";
 import { normalizeRoles, type RoleValue } from "@/features/auth/roles";
 import { siteConfig } from "@/shared/metadata";
 

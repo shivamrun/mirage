@@ -1,3 +1,4 @@
+import { auth } from "@/features/auth/better-auth/server";
 import {
   deleteAdminLinkedAccount,
   getAdminUserSessionForDeletion,
@@ -12,7 +13,6 @@ import {
   canDeleteLinkedAccount,
   canDeleteUserSession,
 } from "@/server/db/services/auth/admin-access";
-import { auth } from "@/server/db/services/auth/better-auth";
 import type { CurrentUser } from "@/server/db/services/auth/current-user";
 import { env } from "@/shared/env";
 

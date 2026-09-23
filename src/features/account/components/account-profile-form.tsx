@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { ImageCropper } from "@/components/ui/image-cropper";
 import { InputGroup, InputGroupInput } from "@/components/ui/input-group";
-import { authClient } from "@/features/auth/client";
+import { authClient } from "@/features/auth/better-auth/client";
 import { AuthStatusMessage } from "@/features/auth/components";
 import {
   getAuthErrorMessage,

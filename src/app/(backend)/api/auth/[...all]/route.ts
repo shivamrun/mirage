@@ -1,6 +1,6 @@
 import { toNextJsHandler } from "better-auth/next-js";
 import { observeRequest } from "@/adapters/operations/request-observability";
-import { auth } from "@/server/db/services/auth/better-auth";
+import { auth } from "@/features/auth/better-auth/server";
 import {
   authPolicyDecisionToNextResponse,
   resolveNextAdminAccess,

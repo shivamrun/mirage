@@ -58,6 +58,8 @@ export const env = createEnv({
     GOOGLE_CLIENT_ID: optionalEnvString,
     GOOGLE_CLIENT_SECRET: optionalEnvString,
     RESEND_API_KEY: optionalEnvString,
+    STRIPE_SECRET_KEY: z.string().min(1),
+    STRIPE_WEBHOOK_SECRET: z.string().min(1),
   },
   client: {
     NEXT_PUBLIC_BASE_URL: z.url(),
@@ -81,6 +83,8 @@ export const env = createEnv({
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     NEXT_PUBLIC_UPLOAD_BASE_URL: process.env.NEXT_PUBLIC_UPLOAD_BASE_URL,
   },
 });
