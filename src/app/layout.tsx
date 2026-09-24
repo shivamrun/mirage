@@ -1,6 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AppProvider from "@/components/app/app-provider";
+import { AppThemeScript } from "@/components/app/app-theme-script";
 
 export { metadata, viewport } from "@/shared/metadata";
 
@@ -25,6 +26,9 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        <AppThemeScript />
+      </head>
       <body className="min-h-full flex flex-col">
         <AppProvider>{children}</AppProvider>
       </body>

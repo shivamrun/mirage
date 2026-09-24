@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   ChevronRight,
+  CreditCard,
   Home,
   Inbox,
   LayoutDashboard,
@@ -47,6 +48,11 @@ const userData = {
       title: "Home",
       url: "/",
       icon: Home,
+    },
+    {
+      title: "Billing",
+      url: "/billing",
+      icon: CreditCard,
     },
     {
       title: "Account",

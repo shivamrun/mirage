@@ -28,6 +28,9 @@ function AppHeader({ isAuthenticated }: { isAuthenticated: boolean }) {
           <Button asChild className="hidden md:inline-flex" variant="ghost">
             <Link href="/articles">Articles</Link>
           </Button>
+          <Button asChild className="hidden md:inline-flex" variant="ghost">
+            <Link href="/pricing">Pricing</Link>
+          </Button>
           <Button asChild className="hidden sm:inline-flex" variant="ghost">
             <Link href="/contact">Contact</Link>
           </Button>

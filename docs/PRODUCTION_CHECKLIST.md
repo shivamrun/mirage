@@ -76,9 +76,10 @@ changes, security reviews, or reliability hardening passes.
 - Select at least these webhook events:
   `checkout.session.completed`, `customer.subscription.created`,
   `customer.subscription.updated`, and `customer.subscription.deleted`.
-- Verify the Stripe lookup keys used by the static `Pro` plan exist in the
-  production Stripe account: `mirage_pro_2_monthly` and
-  `mirage_pro_2_yearly`.
+- Verify the Stripe lookup keys used by static paid plans exist in the
+  production Stripe account: `mirage_pro_2_monthly`,
+  `mirage_pro_2_yearly`, `mirage_hacker_monthly`, and
+  `mirage_hacker_yearly`.
 - Send a Stripe test webhook event in a production-like environment and confirm
   the request is accepted before launch.
 
