@@ -15,6 +15,8 @@ delete process.env.TRUSTED_CLIENT_IP_HEADER;
 process.env.BETTER_AUTH_SECRET ??= "test-only-secret-at-least-32-characters";
 process.env.BETTER_AUTH_URL ??= "http://localhost:3000";
 process.env.NEXT_PUBLIC_BASE_URL ??= "http://localhost:3000";
+process.env.STRIPE_SECRET_KEY ??= "sk_test_test-only";
+process.env.STRIPE_WEBHOOK_SECRET ??= "whsec_test-only";
 
 vi.mock("@/adapters/email/send-email", () => ({ sendEmail: sendTestEmail }));
 

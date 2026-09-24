@@ -67,6 +67,21 @@ changes, security reviews, or reliability hardening passes.
   fallback, and email-list verification flows.
 - Decide how failed email delivery should be monitored and retried.
 
+## Stripe Billing
+
+- Confirm `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are configured in the
+  production environment.
+- Create the Stripe webhook endpoint for the production domain:
+  `https://<production-domain>/api/auth/stripe/webhook`.
+- Select at least these webhook events:
+  `checkout.session.completed`, `customer.subscription.created`,
+  `customer.subscription.updated`, and `customer.subscription.deleted`.
+- Verify the Stripe lookup keys used by the static `Pro` plan exist in the
+  production Stripe account: `mirage_pro_2_monthly` and
+  `mirage_pro_2_yearly`.
+- Send a Stripe test webhook event in a production-like environment and confirm
+  the request is accepted before launch.
+
 ## Authentication And Admin Access
 
 - Verify admin accounts require the intended role, verified email, and two-factor
