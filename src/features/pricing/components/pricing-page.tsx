@@ -154,6 +154,7 @@ function PricingPage({
                     interval={interval}
                     isCurrentPlan={isCurrentPlan}
                     isAuthenticated={isAuthenticated}
+                    plan={plan.key}
                     planName={plan.checkoutPlanName}
                     scheduleAtPeriodEnd={shouldSchedulePlanChangeAtPeriodEnd({
                       currentInterval,

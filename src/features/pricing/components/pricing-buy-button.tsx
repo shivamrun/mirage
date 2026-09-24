@@ -7,12 +7,14 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/features/auth/better-auth/client";
 import { getUnexpectedAuthErrorMessage } from "@/features/auth/components/auth-errors";
-import type { BillingInterval } from "@/features/pricing/plans";
+import { getPricingCheckoutPath } from "@/features/pricing/checkout-intent";
+import type { BillingInterval, PricingPlanKey } from "@/features/pricing/plans";
 
 function PricingBuyButton({
   interval,
   isCurrentPlan,
   isAuthenticated,
+  plan,
   planName,
   scheduleAtPeriodEnd,
   subscriptionId,
@@ -21,6 +23,7 @@ function PricingBuyButton({
   interval: BillingInterval;
   isCurrentPlan?: boolean;
   isAuthenticated: boolean;
+  plan: Exclude<PricingPlanKey, "free">;
   planName: string;
   scheduleAtPeriodEnd?: boolean;
   subscriptionId?: null | string;
@@ -36,7 +39,11 @@ function PricingBuyButton({
     setError(undefined);
 
     if (!isAuthenticated) {
-      router.push("/register?callbackURL=/pricing");
+      router.push(
+        `/register?${new URLSearchParams({
+          callbackURL: getPricingCheckoutPath({ interval, plan }),
+        })}`,
+      );
       return;
     }
 

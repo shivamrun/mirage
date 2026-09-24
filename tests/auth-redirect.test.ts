@@ -16,6 +16,10 @@ describe("auth redirect policy", () => {
     ["/admin", "/admin"],
     ["/admin?tab=users", "/admin?tab=users"],
     ["/account/security#two-factor", "/account/security#two-factor"],
+    [
+      "/checkout?plan=pro&interval=monthly",
+      "/checkout?plan=pro&interval=monthly",
+    ],
   ] as const)("normalizes %s to %s", (input, expected) => {
     expect(getSafeAuthRedirect(input)).toBe(expected);
   });

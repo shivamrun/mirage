@@ -12,14 +12,24 @@ function isProtectedRoute(pathname: string) {
   );
 }
 
-function redirectTo(pathname: string, request: NextRequest) {
+function redirectTo(
+  pathname: string,
+  request: NextRequest,
+  callbackURL?: string,
+) {
   const redirectURL = new URL(pathname, request.url);
 
   if (pathname === "/login") {
-    const callbackURL = getSafeAuthRedirect(
+    const safeCallbackURL = getSafeAuthRedirect(
       `${request.nextUrl.pathname}${request.nextUrl.search}`,
     );
-    redirectURL.searchParams.set("callbackURL", callbackURL);
+    redirectURL.searchParams.set("callbackURL", safeCallbackURL);
+  }
+
+  if (callbackURL) {
+    return NextResponse.redirect(
+      new URL(getSafeAuthRedirect(callbackURL), request.url),
+    );
   }
 
   return NextResponse.redirect(redirectURL);
@@ -42,7 +52,11 @@ export async function proxy(request: NextRequest) {
   }
 
   if (authRoutes.has(pathname) && session) {
-    return redirectTo("/account", request);
+    return redirectTo(
+      "/account",
+      request,
+      request.nextUrl.searchParams.get("callbackURL") ?? undefined,
+    );
   }
 
   return NextResponse.next({
