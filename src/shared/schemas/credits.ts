@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { creditSampleItemKeys } from "@/shared/credits/sample-catalog";
+
 const optionalTrimmedStringSchema = z
   .string()
   .trim()
@@ -35,6 +37,25 @@ export const creditBalanceResponseSchema = z.object({
   recentLedger: z.array(creditLedgerEntryResponseSchema),
 });
 
+export const creditSampleCreateRequestSchema = z.object({
+  idempotencyKey: z.string().trim().min(1).max(200),
+  itemKey: z.enum(creditSampleItemKeys, {
+    error: "Choose a valid credit sample item.",
+  }),
+});
+
+export const creditSampleCreatedEntrySchema = z.object({
+  body: z.string(),
+  creditsSpent: z.number().int(),
+  itemKey: z.string(),
+  title: z.string(),
+});
+
+export const creditSampleCreateResponseSchema = z.object({
+  balance: creditBalanceResponseSchema,
+  created: creditSampleCreatedEntrySchema,
+});
+
 export const adminCreditAdjustmentSchema = z.object({
   amount: z.preprocess(
     (value) => (typeof value === "string" ? Number(value) : value),
@@ -61,4 +82,11 @@ export type AdminCreditAdjustmentInput = z.input<
 >;
 export type AdminCreditAdjustmentValues = z.output<
   typeof adminCreditAdjustmentSchema
+>;
+export type CreditBalanceResponse = z.infer<typeof creditBalanceResponseSchema>;
+export type CreditSampleCreateInput = z.input<
+  typeof creditSampleCreateRequestSchema
+>;
+export type CreditSampleCreateResponse = z.infer<
+  typeof creditSampleCreateResponseSchema
 >;

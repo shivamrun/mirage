@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   ChevronRight,
+  Coins,
   CreditCard,
   Home,
   Inbox,
@@ -53,6 +54,11 @@ const userData = {
       title: "Billing",
       url: "/billing",
       icon: CreditCard,
+    },
+    {
+      title: "Credit Lab",
+      url: "/credits",
+      icon: Coins,
     },
     {
       title: "Account",

@@ -55,6 +55,7 @@ const mutationRoutes = [
     access: "user",
   },
   { method: "POST", path: "/api/contact/", access: "public" },
+  { method: "POST", path: "/api/credits/sample-create", access: "user" },
   { method: "POST", path: "/api/email-list/", access: "public" },
   { method: "POST", path: "/api/uploads/", access: "user" },
   {
@@ -141,6 +142,12 @@ function requestBody(path: string) {
       name: "Phase Zero",
     });
   }
+  if (path === "/api/credits/sample-create") {
+    return JSON.stringify({
+      idempotencyKey: `phase-zero-${randomUUID()}`,
+      itemKey: "tiny-note",
+    });
+  }
   if (path === "/api/email-list/") {
     return JSON.stringify({
       email: "phase-zero-list@example.com",
@@ -197,8 +204,8 @@ describe("current Elysia HTTP contract", () => {
     );
   });
 
-  it("guards all 24 mutations with the current origin response", async () => {
-    expect(mutationRoutes).toHaveLength(24);
+  it("guards all 25 mutations with the current origin response", async () => {
+    expect(mutationRoutes).toHaveLength(25);
     const user = await createTestActor();
     const admin = await createTestActor({ role: "admin", emailVerified: true });
     const sentBefore = testEmailOutbox.length;

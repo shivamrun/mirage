@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { AccountBillingPage } from "@/features/account/components";
+import { CreditLabPage } from "@/features/credits/components";
 import db from "@/server/db";
 import {
   creditAccounts,
@@ -350,6 +351,164 @@ describe("credit ledger", () => {
     });
   });
 
+  it("creates sample items through the credit API", async () => {
+    const actor = await createTestActor();
+    await adjustCredits({
+      amount: 120,
+      idempotencyKey: "manual:sample-create-budget",
+      userId: actor.id,
+    });
+
+    for (const [itemKey, credits] of [
+      ["tiny-note", 10],
+      ["project-idea", 30],
+      ["launch-checklist", 50],
+    ] as const) {
+      const response = await httpRequest(app, "/api/credits/sample-create", {
+        body: JSON.stringify({
+          idempotencyKey: `sample-create:${itemKey}`,
+          itemKey,
+        }),
+        cookie: actor.cookie,
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+        },
+        method: "POST",
+      });
+
+      expect(response.status, await response.clone().text()).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        created: {
+          creditsSpent: credits,
+          itemKey,
+        },
+      });
+    }
+
+    const balance = await getCreditBalance(actor.id);
+    const ledger = await db
+      .select()
+      .from(creditLedgerEntries)
+      .where(eq(creditLedgerEntries.userId, actor.id));
+
+    expect(balance.account.availableCredits).toBe(40);
+    expect(balance.account.lifetimeSpent).toBe(90);
+    expect(ledger).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          amount: -10,
+          source: "sample_credit_lab",
+          sourceId: "tiny-note",
+          type: "spend",
+        }),
+        expect.objectContaining({
+          amount: -30,
+          source: "sample_credit_lab",
+          sourceId: "project-idea",
+          type: "spend",
+        }),
+        expect.objectContaining({
+          amount: -50,
+          source: "sample_credit_lab",
+          sourceId: "launch-checklist",
+          type: "spend",
+        }),
+      ]),
+    );
+  });
+
+  it("guards sample credit creation inputs and balances", async () => {
+    const actor = await createTestActor();
+
+    const unauthenticated = await httpRequest(
+      app,
+      "/api/credits/sample-create",
+      {
+        body: JSON.stringify({
+          idempotencyKey: "sample-create:unauthenticated",
+          itemKey: "tiny-note",
+        }),
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+        },
+        method: "POST",
+      },
+    );
+    const invalidItem = await httpRequest(app, "/api/credits/sample-create", {
+      body: JSON.stringify({
+        idempotencyKey: "sample-create:invalid",
+        itemKey: "missing-item",
+      }),
+      cookie: actor.cookie,
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:3000",
+      },
+      method: "POST",
+    });
+    const tooExpensive = await httpRequest(app, "/api/credits/sample-create", {
+      body: JSON.stringify({
+        idempotencyKey: "sample-create:too-expensive",
+        itemKey: "project-idea",
+      }),
+      cookie: actor.cookie,
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:3000",
+      },
+      method: "POST",
+    });
+
+    expect(unauthenticated.status).toBe(401);
+    expect(invalidItem.status).toBe(400);
+    expect(tooExpensive.status, await tooExpensive.clone().text()).toBe(402);
+    await expect(tooExpensive.json()).resolves.toEqual({
+      message: "Insufficient credits. Available: 10. Required: 30.",
+    });
+  });
+
+  it("keeps sample credit creation idempotent", async () => {
+    const actor = await createTestActor();
+    const body = JSON.stringify({
+      idempotencyKey: "sample-create:idempotent",
+      itemKey: "tiny-note",
+    });
+
+    const first = await httpRequest(app, "/api/credits/sample-create", {
+      body,
+      cookie: actor.cookie,
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:3000",
+      },
+      method: "POST",
+    });
+    const second = await httpRequest(app, "/api/credits/sample-create", {
+      body,
+      cookie: actor.cookie,
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:3000",
+      },
+      method: "POST",
+    });
+
+    expect(first.status, await first.clone().text()).toBe(200);
+    expect(second.status, await second.clone().text()).toBe(200);
+    await expect(second.json()).resolves.toMatchObject({
+      balance: {
+        availableCredits: 0,
+        lifetimeSpent: 10,
+      },
+      created: {
+        creditsSpent: 10,
+        itemKey: "tiny-note",
+      },
+    });
+  });
+
   it("renders the billing credit counter for the authenticated user", async () => {
     const actor = await createTestActor();
     await adjustCredits({
@@ -397,6 +556,25 @@ describe("credit ledger", () => {
     expect(html).toContain("Credits");
     expect(html).toContain("16 / 10");
     expect(html).toContain("Credits remaining this period");
+  });
+
+  it("renders the credit lab items and prices", async () => {
+    const actor = await createTestActor();
+    const balance = await getCreditBalance(actor.id);
+
+    const html = renderToStaticMarkup(
+      createElement(CreditLabPage, {
+        balance,
+      }),
+    );
+
+    expect(html).toContain("Credit Lab");
+    expect(html).toContain("Tiny note");
+    expect(html).toContain("Project idea");
+    expect(html).toContain("Launch checklist");
+    expect(html).toContain(">10</");
+    expect(html).toContain(">30</");
+    expect(html).toContain(">50</");
   });
 
   it("loads admin user detail credits for only the selected user", async () => {
