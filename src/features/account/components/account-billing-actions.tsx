@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Loader2, RotateCcw, XCircle } from "lucide-react";
+import { Loader2, RotateCcw, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 

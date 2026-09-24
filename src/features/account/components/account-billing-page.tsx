@@ -61,6 +61,10 @@ function formatStatus(value: string | null | undefined) {
     .join(" ");
 }
 
+function isCancellationScheduled(subscription: BillingSubscriptionRecord) {
+  return Boolean(subscription.cancelAtPeriodEnd || subscription.cancelAt);
+}
+
 function getCurrentSubscription(subscriptions: BillingSubscriptionRecord[]) {
   return (
     subscriptions.find((subscription) =>
@@ -115,18 +119,18 @@ function SubscriptionSummary({
   }
 
   const isActive = activeStatuses.has(subscription.status ?? "");
+  const cancellationScheduled = isCancellationScheduled(subscription);
 
   const canCancel = Boolean(
     subscription.stripeSubscriptionId &&
       activeStatuses.has(subscription.status ?? "") &&
-      !subscription.cancelAtPeriodEnd &&
-      !subscription.cancelAt,
+      !cancellationScheduled,
   );
 
   const canRestore = Boolean(
     subscription.stripeSubscriptionId &&
       activeStatuses.has(subscription.status ?? "") &&
-      (subscription.cancelAtPeriodEnd || subscription.cancelAt),
+      cancellationScheduled,
   );
 
   return (
@@ -135,7 +139,7 @@ function SubscriptionSummary({
         <HeadingBlock
           className="min-w-0"
           description={
-            subscription.cancelAtPeriodEnd
+            cancellationScheduled
               ? "This subscription is scheduled to end at the current period."
               : "Your billing state is synced from Stripe webhooks."
           }
@@ -167,7 +171,16 @@ function SubscriptionSummary({
 
         <DetailRow
           label="Cancel at period end"
-          value={subscription.cancelAtPeriodEnd ? "Yes" : "No"}
+          value={cancellationScheduled ? "Yes" : "No"}
+        />
+
+        <DetailRow
+          label="Cancellation date"
+          value={
+            cancellationScheduled
+              ? formatDate(subscription.cancelAt ?? subscription.periodEnd)
+              : "Not set"
+          }
         />
 
         <DetailRow
