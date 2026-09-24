@@ -11,7 +11,6 @@ import {
 } from "@/features/account/components/account-section";
 import type { BillingSubscriptionRecord } from "@/server/db/dal/billing";
 import type { CurrentUser } from "@/server/db/services/auth/access";
-import type { BillingTransaction } from "@/server/db/services/billing/stripe-subscriptions";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
@@ -36,18 +35,6 @@ function formatBillingInterval(value: string | null | undefined) {
   }
 
   return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function formatTransactionBillingInterval(value: string | null | undefined) {
-  if (value === "month") {
-    return "Monthly";
-  }
-
-  if (value === "year") {
-    return "Annual";
-  }
-
-  return formatBillingInterval(value);
 }
 
 function formatStatus(value: string | null | undefined) {
@@ -80,17 +67,6 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       <dd className="min-w-0 break-words text-sm">{value}</dd>
     </div>
   );
-}
-
-function formatCurrency(amount: number, currency: string) {
-  return new Intl.NumberFormat("en-US", {
-    currency: currency.toUpperCase(),
-    style: "currency",
-  }).format(amount / 100);
-}
-
-function formatOptionalCurrency(amount: null | number, currency: string) {
-  return amount === null ? "-" : formatCurrency(amount, currency);
 }
 
 function SubscriptionSummary({
@@ -204,112 +180,29 @@ function SubscriptionSummary({
 
 function TransactionHistory({
   hasStripeCustomer,
-  transactions,
 }: {
   hasStripeCustomer: boolean;
-  transactions: BillingTransaction[];
 }) {
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-muted-foreground text-sm leading-6">
-          {transactions.length === 0
-            ? "No Stripe invoices have been recorded for this customer yet."
-            : "Showing the most recent invoices from Stripe."}
-        </p>
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-muted-foreground text-sm leading-6">
+        Open Stripe to review invoices, receipts, and payments.
+      </p>
 
-        <AccountBillingPortalButton
-          disabled={!hasStripeCustomer}
-          label="View all transactions"
-          variant="outline"
-        />
-      </div>
-
-      {transactions.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[50rem] text-left text-sm">
-            <thead className="text-muted-foreground">
-              <tr className="border-border border-b">
-                <th className="px-0 py-2 pr-4 font-medium">Plan</th>
-                <th className="px-0 py-2 pr-4 font-medium">Billing</th>
-                <th className="px-0 py-2 pr-4 font-medium">Expires</th>
-                <th className="px-0 py-2 pr-4 font-medium">Date</th>
-                <th className="px-0 py-2 pr-4 font-medium">Status</th>
-                <th className="px-0 py-2 pr-4 text-right font-medium">
-                  Amount
-                </th>
-                <th className="px-0 py-2 text-right font-medium">Receipt</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {transactions.map((transaction) => (
-                <tr
-                  className="border-border border-b last:border-b-0"
-                  key={transaction.id}
-                >
-                  <td className="px-0 py-3 pr-4">
-                    {transaction.planName ??
-                      transaction.invoiceNumber ??
-                      transaction.id}
-                  </td>
-
-                  <td className="px-0 py-3 pr-4">
-                    {formatTransactionBillingInterval(
-                      transaction.billingInterval,
-                    )}
-                  </td>
-
-                  <td className="px-0 py-3 pr-4">
-                    {formatDate(transaction.expiresAt)}
-                  </td>
-
-                  <td className="px-0 py-3 pr-4">
-                    {dateTimeFormatter.format(transaction.timestamp)}
-                  </td>
-
-                  <td className="px-0 py-3 pr-4">
-                    {formatStatus(transaction.status)}
-                  </td>
-
-                  <td className="px-0 py-3 pr-4 text-right">
-                    {formatOptionalCurrency(
-                      transaction.amountPaid,
-                      transaction.currency,
-                    )}
-                  </td>
-
-                  <td className="px-0 py-3 text-right">
-                    {transaction.hostedInvoiceUrl ? (
-                      <a
-                        className="link-text"
-                        href={transaction.hostedInvoiceUrl}
-                        rel="noreferrer"
-                        target="_blank"
-                      >
-                        Open
-                      </a>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
+      <AccountBillingPortalButton
+        disabled={!hasStripeCustomer}
+        label="View all transaction history"
+        variant="outline"
+      />
     </div>
   );
 }
 
 function AccountBillingPage({
   subscriptions,
-  transactions,
   user,
 }: {
   subscriptions: BillingSubscriptionRecord[];
-  transactions: BillingTransaction[];
   user: CurrentUser;
 }) {
   const currentSubscription = getCurrentSubscription(subscriptions);
@@ -343,13 +236,10 @@ function AccountBillingPage({
           </AccountSection>
 
           <AccountSection
-            description="Recent invoices and payments from Stripe."
+            description="Invoices and payments are managed in Stripe."
             title="Transaction history"
           >
-            <TransactionHistory
-              hasStripeCustomer={hasStripeCustomer}
-              transactions={transactions}
-            />
+            <TransactionHistory hasStripeCustomer={hasStripeCustomer} />
           </AccountSection>
         </AccountSectionStack>
       </div>
