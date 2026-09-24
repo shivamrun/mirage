@@ -148,6 +148,13 @@
       "when": 1790144275672,
       "tag": "0020_same_magneto",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790227573763,
+      "tag": "0021_yielding_lyja",
+      "breakpoints": true
     }
   ]
 }

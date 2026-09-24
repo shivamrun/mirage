@@ -1,0 +1,1 @@
+DROP TABLE "mirage_billing_plan" CASCADE;
