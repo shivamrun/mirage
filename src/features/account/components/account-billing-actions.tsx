@@ -19,6 +19,9 @@ function AccountBillingActions({
 }) {
   const router = useRouter();
   const [error, setError] = React.useState<string>();
+  const [redirectingAction, setRedirectingAction] = React.useState<
+    "cancel" | undefined
+  >();
   const [pendingAction, setPendingAction] = React.useState<
     "cancel" | "restore" | undefined
   >();
@@ -51,6 +54,7 @@ function AccountBillingActions({
           result.data && "url" in result.data ? result.data.url : undefined;
 
         if (cancelUrl) {
+          setRedirectingAction("cancel");
           window.location.assign(cancelUrl);
           return;
         }
@@ -115,17 +119,19 @@ function AccountBillingActions({
 
         {canCancel ? (
           <Button
-            disabled={pendingAction === "cancel"}
+            disabled={
+              pendingAction === "cancel" || redirectingAction === "cancel"
+            }
             onClick={cancelSubscription}
             type="button"
             variant="destructive"
           >
-            {pendingAction === "cancel" ? (
+            {pendingAction === "cancel" || redirectingAction === "cancel" ? (
               <Loader2 className="animate-spin" data-icon="inline-start" />
             ) : (
               <XCircle data-icon="inline-start" />
             )}
-            Cancel plan
+            {redirectingAction === "cancel" ? "Redirecting..." : "Cancel plan"}
           </Button>
         ) : null}
       </div>

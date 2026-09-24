@@ -23,8 +23,10 @@ export const metadata: Metadata = getPageMetadata("Pricing", {
 const activeStatuses = new Set(["active", "trialing"]);
 
 function getCurrentSubscription(subscriptions: BillingSubscriptionRecord[]) {
-  return subscriptions.find((subscription) =>
-    activeStatuses.has(subscription.status ?? ""),
+  return (
+    subscriptions.find((subscription) =>
+      activeStatuses.has(subscription.status ?? ""),
+    ) ?? subscriptions[0]
   );
 }
 
@@ -80,6 +82,7 @@ const Page = async () => {
         )}
         currentPlan={getPlanKey(currentSubscription?.plan)}
         isAuthenticated={Boolean(user)}
+        subscriptionId={currentSubscription?.stripeSubscriptionId}
       />
     </main>
   );

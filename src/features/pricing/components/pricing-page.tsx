@@ -10,20 +10,53 @@ import { PricingBuyButton } from "@/features/pricing/components/pricing-buy-butt
 import {
   type BillingInterval,
   billingIntervalLabels,
+  billingIntervalRank,
   type PricingPlanKey,
+  pricingPlanRank,
   pricingPlans,
 } from "@/features/pricing/plans";
+
+function shouldSchedulePlanChangeAtPeriodEnd({
+  currentInterval,
+  currentPlan,
+  interval,
+  plan,
+}: {
+  currentInterval?: BillingInterval;
+  currentPlan: PricingPlanKey;
+  interval: BillingInterval;
+  plan: PricingPlanKey;
+}) {
+  // TODO: Add an explicit immediate-downgrade flow with Stripe credit/refund copy.
+  if (pricingPlanRank[plan] < pricingPlanRank[currentPlan]) {
+    return true;
+  }
+
+  if (
+    plan === currentPlan &&
+    currentInterval &&
+    billingIntervalRank[interval] < billingIntervalRank[currentInterval]
+  ) {
+    return true;
+  }
+
+  return false;
+}
 
 function PricingPage({
   currentInterval,
   currentPlan = "free",
   isAuthenticated,
+  subscriptionId,
 }: {
   currentInterval?: BillingInterval;
   currentPlan?: PricingPlanKey;
   isAuthenticated: boolean;
+  subscriptionId?: null | string;
 }) {
-  const [interval, setInterval] = React.useState<BillingInterval>("monthly");
+  const [interval, setInterval] = React.useState<BillingInterval>(
+    currentInterval ?? "monthly",
+  );
 
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 py-10 sm:py-14 lg:py-16">
@@ -122,6 +155,13 @@ function PricingPage({
                     isCurrentPlan={isCurrentPlan}
                     isAuthenticated={isAuthenticated}
                     planName={plan.checkoutPlanName}
+                    scheduleAtPeriodEnd={shouldSchedulePlanChangeAtPeriodEnd({
+                      currentInterval,
+                      currentPlan,
+                      interval,
+                      plan: plan.key,
+                    })}
+                    subscriptionId={subscriptionId}
                     text={plan.cta}
                   />
                 ) : (

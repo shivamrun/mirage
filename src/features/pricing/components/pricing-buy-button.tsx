@@ -14,17 +14,23 @@ function PricingBuyButton({
   isCurrentPlan,
   isAuthenticated,
   planName,
+  scheduleAtPeriodEnd,
+  subscriptionId,
   text,
 }: {
   interval: BillingInterval;
   isCurrentPlan?: boolean;
   isAuthenticated: boolean;
   planName: string;
+  scheduleAtPeriodEnd?: boolean;
+  subscriptionId?: null | string;
   text: string;
 }) {
   const router = useRouter();
   const [error, setError] = React.useState<string>();
+  const [isRedirecting, setIsRedirecting] = React.useState(false);
   const [isPending, startTransition] = React.useTransition();
+  const isBusy = isPending || isRedirecting;
 
   function handleCheckout() {
     setError(undefined);
@@ -42,8 +48,10 @@ function PricingBuyButton({
           cancelUrl: `${origin}/pricing?checkout=cancelled`,
           disableRedirect: true,
           plan: planName,
+          scheduleAtPeriodEnd,
+          subscriptionId: subscriptionId ?? undefined,
           returnUrl: `${origin}/billing?checkout=updated`,
-          successUrl: `${origin}/account?checkout=success`,
+          successUrl: `${origin}/billing?checkout=success`,
         });
 
         if (result.error) {
@@ -55,6 +63,7 @@ function PricingBuyButton({
           result.data && "url" in result.data ? result.data.url : undefined;
 
         if (checkoutUrl) {
+          setIsRedirecting(true);
           window.location.assign(checkoutUrl);
           return;
         }
@@ -70,15 +79,19 @@ function PricingBuyButton({
     <div className="space-y-2">
       <Button
         className="w-full"
-        disabled={isCurrentPlan || isPending}
+        disabled={isCurrentPlan || isBusy}
         onClick={handleCheckout}
         type="button"
       >
-        {isPending ? (
+        {isBusy ? (
           <Loader2 className="animate-spin" data-icon="inline-start" />
         ) : null}
-        {isCurrentPlan ? "Current plan" : text}
-        {isCurrentPlan ? null : <ArrowRight data-icon="inline-end" />}
+        {isCurrentPlan
+          ? "Current plan"
+          : isRedirecting
+            ? "Redirecting..."
+            : text}
+        {isCurrentPlan || isBusy ? null : <ArrowRight data-icon="inline-end" />}
       </Button>
       {error ? (
         <p className="text-destructive text-sm leading-6" role="alert">

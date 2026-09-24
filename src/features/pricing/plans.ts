@@ -3,9 +3,20 @@ import { Check, Rocket, Sparkles } from "lucide-react";
 export type BillingInterval = "monthly" | "annual";
 export type PricingPlanKey = "free" | "hacker" | "pro";
 
+export const billingIntervalRank: Record<BillingInterval, number> = {
+  monthly: 0,
+  annual: 1,
+};
+
 export const billingIntervalLabels: Record<BillingInterval, string> = {
   monthly: "Monthly",
   annual: "Annual",
+};
+
+export const pricingPlanRank: Record<PricingPlanKey, number> = {
+  free: 0,
+  pro: 1,
+  hacker: 2,
 };
 
 export const pricingPlans = [

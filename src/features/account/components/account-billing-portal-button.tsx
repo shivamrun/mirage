@@ -19,7 +19,9 @@ function AccountBillingPortalButton({
   variant?: "default" | "outline";
 }) {
   const [error, setError] = React.useState<string>();
+  const [isRedirecting, setIsRedirecting] = React.useState(false);
   const [isPending, startTransition] = React.useTransition();
+  const isBusy = isPending || isRedirecting;
 
   function openBillingPortal() {
     setError(undefined);
@@ -43,6 +45,7 @@ function AccountBillingPortalButton({
           result.data && "url" in result.data ? result.data.url : undefined;
 
         if (portalUrl) {
+          setIsRedirecting(true);
           window.location.assign(portalUrl);
           return;
         }
@@ -57,17 +60,17 @@ function AccountBillingPortalButton({
   return (
     <div className="space-y-2">
       <Button
-        disabled={disabled || isPending}
+        disabled={disabled || isBusy}
         onClick={openBillingPortal}
         type="button"
         variant={variant}
       >
-        {isPending ? (
+        {isBusy ? (
           <Loader2 className="animate-spin" data-icon="inline-start" />
         ) : (
           <ExternalLink data-icon="inline-start" />
         )}
-        {label}
+        {isRedirecting ? "Redirecting..." : label}
       </Button>
       {error ? (
         <p className="text-destructive text-sm leading-6" role="alert">
