@@ -5,6 +5,7 @@ export * from "./auth-actions";
 export * from "./auth-forms";
 export * from "./contact";
 export * from "./contact-submission";
+export * from "./credits";
 export * from "./email-list";
 export * from "./pagination";
 export * from "./uploads";

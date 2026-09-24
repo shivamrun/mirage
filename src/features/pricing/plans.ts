@@ -25,17 +25,13 @@ export const pricingPlans = [
     name: "Free",
     eyebrow: "Start",
     description: "Everything needed to explore Mirage and set up your account.",
+    credits: 10,
     price: {
       annual: "$0",
       monthly: "$0",
     },
     priceSuffix: "forever",
     icon: Check,
-    features: [
-      "Authenticated account workspace",
-      "Profile and security settings",
-      "Email support for product updates",
-    ],
     cta: "Current starter plan",
   },
   {
@@ -44,18 +40,13 @@ export const pricingPlans = [
     checkoutPlanName: "Mirage Pro",
     eyebrow: "Upgrade",
     description: "Unlock the paid workspace with Stripe-hosted checkout.",
+    credits: 50,
     price: {
       annual: "$100",
       monthly: "$10",
     },
     priceSuffix: "per user",
     icon: Sparkles,
-    features: [
-      "Static Pro subscription identity",
-      "Stripe-hosted checkout",
-      "Monthly or yearly billing",
-      "Webhook-backed subscription updates",
-    ],
     cta: "Buy Pro",
   },
   {
@@ -63,27 +54,22 @@ export const pricingPlans = [
     name: "Mirage Hacker",
     checkoutPlanName: "Mirage Hacker",
     eyebrow: "Scale",
-    description: "Higher limits for serious builders and heavier usage.",
+    description: "More credits for serious builders and heavier usage.",
+    credits: 100,
     price: {
       annual: "$300",
       monthly: "$30",
     },
     priceSuffix: "per user",
     icon: Rocket,
-    features: [
-      "Everything in Pro",
-      "Higher monthly credit allowance",
-      "Priority billing and account controls",
-      "Built for power users and launch weeks",
-    ],
     cta: "Buy Hacker",
   },
 ] as const satisfies Array<{
   checkoutPlanName?: string;
+  credits: number;
   cta: string;
   description: string;
   eyebrow: string;
-  features: readonly string[];
   icon: typeof Check;
   key: PricingPlanKey;
   name: string;

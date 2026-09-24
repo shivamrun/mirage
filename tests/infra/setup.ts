@@ -17,6 +17,8 @@ process.env.BETTER_AUTH_URL ??= "http://localhost:3000";
 process.env.NEXT_PUBLIC_BASE_URL ??= "http://localhost:3000";
 process.env.STRIPE_SECRET_KEY ??= "sk_test_test-only";
 process.env.STRIPE_WEBHOOK_SECRET ??= "whsec_test-only";
+process.env.TURNSTILE_SECRET_KEY ??= "test-turnstile-secret";
+process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ??= "test-turnstile-site-key";
 
 vi.mock("@/adapters/email/send-email", () => ({ sendEmail: sendTestEmail }));
 

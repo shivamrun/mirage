@@ -1,6 +1,5 @@
 "use client";
 
-import { Check } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
@@ -107,7 +106,7 @@ function PricingPage({
 
           return (
             <article
-              className="flex min-h-[31rem] flex-col rounded-lg border border-border bg-card p-6"
+              className="flex flex-col rounded-lg border border-border bg-card p-6"
               key={plan.key}
             >
               <div className="flex items-start justify-between gap-4">
@@ -126,7 +125,7 @@ function PricingPage({
                 {plan.description}
               </p>
 
-              <div className="mt-6 border-border border-y py-6">
+              <div className="mt-6">
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                   <span className="font-semibold text-3xl">
                     {plan.price[interval]}
@@ -135,20 +134,12 @@ function PricingPage({
                     {plan.priceSuffix}
                   </span>
                 </div>
+                <p className="mt-3 font-medium text-primary text-sm">
+                  {plan.credits} monthly credits
+                </p>
               </div>
 
-              <ul className="mt-6 grid gap-3 text-sm">
-                {plan.features.map((feature) => (
-                  <li className="flex gap-3" key={feature}>
-                    <Check className="mt-0.5 size-4 shrink-0 text-primary" />
-                    <span className="text-muted-foreground leading-6">
-                      {feature}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-
-              <div className="mt-auto pt-8">
+              <div className="pt-8">
                 {isPaid ? (
                   <PricingBuyButton
                     interval={interval}

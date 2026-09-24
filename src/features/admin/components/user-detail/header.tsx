@@ -129,6 +129,15 @@ export function AdminUserDetailHeader({
                   >
                     [ sessions: {sessionsLength} ]
                   </Link>
+                  <Link
+                    aria-current={
+                      activeSection === "ledger" ? "page" : undefined
+                    }
+                    className={navLinkClass("ledger")}
+                    href={`${detailPath}/ledger`}
+                  >
+                    [ ledger ]
+                  </Link>
                 </nav>
               </div>
             </div>

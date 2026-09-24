@@ -1,21 +1,38 @@
-import type { AdminUserDetailViewModel } from "@/server/db/services/admin/user-detail";
+import type {
+  AdminUserDetailCreditLedgerEntry,
+  AdminUserDetailViewModel,
+} from "@/server/db/services/admin/user-detail";
+import type { PaginationMeta } from "@/shared/pagination";
 import { isFutureDate } from "../shared/formatters";
-import { AdminUserAccountsTab, AdminUserSessionsTab } from "./activity-tabs";
+import {
+  AdminUserAccountsTab,
+  AdminUserCreditLedgerTab,
+  AdminUserSessionsTab,
+} from "./activity-tabs";
 import { AdminUserDetailHeader } from "./header";
 import { AdminUserDetailOverview } from "./overview";
 
-export type AdminUserDetailSection = "accounts" | "overview" | "sessions";
+export type AdminUserDetailSection =
+  | "accounts"
+  | "ledger"
+  | "overview"
+  | "sessions";
 
 export function AdminUserDetailView({
   currentUserId,
   detail,
+  ledger,
   section = "overview",
 }: {
   currentUserId: string;
   detail: AdminUserDetailViewModel;
+  ledger?: {
+    entries: AdminUserDetailCreditLedgerEntry[];
+    pagination: PaginationMeta;
+  };
   section?: AdminUserDetailSection;
 }) {
-  const { accounts, sessions, user } = detail;
+  const { accounts, creditBalance, sessions, user } = detail;
   const now = new Date();
   const isBanned = Boolean(user.banned);
   const hasActiveBan = Boolean(
@@ -36,6 +53,7 @@ export function AdminUserDetailView({
       <div className="min-h-0 min-w-0 flex-1 pt-4 mb-6">
         {section === "overview" ? (
           <AdminUserDetailOverview
+            creditBalance={creditBalance}
             currentUserId={currentUserId}
             hasActiveBan={hasActiveBan}
             isBanned={isBanned}
@@ -51,6 +69,14 @@ export function AdminUserDetailView({
           <AdminUserSessionsTab
             now={now}
             sessions={sessions}
+            userId={user.id}
+          />
+        ) : null}
+
+        {section === "ledger" && ledger ? (
+          <AdminUserCreditLedgerTab
+            entries={ledger.entries}
+            pagination={ledger.pagination}
             userId={user.id}
           />
         ) : null}

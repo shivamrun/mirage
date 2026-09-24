@@ -2,7 +2,7 @@
 
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import * as React from "react";
-import { FieldDescription, FieldError } from "@/components/ui/field";
+import { FieldError } from "@/components/ui/field";
 
 const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 

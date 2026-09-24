@@ -9,8 +9,12 @@ import {
   AccountSection,
   AccountSectionStack,
 } from "@/features/account/components/account-section";
+import { pricingPlans } from "@/features/pricing/plans";
 import type { BillingSubscriptionRecord } from "@/server/db/dal/billing";
 import type { CurrentUser } from "@/server/db/services/auth/access";
+import type { getCreditBalance } from "@/server/db/services/credits/ledger";
+
+type CreditBalance = Awaited<ReturnType<typeof getCreditBalance>>;
 
 const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
@@ -27,6 +31,32 @@ function formatPlanName(value: string) {
     .split(" ")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function normalizePlanName(value?: null | string) {
+  return value?.toLowerCase().replace(/\s+/g, " ").trim() ?? "";
+}
+
+function getPlanCredits(plan?: null | string) {
+  const normalizedPlan = normalizePlanName(plan);
+  const matchedPlan = pricingPlans.find((pricingPlan) => {
+    const checkoutPlanName =
+      "checkoutPlanName" in pricingPlan
+        ? pricingPlan.checkoutPlanName
+        : undefined;
+
+    return (
+      normalizedPlan === normalizePlanName(pricingPlan.key) ||
+      normalizedPlan === normalizePlanName(pricingPlan.name) ||
+      normalizedPlan === normalizePlanName(checkoutPlanName)
+    );
+  });
+
+  return matchedPlan?.credits ?? pricingPlans[0].credits;
+}
+
+function formatCredits(value: number) {
+  return `${value} monthly credits`;
 }
 
 function formatBillingInterval(value: string | null | undefined) {
@@ -81,7 +111,9 @@ function SubscriptionSummary({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <HeadingBlock
           className="min-w-0"
-          description="You are currently using the free workspace."
+          description={`You are currently using the free workspace with ${formatCredits(
+            getPlanCredits("free"),
+          )}.`}
           size="sm"
           title="Free plan"
           titleAs="h3"
@@ -133,6 +165,11 @@ function SubscriptionSummary({
         <DetailRow
           label="Billing interval"
           value={formatBillingInterval(subscription.billingInterval)}
+        />
+
+        <DetailRow
+          label="Credit allowance"
+          value={formatCredits(getPlanCredits(subscription.plan))}
         />
 
         <DetailRow
@@ -199,9 +236,11 @@ function TransactionHistory({
 }
 
 function AccountBillingPage({
+  creditBalance,
   subscriptions,
   user,
 }: {
+  creditBalance: CreditBalance;
   subscriptions: BillingSubscriptionRecord[];
   user: CurrentUser;
 }) {
@@ -233,6 +272,38 @@ function AccountBillingPage({
               hasStripeCustomer={hasStripeCustomer}
               subscription={currentSubscription}
             />
+          </AccountSection>
+
+          <AccountSection
+            description="Your current ledger balance for this billing period."
+            title="Credits"
+          >
+            <div className="space-y-5">
+              <div>
+                <p className="font-semibold text-3xl tracking-normal">
+                  {creditBalance.account.availableCredits} /{" "}
+                  {creditBalance.currentPeriod.allowance}
+                </p>
+                <p className="mt-1 text-muted-foreground text-sm">
+                  Credits remaining this period
+                </p>
+              </div>
+
+              <dl>
+                <DetailRow
+                  label="Plan"
+                  value={formatPlanName(creditBalance.currentPeriod.plan)}
+                />
+                <DetailRow
+                  label="Current period start"
+                  value={formatDate(creditBalance.currentPeriod.periodStart)}
+                />
+                <DetailRow
+                  label="Current period end"
+                  value={formatDate(creditBalance.currentPeriod.periodEnd)}
+                />
+              </dl>
+            </div>
           </AccountSection>
 
           <AccountSection

@@ -12,6 +12,7 @@ import { authHooks } from "@/features/auth/better-auth/hooks";
 import { subscriptionPlans } from "@/features/auth/better-auth/subscription-plans";
 import { authAccessControl, authRolePermissions } from "@/features/auth/roles";
 import { createAuthDatabaseAdapter } from "@/server/db/dal/auth";
+import { reconcileCreditGrantForSubscription } from "@/server/db/services/credits/ledger";
 import { env } from "@/shared/env";
 import { siteConfig } from "@/shared/metadata";
 
@@ -122,6 +123,15 @@ export const auth = betterAuth({
       createCustomerOnSignUp: true,
       subscription: {
         enabled: true,
+        async onSubscriptionComplete({ subscription }) {
+          await reconcileCreditGrantForSubscription(subscription);
+        },
+        async onSubscriptionCreated({ subscription }) {
+          await reconcileCreditGrantForSubscription(subscription);
+        },
+        async onSubscriptionUpdate({ subscription }) {
+          await reconcileCreditGrantForSubscription(subscription);
+        },
         plans: subscriptionPlans,
       },
     }),

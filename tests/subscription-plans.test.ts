@@ -8,6 +8,7 @@ describe("subscriptionPlans", () => {
       {
         name: "Free",
         limits: {
+          credits: 10,
           plan: "free",
         },
       },
@@ -17,6 +18,7 @@ describe("subscriptionPlans", () => {
         annualDiscountLookupKey: "mirage_pro_2_yearly",
         prorationBehavior: "always_invoice",
         limits: {
+          credits: 50,
           plan: "pro",
         },
       },
@@ -26,6 +28,7 @@ describe("subscriptionPlans", () => {
         annualDiscountLookupKey: "mirage_hacker_yearly",
         prorationBehavior: "always_invoice",
         limits: {
+          credits: 100,
           plan: "hacker",
         },
       },

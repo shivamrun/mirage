@@ -5,6 +5,7 @@ import { apiErrors } from "@/server/http/errors";
 import { accountRoutes } from "@/server/routes/account";
 import { adminRoutes } from "@/server/routes/admin";
 import { contactRoutes } from "@/server/routes/contact";
+import { creditsRoutes } from "@/server/routes/credits";
 import { emailListRoutes } from "@/server/routes/email-list";
 import { uploadsRoutes } from "@/server/routes/uploads";
 
@@ -33,6 +34,7 @@ export const app = new Elysia({ prefix: "/api" })
   .use(accountRoutes)
   .use(accessVerificationRoutes)
   .use(contactRoutes)
+  .use(creditsRoutes)
   .use(emailListRoutes)
   .use(uploadsRoutes)
   .use(adminRoutes);

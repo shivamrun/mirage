@@ -67,6 +67,11 @@ const mutationRoutes = [
     path: "/api/admin/users/:userId/sessions/:sessionId",
     access: "admin",
   },
+  {
+    method: "POST",
+    path: "/api/admin/users/:userId/credits/adjust",
+    access: "admin",
+  },
   { method: "POST", path: "/api/admin/email-list", access: "admin" },
   { method: "PATCH", path: "/api/admin/email-list/:key", access: "admin" },
   {
@@ -159,6 +164,9 @@ function requestBody(path: string) {
   if (path === "/api/admin/security/force-password-reset") {
     return JSON.stringify({ email: "phase-zero-reset@example.com" });
   }
+  if (path === "/api/admin/users/:userId/credits/adjust") {
+    return JSON.stringify({ amount: 1, reason: "Phase zero adjustment" });
+  }
   return "{}";
 }
 
@@ -171,6 +179,7 @@ describe("current Elysia HTTP contract", () => {
       "GET /api/account/google-account",
       "GET /api/account/confirm-email-change",
       "GET /api/account/approve-email-change",
+      "GET /api/credits/balance",
       "GET /api/email-list/verify",
       "GET /api/admin/",
       ...mutationRoutes.map(({ method, path }) => `${method} ${path}`),
@@ -178,10 +187,18 @@ describe("current Elysia HTTP contract", () => {
     expect(
       app.routes.map(({ method, path }) => `${method} ${path}`).sort(),
     ).toEqual(expected);
+    expect(
+      app.routes.map(({ method, path }) => `${method} ${path}`),
+    ).not.toEqual(
+      expect.arrayContaining([
+        "POST /api/credits/spend",
+        "POST /api/credits/adjust",
+      ]),
+    );
   });
 
-  it("guards all 23 mutations with the current origin response", async () => {
-    expect(mutationRoutes).toHaveLength(23);
+  it("guards all 24 mutations with the current origin response", async () => {
+    expect(mutationRoutes).toHaveLength(24);
     const user = await createTestActor();
     const admin = await createTestActor({ role: "admin", emailVerified: true });
     const sentBefore = testEmailOutbox.length;

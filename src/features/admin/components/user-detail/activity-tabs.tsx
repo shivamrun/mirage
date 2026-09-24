@@ -1,9 +1,12 @@
 import { CheckCircle2, Fingerprint, XCircle } from "lucide-react";
 
+import { Pagination } from "@/components/ui/pagination";
 import type {
   AdminUserDetailAccount,
+  AdminUserDetailCreditLedgerEntry,
   AdminUserDetailSession,
 } from "@/server/db/services/admin/user-detail";
+import type { PaginationMeta } from "@/shared/pagination";
 import { formatDate, formatValue, isFutureDate } from "../shared/formatters";
 import { CopyableId } from "./copyable-id";
 import {
@@ -19,6 +22,7 @@ import { formatProviderName } from "./formatters";
 import { DetailPanel, EmptyState, StatusBadge } from "./primitives";
 
 type AccountRecord = AdminUserDetailAccount;
+type CreditLedgerRecord = AdminUserDetailCreditLedgerEntry;
 type SessionRecord = AdminUserDetailSession;
 
 export function AdminUserAccountsTab({
@@ -74,6 +78,44 @@ export function AdminUserSessionsTab({
         />
       )}
     </DetailPanel>
+  );
+}
+
+export function AdminUserCreditLedgerTab({
+  entries,
+  pagination,
+  userId,
+}: {
+  entries: CreditLedgerRecord[];
+  pagination: PaginationMeta;
+  userId: string;
+}) {
+  return (
+    <div className="flex min-h-0 flex-col">
+      <DetailPanel
+        description="All grant, spend, refund, expiration, and manual adjustment ledger rows."
+        title="Credit Ledger"
+      >
+        {entries.length > 0 ? (
+          <CreditLedgerTable entries={entries} />
+        ) : (
+          <EmptyState
+            description="This user does not have credit ledger entries yet."
+            title="No ledger entries"
+          />
+        )}
+      </DetailPanel>
+
+      <Pagination
+        entityLabel="ledger entries"
+        getPageHref={(page) =>
+          page > 1
+            ? `/admin/users/${userId}/ledger?page=${page}`
+            : `/admin/users/${userId}/ledger`
+        }
+        pagination={pagination}
+      />
+    </div>
   );
 }
 
@@ -277,6 +319,84 @@ function SessionsTable({
   );
 }
 
+function CreditLedgerTable({ entries }: { entries: CreditLedgerRecord[] }) {
+  return (
+    <div className="min-w-0 overflow-hidden bg-card">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1100px] text-left text-sm">
+          <thead className="border-b bg-muted/40">
+            <tr className="text-muted-foreground">
+              <TableHeader>Amount</TableHeader>
+              <TableHeader>Type</TableHeader>
+              <TableHeader>Source</TableHeader>
+              <TableHeader>Source ID</TableHeader>
+              <TableHeader>Period</TableHeader>
+              <TableHeader>Entry ID</TableHeader>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y">
+            {entries.map((entry) => (
+              <CreditLedgerRow entry={entry} key={entry.id} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function CreditLedgerRow({ entry }: { entry: CreditLedgerRecord }) {
+  return (
+    <tr className="align-top transition-colors hover:bg-muted/20">
+      <TableCell>
+        <span className="font-medium">{entry.amount}</span>
+      </TableCell>
+      <TableCell>
+        <div className="space-y-1">
+          <p className="font-medium">{formatLedgerType(entry.type)}</p>
+          {entry.reversesLedgerEntryId ? (
+            <div className="flex flex-wrap items-center gap-1.5 text-muted-foreground text-xs">
+              <span>reverses</span>
+              <CopyableId maxLength={10} value={entry.reversesLedgerEntryId} />
+            </div>
+          ) : null}
+        </div>
+      </TableCell>
+      <TableCell>{entry.source}</TableCell>
+      <TableCell>
+        {entry.sourceId ? (
+          <CopyableId maxLength={10} value={entry.sourceId} />
+        ) : (
+          <span className="text-muted-foreground">None</span>
+        )}
+      </TableCell>
+      <TableCell>
+        <div className="grid min-w-[270px] gap-2">
+          <TimeRow
+            label="Created"
+            value={formatDate(entry.createdAt)}
+            variant="event"
+          />
+          <TimeRow
+            label="Start"
+            value={formatDate(entry.periodStart)}
+            variant="event"
+          />
+          <TimeRow
+            label="End"
+            value={formatDate(entry.periodEnd)}
+            variant="token"
+          />
+        </div>
+      </TableCell>
+      <TableCell>
+        <CopyableId maxLength={10} value={entry.id} />
+      </TableCell>
+    </tr>
+  );
+}
+
 function SessionRow({
   now,
   session,
@@ -367,6 +487,13 @@ function toManagedSession(session: SessionRecord): AdminUserManagedSession {
     ipAddress: session.ipAddress,
     userAgent: session.userAgent,
   };
+}
+
+function formatLedgerType(value: string) {
+  return value
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function IdentifierField({ label, value }: { label: string; value: string }) {
