@@ -1,9 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { TurnstileInstance } from "@marsidev/react-turnstile";
 import { Send } from "lucide-react";
 import * as React from "react";
 import { useForm } from "react-hook-form";
+import { TurnstileField } from "@/components/turnstile-field";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -31,6 +33,8 @@ function ContactForm() {
     tone: "error" | "success";
     message: string;
   }>();
+  const [turnstileToken, setTurnstileToken] = React.useState("");
+  const turnstileRef = React.useRef<TurnstileInstance>(null);
   const form = useForm<
     ContactSubmissionInput,
     undefined,
@@ -42,6 +46,7 @@ function ContactForm() {
       email: "",
       company: "",
       message: "",
+      turnstileToken: "",
       website: "",
     },
   });
@@ -51,8 +56,19 @@ function ContactForm() {
   async function onSubmit(values: ContactSubmissionValues) {
     setStatusMessage(undefined);
 
+    if (!turnstileToken) {
+      setStatusMessage({
+        tone: "error",
+        message: "Complete the security check before sending your message.",
+      });
+      return;
+    }
+
     try {
-      const result = await api.api.contact.post(values);
+      const result = await api.api.contact.post({
+        ...values,
+        turnstileToken,
+      });
 
       if (result.error) {
         setStatusMessage({
@@ -65,10 +81,14 @@ function ContactForm() {
                 : "We could not send your message. Please try again."
               : "We could not send your message. Please try again.",
         });
+        setTurnstileToken("");
+        turnstileRef.current?.reset();
         return;
       }
 
       form.reset();
+      setTurnstileToken("");
+      turnstileRef.current?.reset();
       setStatusMessage({
         tone: "success",
         message: "Thanks, your message has been received.",
@@ -78,6 +98,8 @@ function ContactForm() {
         tone: "error",
         message: "We could not send your message. Please try again.",
       });
+      setTurnstileToken("");
+      turnstileRef.current?.reset();
     }
   }
 
@@ -150,10 +172,17 @@ function ContactForm() {
           tabIndex={-1}
           {...form.register("website")}
         />
+        <input type="hidden" {...form.register("turnstileToken")} />
+        <TurnstileField
+          action="contact"
+          id="contact-turnstile"
+          onTokenChange={setTurnstileToken}
+          ref={turnstileRef}
+        />
       </FieldGroup>
       <Button
         className="w-full"
-        disabled={form.formState.isSubmitting}
+        disabled={form.formState.isSubmitting || !turnstileToken}
         type="submit"
       >
         {form.formState.isSubmitting ? "Sending..." : "Send message"}

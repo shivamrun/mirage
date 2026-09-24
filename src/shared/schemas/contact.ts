@@ -27,6 +27,7 @@ export const contactSubmissionSchema = z.object({
       CONTACT_MESSAGE_MAX_LENGTH,
       `Message must be ${CONTACT_MESSAGE_MAX_LENGTH} characters or fewer.`,
     ),
+  turnstileToken: z.string().trim().optional(),
   website: z.string().optional(),
 });
 

@@ -1,9 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { TurnstileInstance } from "@marsidev/react-turnstile";
 import Link from "next/link";
 import * as React from "react";
 import { useForm } from "react-hook-form";
+import { TurnstileField } from "@/components/turnstile-field";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
 import { authClient } from "@/features/auth/better-auth/client";
@@ -26,6 +28,8 @@ import {
 function ForgotPasswordForm() {
   const [error, setError] = React.useState<string>();
   const [success, setSuccess] = React.useState<string>();
+  const [turnstileToken, setTurnstileToken] = React.useState("");
+  const turnstileRef = React.useRef<TurnstileInstance>(null);
   const form = useForm<ForgotPasswordInput, undefined, ForgotPasswordValues>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
@@ -37,14 +41,26 @@ function ForgotPasswordForm() {
     setError(undefined);
     setSuccess(undefined);
 
+    if (!turnstileToken) {
+      setError("Complete the security check before requesting a reset link.");
+      return;
+    }
+
     try {
       const result = await authClient.requestPasswordReset({
         email: values.email,
         redirectTo: `${window.location.origin}/reset-password`,
+        fetchOptions: {
+          headers: {
+            "x-captcha-response": turnstileToken,
+          },
+        },
       });
 
       if (result.error) {
         setError(getAuthErrorMessage(result.error));
+        setTurnstileToken("");
+        turnstileRef.current?.reset();
         return;
       }
 
@@ -52,8 +68,12 @@ function ForgotPasswordForm() {
         result.data?.message ||
           "If we find an account for that email, a reset link is on the way.",
       );
+      setTurnstileToken("");
+      turnstileRef.current?.reset();
     } catch (reason) {
       setError(getUnexpectedAuthErrorMessage(reason));
+      setTurnstileToken("");
+      turnstileRef.current?.reset();
     }
   }
 
@@ -86,10 +106,16 @@ function ForgotPasswordForm() {
             required
             {...form.register("email")}
           />
+          <TurnstileField
+            action="auth"
+            id="forgot-password-turnstile"
+            onTokenChange={setTurnstileToken}
+            ref={turnstileRef}
+          />
         </FieldGroup>
         <Button
           className="w-full"
-          disabled={form.formState.isSubmitting}
+          disabled={form.formState.isSubmitting || !turnstileToken}
           type="submit"
         >
           {form.formState.isSubmitting ? "Sending link..." : "Send reset link"}

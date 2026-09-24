@@ -1,10 +1,12 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { TurnstileInstance } from "@marsidev/react-turnstile";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { useForm } from "react-hook-form";
+import { TurnstileField } from "@/components/turnstile-field";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
 import { authClient } from "@/features/auth/better-auth/client";
@@ -48,6 +50,8 @@ function ResetPasswordForm({
 }) {
   const router = useRouter();
   const [error, setError] = React.useState<string>();
+  const [turnstileToken, setTurnstileToken] = React.useState("");
+  const turnstileRef = React.useRef<TurnstileInstance>(null);
   const linkErrorMessage = getResetLinkErrorMessage(linkError);
   const canSubmit = Boolean(token && !linkErrorMessage);
   const form = useForm<ResetPasswordInput, undefined, ResetPasswordValues>({
@@ -70,14 +74,26 @@ function ResetPasswordForm({
       return;
     }
 
+    if (!turnstileToken) {
+      setError("Complete the security check before updating your password.");
+      return;
+    }
+
     try {
       const result = await authClient.resetPassword({
         newPassword: values.password,
         token: values.token,
+        fetchOptions: {
+          headers: {
+            "x-captcha-response": turnstileToken,
+          },
+        },
       });
 
       if (result.error) {
         setError(getAuthErrorMessage(result.error));
+        setTurnstileToken("");
+        turnstileRef.current?.reset();
         return;
       }
 
@@ -85,6 +101,8 @@ function ResetPasswordForm({
       router.refresh();
     } catch (reason) {
       setError(getUnexpectedAuthErrorMessage(reason));
+      setTurnstileToken("");
+      turnstileRef.current?.reset();
     }
   }
 
@@ -135,10 +153,20 @@ function ResetPasswordForm({
             {...form.register("confirmPassword")}
           />
           <input type="hidden" {...form.register("token")} />
+          {canSubmit ? (
+            <TurnstileField
+              action="auth"
+              id="reset-password-turnstile"
+              onTokenChange={setTurnstileToken}
+              ref={turnstileRef}
+            />
+          ) : null}
         </FieldGroup>
         <Button
           className="w-full"
-          disabled={form.formState.isSubmitting || !canSubmit}
+          disabled={
+            form.formState.isSubmitting || !canSubmit || !turnstileToken
+          }
           type="submit"
         >
           {form.formState.isSubmitting

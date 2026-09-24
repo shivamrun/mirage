@@ -1,10 +1,12 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { TurnstileInstance } from "@marsidev/react-turnstile";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { Controller, useForm } from "react-hook-form";
+import { TurnstileField } from "@/components/turnstile-field";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FieldError, FieldGroup } from "@/components/ui/field";
@@ -41,6 +43,8 @@ function RegisterForm({
 }) {
   const router = useRouter();
   const [error, setError] = React.useState<string>();
+  const [turnstileToken, setTurnstileToken] = React.useState("");
+  const turnstileRef = React.useRef<TurnstileInstance>(null);
   const [isRedirecting, setIsRedirecting] = React.useState(false);
   const form = useForm<RegisterFormInput, undefined, RegisterFormValues>({
     resolver: zodResolver(registerFormSchema),
@@ -54,15 +58,27 @@ function RegisterForm({
   async function onSubmit(values: RegisterFormValues) {
     setError(undefined);
 
+    if (!turnstileToken) {
+      setError("Complete the security check before creating your account.");
+      return;
+    }
+
     try {
       const result = await authClient.signUp.email({
         ...values,
         name: "",
         callbackURL: "/email-verification?status=success",
+        fetchOptions: {
+          headers: {
+            "x-captcha-response": turnstileToken,
+          },
+        },
       });
 
       if (result.error) {
         setError(getAuthErrorMessage(result.error));
+        setTurnstileToken("");
+        turnstileRef.current?.reset();
         return;
       }
 
@@ -71,6 +87,8 @@ function RegisterForm({
       router.refresh();
     } catch (reason) {
       setError(getUnexpectedAuthErrorMessage(reason));
+      setTurnstileToken("");
+      turnstileRef.current?.reset();
     }
   }
 
@@ -169,10 +187,18 @@ function RegisterForm({
               );
             }}
           />
+          <TurnstileField
+            action="auth"
+            id="register-turnstile"
+            onTokenChange={setTurnstileToken}
+            ref={turnstileRef}
+          />
         </FieldGroup>
         <Button
           className="w-full"
-          disabled={form.formState.isSubmitting || isRedirecting}
+          disabled={
+            form.formState.isSubmitting || isRedirecting || !turnstileToken
+          }
           type="submit"
         >
           {isRedirecting

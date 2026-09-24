@@ -60,10 +60,12 @@ export const env = createEnv({
     RESEND_API_KEY: optionalEnvString,
     STRIPE_SECRET_KEY: z.string().min(1),
     STRIPE_WEBHOOK_SECRET: z.string().min(1),
+    TURNSTILE_SECRET_KEY: z.string().min(1),
   },
   client: {
     NEXT_PUBLIC_BASE_URL: z.url(),
     NEXT_PUBLIC_UPLOAD_BASE_URL: optionalEnvString,
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().min(1),
   },
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
@@ -85,7 +87,9 @@ export const env = createEnv({
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
     NEXT_PUBLIC_UPLOAD_BASE_URL: process.env.NEXT_PUBLIC_UPLOAD_BASE_URL,
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
   },
 });
 

@@ -1,10 +1,12 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { TurnstileInstance } from "@marsidev/react-turnstile";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { useForm } from "react-hook-form";
+import { TurnstileField } from "@/components/turnstile-field";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
 import { authClient } from "@/features/auth/better-auth/client";
@@ -41,6 +43,8 @@ function LoginForm({
 }) {
   const router = useRouter();
   const [error, setError] = React.useState<string>();
+  const [turnstileToken, setTurnstileToken] = React.useState("");
+  const turnstileRef = React.useRef<TurnstileInstance>(null);
   const [isRedirecting, setIsRedirecting] = React.useState(false);
   const form = useForm<LoginInput, undefined, LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -53,14 +57,26 @@ function LoginForm({
   async function onSubmit(values: LoginValues) {
     setError(undefined);
 
+    if (!turnstileToken) {
+      setError("Complete the security check before signing in.");
+      return;
+    }
+
     try {
       const result = await authClient.signIn.email({
         ...values,
         callbackURL: redirectTo,
+        fetchOptions: {
+          headers: {
+            "x-captcha-response": turnstileToken,
+          },
+        },
       });
 
       if (result.error) {
         setError(getAuthErrorMessage(result.error));
+        setTurnstileToken("");
+        turnstileRef.current?.reset();
         return;
       }
 
@@ -81,6 +97,8 @@ function LoginForm({
       router.refresh();
     } catch (reason) {
       setError(getUnexpectedAuthErrorMessage(reason));
+      setTurnstileToken("");
+      turnstileRef.current?.reset();
     }
   }
 
@@ -134,6 +152,12 @@ function LoginForm({
               required
               {...form.register("password")}
             />
+            <TurnstileField
+              action="auth"
+              id="login-turnstile"
+              onTokenChange={setTurnstileToken}
+              ref={turnstileRef}
+            />
           </FieldGroup>
           <Link
             className="link-text text-sm hover:brightness-100"
@@ -143,7 +167,9 @@ function LoginForm({
           </Link>
           <Button
             className="w-full"
-            disabled={form.formState.isSubmitting || isRedirecting}
+            disabled={
+              form.formState.isSubmitting || isRedirecting || !turnstileToken
+            }
             type="submit"
           >
             {isRedirecting

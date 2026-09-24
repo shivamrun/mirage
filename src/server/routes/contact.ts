@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 import { submitContactForm } from "@/server/db/services/contact/service";
 import { requestPolicy } from "@/server/http/request-policy";
+import { verifyTurnstileToken } from "@/server/http/turnstile";
 import {
   contactSubmissionSchema,
   contactSuccessResponseSchema,
@@ -12,6 +13,16 @@ export const contactRoutes = new Elysia({ prefix: "/contact" })
   .post(
     "/",
     async ({ body, request, set, status }) => {
+      const turnstile = await verifyTurnstileToken({
+        action: "contact",
+        headers: request.headers,
+        token: body.turnstileToken,
+      });
+
+      if (turnstile.status === "failed") {
+        return status(403, { message: turnstile.message });
+      }
+
       const result = await submitContactForm({
         headers: request.headers,
         values: body,

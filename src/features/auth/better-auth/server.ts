@@ -1,7 +1,7 @@
 import { stripe } from "@better-auth/stripe";
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
-import { admin, twoFactor } from "better-auth/plugins";
+import { admin, captcha, twoFactor } from "better-auth/plugins";
 import Stripe from "stripe";
 import {
   sendVerificationEmail as sendAuthVerificationEmail,
@@ -22,6 +22,24 @@ export const isGoogleAuthConfigured = Boolean(
 const stripeClient = new Stripe(env.STRIPE_SECRET_KEY, {
   apiVersion: "2026-08-26.dahlia",
 });
+
+const authCaptchaPlugins =
+  env.NODE_ENV === "test"
+    ? []
+    : [
+        captcha({
+          allowedHostnames: [new URL(env.NEXT_PUBLIC_BASE_URL).hostname],
+          endpoints: [
+            "/sign-up/email",
+            "/sign-in/email",
+            "/request-password-reset",
+            "/reset-password",
+          ],
+          expectedAction: "auth",
+          provider: "cloudflare-turnstile",
+          secretKey: env.TURNSTILE_SECRET_KEY,
+        }),
+      ];
 
 export const auth = betterAuth({
   appName: siteConfig.name,
@@ -96,6 +114,7 @@ export const auth = betterAuth({
     twoFactor({
       issuer: siteConfig.name,
     }),
+    ...authCaptchaPlugins,
     nextCookies(),
     stripe({
       stripeClient,
