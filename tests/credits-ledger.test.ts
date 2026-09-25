@@ -622,7 +622,7 @@ describe("credit ledger", () => {
     });
   });
 
-  it("starts subscription checkout through the billing API", async () => {
+  it("keeps subscription checkout out of the custom billing API", async () => {
     const actor = await createTestActor();
     setStripeTopUpClient();
 
@@ -640,10 +640,7 @@ describe("credit ledger", () => {
       method: "POST",
     });
 
-    expect(checkout.status, await checkout.clone().text()).toBe(200);
-    await expect(checkout.json()).resolves.toEqual({
-      url: "https://checkout.stripe.test/session",
-    });
+    expect(checkout.status).toBe(422);
   });
 
   it("creates sample items through the credit API", async () => {

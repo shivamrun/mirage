@@ -9,7 +9,6 @@ import { authClient } from "@/features/auth/better-auth/client";
 import { getUnexpectedAuthErrorMessage } from "@/features/auth/components/auth-errors";
 import { getPricingCheckoutPath } from "@/features/pricing/checkout-intent";
 import type { BillingInterval, PricingPlanKey } from "@/features/pricing/plans";
-import { api } from "@/shared/api/client";
 
 function PricingBuyButton({
   interval,
@@ -50,59 +49,33 @@ function PricingBuyButton({
 
     startTransition(async () => {
       try {
-        if (subscriptionId) {
-          const origin = window.location.origin;
-          const result = await authClient.subscription.upgrade({
-            annual: interval === "annual",
-            cancelUrl: `${origin}/pricing?checkout=cancelled`,
-            disableRedirect: true,
-            plan: planName,
-            returnUrl: `${origin}/billing?checkout=updated`,
-            scheduleAtPeriodEnd,
-            subscriptionId,
-            successUrl: `${origin}/billing?checkout=success`,
-          });
-
-          if (result.error) {
-            setError(result.error.message || "Checkout could not be started.");
-            return;
-          }
-
-          const checkoutUrl =
-            result.data && "url" in result.data ? result.data.url : undefined;
-
-          if (checkoutUrl) {
-            setIsRedirecting(true);
-            window.location.assign(checkoutUrl);
-            return;
-          }
-
-          router.refresh();
-          return;
-        }
-
-        const result = await api.api.billing.checkout.post(
-          {
-            interval: interval === "annual" ? "yearly" : "monthly",
-            plan,
-            type: "subscription",
-          },
-          {
-            headers: {
-              "content-type": "application/json",
-            },
-          },
-        );
+        const origin = window.location.origin;
+        const result = await authClient.subscription.upgrade({
+          annual: interval === "annual",
+          cancelUrl: `${origin}/pricing?checkout=cancelled`,
+          disableRedirect: true,
+          plan: planName,
+          returnUrl: `${origin}/billing?checkout=updated`,
+          scheduleAtPeriodEnd,
+          subscriptionId: subscriptionId ?? undefined,
+          successUrl: `${origin}/billing?checkout=success`,
+        });
 
         if (result.error) {
-          setError(
-            result.error.value.message || "Checkout could not be started.",
-          );
+          setError(result.error.message || "Checkout could not be started.");
           return;
         }
 
-        setIsRedirecting(true);
-        window.location.assign(result.data.url);
+        const checkoutUrl =
+          result.data && "url" in result.data ? result.data.url : undefined;
+
+        if (checkoutUrl) {
+          setIsRedirecting(true);
+          window.location.assign(checkoutUrl);
+          return;
+        }
+
+        router.refresh();
       } catch (reason) {
         setError(getUnexpectedAuthErrorMessage(reason));
       }

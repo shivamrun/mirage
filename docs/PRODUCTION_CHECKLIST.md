@@ -69,13 +69,20 @@ changes, security reviews, or reliability hardening passes.
 
 ## Stripe Billing
 
-- Confirm `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are configured in the
-  production environment.
-- Create the Stripe webhook endpoint for the production domain:
-  `https://<production-domain>/api/stripe/webhook`.
-- Select at least these webhook events:
+- Confirm `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and
+  `STRIPE_CREDIT_TOP_UP_WEBHOOK_SECRET` are configured in the production
+  environment. `STRIPE_WEBHOOK_SECRET` belongs to the Better Auth subscription
+  webhook. `STRIPE_CREDIT_TOP_UP_WEBHOOK_SECRET` belongs to the custom credit
+  top-up webhook.
+- Create the Better Auth Stripe webhook endpoint for subscriptions:
+  `https://<production-domain>/api/auth/stripe/webhook`.
+- Select at least these events for the Better Auth endpoint:
   `checkout.session.completed`, `customer.subscription.created`,
-  `customer.subscription.updated`, `customer.subscription.deleted`, and
+  `customer.subscription.updated`, and `customer.subscription.deleted`.
+- Create the Mirage credit top-up webhook endpoint:
+  `https://<production-domain>/api/stripe/webhook`.
+- Select at least these events for the credit top-up endpoint:
+  `checkout.session.completed` and
   `checkout.session.async_payment_succeeded`.
 - Verify the Stripe lookup keys used by the billing catalog exist in the
   production Stripe account: `mirage_pro_2_monthly`,

@@ -5,10 +5,10 @@ import Link from "next/link";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
+import { authClient } from "@/features/auth/better-auth/client";
 import { getUnexpectedAuthErrorMessage } from "@/features/auth/components/auth-errors";
-import type { BillingInterval, PricingPlanKey } from "@/features/pricing/plans";
+import type { BillingInterval } from "@/features/pricing/plans";
 import { pricingPlans } from "@/features/pricing/plans";
-import { api } from "@/shared/api/client";
 
 function CheckoutResume({
   interval,
@@ -37,34 +37,37 @@ function CheckoutResume({
           return;
         }
 
-        const result = await api.api.billing.checkout.post(
-          {
-            interval: interval === "annual" ? "yearly" : "monthly",
-            plan: planKey as Exclude<PricingPlanKey, "free">,
-            type: "subscription",
-          },
-          {
-            headers: {
-              "content-type": "application/json",
-            },
-          },
-        );
+        const origin = window.location.origin;
+        const result = await authClient.subscription.upgrade({
+          annual: interval === "annual",
+          cancelUrl: `${origin}/pricing?checkout=cancelled`,
+          disableRedirect: true,
+          plan: planName,
+          returnUrl: `${origin}/billing?checkout=updated`,
+          successUrl: `${origin}/billing?checkout=success`,
+        });
 
         if (result.error) {
-          setError(
-            result.error.value.message || "Checkout could not be started.",
-          );
+          setError(result.error.message || "Checkout could not be started.");
           return;
         }
 
-        window.location.assign(result.data.url);
+        const checkoutUrl =
+          result.data && "url" in result.data ? result.data.url : undefined;
+
+        if (!checkoutUrl) {
+          setError("Checkout could not be started.");
+          return;
+        }
+
+        window.location.assign(checkoutUrl);
       } catch (reason) {
         setError(getUnexpectedAuthErrorMessage(reason));
       }
     }
 
     void startCheckout();
-  }, [interval, planKey]);
+  }, [interval, planKey, planName]);
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-6 px-6 text-center">

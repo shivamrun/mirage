@@ -247,7 +247,7 @@ describe("Stripe webhook route", () => {
     ).toHaveLength(1);
   });
 
-  it("reconciles subscription state and period credits from Stripe events", async () => {
+  it("leaves subscription webhooks to the Better Auth handler", async () => {
     const actor = await createTestActor();
     setSubscriptionWebhookStripeClient({ userId: actor.id });
 
@@ -264,23 +264,16 @@ describe("Stripe webhook route", () => {
 
     expect(response.status, await response.clone().text()).toBe(200);
 
-    const [record] = await db
+    const records = await db
       .select()
       .from(subscription)
       .where(eq(subscription.stripeSubscriptionId, "sub_test"));
     const balance = await getCreditBalance(actor.id);
 
-    expect(record).toMatchObject({
-      billingInterval: "month",
-      plan: "pro",
-      referenceId: actor.id,
-      status: "active",
-      stripeCustomerId: "cus_test",
-      stripeSubscriptionId: "sub_test",
-    });
+    expect(records).toEqual([]);
     expect(balance.currentPeriod).toMatchObject({
-      allowance: 50,
-      plan: "pro",
+      allowance: 10,
+      plan: "free",
     });
   });
 });

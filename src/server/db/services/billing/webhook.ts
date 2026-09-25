@@ -135,17 +135,6 @@ async function handleCheckoutSession(session: Stripe.Checkout.Session) {
     await grantCreditTopUpForCheckoutSession(session);
     return;
   }
-
-  if (session.mode === "subscription" && session.subscription) {
-    const subscriptionId =
-      typeof session.subscription === "string"
-        ? session.subscription
-        : session.subscription.id;
-    const stripeSubscription =
-      await getBillingStripeClient().subscriptions.retrieve(subscriptionId);
-
-    await reconcileStripeSubscription(stripeSubscription);
-  }
 }
 
 export async function constructBillingStripeEvent({
@@ -158,7 +147,7 @@ export async function constructBillingStripeEvent({
   return getBillingStripeClient().webhooks.constructEventAsync(
     body,
     signature,
-    env.STRIPE_WEBHOOK_SECRET,
+    env.STRIPE_CREDIT_TOP_UP_WEBHOOK_SECRET ?? env.STRIPE_WEBHOOK_SECRET,
   );
 }
 
@@ -171,11 +160,5 @@ export async function handleBillingStripeEvent(event: Stripe.Event) {
     return;
   }
 
-  if (
-    event.type === "customer.subscription.created" ||
-    event.type === "customer.subscription.updated" ||
-    event.type === "customer.subscription.deleted"
-  ) {
-    await reconcileStripeSubscription(event.data.object as Stripe.Subscription);
-  }
+  // Subscription webhooks are handled by the Better Auth Stripe plugin.
 }

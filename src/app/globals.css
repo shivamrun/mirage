@@ -59,117 +59,117 @@
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 }
-:root {
-  /* Pure white canvas */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.15 0 0);
 
-  /* White elevated surfaces */
+
+:root {
+  --background: oklch(0.985 0.002 250);
+  --foreground: oklch(0.18 0.01 250);
+
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.15 0 0);
+  --card-foreground: oklch(0.18 0.01 250);
 
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.15 0 0);
+  --popover-foreground: oklch(0.18 0.01 250);
 
-  /* #098ce3-ish */
-  --primary: oklch(0.623 0.163 247.4);
+  /* Teal stays strong here */
+  --primary: oklch(0.59 0.14 180);
   --primary-foreground: oklch(0.99 0 0);
 
-  /* Very light neutral surfaces */
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.21 0 0);
+  /* Neutral */
+  --secondary: oklch(0.955 0.004 250);
+  --secondary-foreground: oklch(0.24 0.01 250);
 
-  --muted: oklch(0.975 0 0);
-  --muted-foreground: oklch(0.47 0 0);
+  --muted: oklch(0.965 0.003 250);
+  --muted-foreground: oklch(0.48 0.012 250);
 
-  /* Sky-blue interaction surface */
-  --accent: oklch(0.9 0.065 247);
-  --accent-foreground: oklch(0.3 0.13 247);
+  /* Very subtle teal */
+  --accent: oklch(0.94 0.025 180);
+  --accent-foreground: oklch(0.31 0.08 180);
 
   --destructive: oklch(0.59 0.22 27);
 
-  /* Neutral */
-  --border: oklch(0.9 0 0);
-  --input: oklch(0.93 0 0);
+  --border: oklch(0.89 0.005 250);
+  --input: oklch(0.91 0.006 250);
+  --ring: oklch(0.59 0.14 180);
 
-  --ring: oklch(0.623 0.163 247.4);
+  --chart-1: oklch(0.59 0.14 180);
+  --chart-2: oklch(0.62 0.15 220);
+  --chart-3: oklch(0.66 0.15 150);
+  --chart-4: oklch(0.73 0.15 85);
+  --chart-5: oklch(0.62 0.18 300);
 
-  /* Sky blue scale */
-  --chart-1: oklch(0.47 0.17 247);
-  --chart-2: oklch(0.56 0.17 247);
-  --chart-3: oklch(0.64 0.16 247);
-  --chart-4: oklch(0.73 0.13 247);
-  --chart-5: oklch(0.82 0.09 247);
+  --radius: 0.5rem;
 
-  --radius: 0.625rem;
+  /* Sidebar mostly neutral */
+  --sidebar: oklch(0.97 0.003 250);
+  --sidebar-foreground: oklch(0.2 0.01 250);
 
-  /* Slightly separated from white page */
-  --sidebar: oklch(0.975 0 0);
-  --sidebar-foreground: oklch(0.15 0 0);
-
-  --sidebar-primary: oklch(0.623 0.163 247.4);
+  --sidebar-primary: oklch(0.59 0.14 180);
   --sidebar-primary-foreground: oklch(0.99 0 0);
 
-  --sidebar-accent: oklch(0.9 0.065 247);
-  --sidebar-accent-foreground: oklch(0.3 0.13 247);
+  --sidebar-accent: oklch(0.93 0.028 180);
+  --sidebar-accent-foreground: oklch(0.29 0.08 180);
 
-  --sidebar-border: oklch(0.9 0 0);
-  --sidebar-ring: oklch(0.623 0.163 247.4);
+  --sidebar-border: oklch(0.89 0.005 250);
+  --sidebar-ring: oklch(0.59 0.14 180);
 }
 
 .dark {
-  /* Keep the graphite background */
-  --background: oklch(0.19 0 0);
-  --foreground: oklch(0.95 0 0);
+  /* Neutral graphite */
+  --background: oklch(0.115 0.006 250);
+  --foreground: oklch(0.94 0.005 250);
 
-  /* More visibly raised from background */
-  --card: oklch(0.24 0 0);
-  --card-foreground: oklch(0.95 0 0);
+  /* Small but visible lift */
+  --card: oklch(0.165 0.007 250);
+  --card-foreground: oklch(0.94 0.005 250);
 
-  --popover: oklch(0.26 0 0);
-  --popover-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.19 0.008 250);
+  --popover-foreground: oklch(0.95 0.005 250);
 
-  /* Sky blue */
-  --primary: oklch(0.68 0.16 247);
-  --primary-foreground: oklch(0.13 0 0);
+  /* Teal brand */
+  --primary: oklch(0.7 0.14 180);
+  --primary-foreground: oklch(0.11 0.02 190);
 
-  /* Lighter neutral surfaces */
-  --secondary: oklch(0.29 0 0);
-  --secondary-foreground: oklch(0.94 0 0);
+  /* Neutral surfaces */
+  --secondary: oklch(0.22 0.008 250);
+  --secondary-foreground: oklch(0.92 0.005 250);
 
-  --muted: oklch(0.27 0 0);
-  --muted-foreground: oklch(0.7 0 0);
+  --muted: oklch(0.195 0.007 250);
+  --muted-foreground: oklch(0.67 0.01 250);
 
-  /* Deep blue interaction surface */
-  --accent: oklch(0.34 0.085 247);
-  --accent-foreground: oklch(0.93 0.05 247);
+  /* Only a hint of teal */
+  --accent: oklch(0.235 0.035 180);
+  --accent-foreground: oklch(0.88 0.06 180);
 
   --destructive: oklch(0.65 0.2 25);
 
-  /* More visible neutral separation */
-  --border: oklch(0.36 0 0);
-  --input: oklch(0.31 0 0);
+  /* Neutral separation */
+  --border: oklch(0.275 0.008 250);
+  --input: oklch(0.235 0.009 250);
+  --ring: oklch(0.7 0.14 180);
 
-  --ring: oklch(0.68 0.16 247);
+  --chart-1: oklch(0.7 0.14 180);
+  --chart-2: oklch(0.69 0.14 220);
+  --chart-3: oklch(0.7 0.14 150);
+  --chart-4: oklch(0.79 0.14 85);
+  --chart-5: oklch(0.7 0.17 300);
 
-  --chart-1: oklch(0.48 0.15 247);
-  --chart-2: oklch(0.57 0.16 247);
-  --chart-3: oklch(0.67 0.16 247);
-  --chart-4: oklch(0.76 0.13 247);
-  --chart-5: oklch(0.84 0.09 247);
+  /*
+   * Sidebar remains graphite.
+   * This is the big fix compared with your screenshot.
+   */
+  --sidebar: oklch(0.135 0.007 250);
+  --sidebar-foreground: oklch(0.92 0.005 250);
 
-  /* Lighter than main background */
-  --sidebar: oklch(0.225 0 0);
-  --sidebar-foreground: oklch(0.95 0 0);
+  --sidebar-primary: oklch(0.7 0.14 180);
+  --sidebar-primary-foreground: oklch(0.11 0.02 190);
 
-  --sidebar-primary: oklch(0.68 0.16 247);
-  --sidebar-primary-foreground: oklch(0.13 0 0);
+  /* Teal only for active/hover */
+  --sidebar-accent: oklch(0.225 0.04 180);
+  --sidebar-accent-foreground: oklch(0.88 0.06 180);
 
-  --sidebar-accent: oklch(0.32 0.08 247);
-  --sidebar-accent-foreground: oklch(0.93 0.05 247);
-
-  --sidebar-border: oklch(0.34 0 0);
-  --sidebar-ring: oklch(0.68 0.16 247);
+  --sidebar-border: oklch(0.25 0.008 250);
+  --sidebar-ring: oklch(0.7 0.14 180);
 }
 
 @layer base {

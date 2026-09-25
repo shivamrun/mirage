@@ -61,16 +61,9 @@ export const creditTopUpCheckoutResponseSchema = z.object({
   url: z.string().url(),
 });
 
-export const billingCheckoutRequestSchema = z.discriminatedUnion("type", [
-  z.object({
-    interval: z.enum(["monthly", "yearly"]),
-    plan: z.enum(["pro", "hacker"]),
-    type: z.literal("subscription"),
-  }),
-  z.object({
-    type: z.literal("credit_top_up"),
-  }),
-]);
+export const billingCheckoutRequestSchema = z.object({
+  type: z.literal("credit_top_up"),
+});
 
 export const billingCheckoutResponseSchema = z.object({
   url: z.string().url(),
