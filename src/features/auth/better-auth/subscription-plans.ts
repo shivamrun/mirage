@@ -1,5 +1,7 @@
 import type { StripePlan } from "@better-auth/stripe";
 
+import { billingCatalog } from "@/server/db/services/billing/catalog";
+
 export const subscriptionPlans = [
   {
     name: "Free",
@@ -9,22 +11,24 @@ export const subscriptionPlans = [
     },
   },
   {
-    name: "Mirage Pro",
-    lookupKey: "mirage_pro_2_monthly",
-    annualDiscountLookupKey: "mirage_pro_2_yearly",
+    name: billingCatalog.subscriptions.pro.displayName,
+    lookupKey: billingCatalog.subscriptions.pro.prices.monthly.lookupKey,
+    annualDiscountLookupKey:
+      billingCatalog.subscriptions.pro.prices.yearly.lookupKey,
     prorationBehavior: "always_invoice",
     limits: {
-      credits: 50,
+      credits: billingCatalog.subscriptions.pro.credits,
       plan: "pro",
     },
   },
   {
-    name: "Mirage Hacker",
-    lookupKey: "mirage_hacker_monthly",
-    annualDiscountLookupKey: "mirage_hacker_yearly",
+    name: billingCatalog.subscriptions.hacker.displayName,
+    lookupKey: billingCatalog.subscriptions.hacker.prices.monthly.lookupKey,
+    annualDiscountLookupKey:
+      billingCatalog.subscriptions.hacker.prices.yearly.lookupKey,
     prorationBehavior: "always_invoice",
     limits: {
-      credits: 100,
+      credits: billingCatalog.subscriptions.hacker.credits,
       plan: "hacker",
     },
   },

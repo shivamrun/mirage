@@ -4,6 +4,7 @@ import { checkDatabaseHealth } from "@/server/db/dal/health";
 import { apiErrors } from "@/server/http/errors";
 import { accountRoutes } from "@/server/routes/account";
 import { adminRoutes } from "@/server/routes/admin";
+import { billingRoutes } from "@/server/routes/billing";
 import { contactRoutes } from "@/server/routes/contact";
 import { creditsRoutes } from "@/server/routes/credits";
 import { emailListRoutes } from "@/server/routes/email-list";
@@ -33,6 +34,7 @@ export const app = new Elysia({ prefix: "/api" })
   })
   .use(accountRoutes)
   .use(accessVerificationRoutes)
+  .use(billingRoutes)
   .use(contactRoutes)
   .use(creditsRoutes)
   .use(emailListRoutes)

@@ -7,16 +7,13 @@ import {
   spendCredits,
 } from "@/server/db/services/credits/ledger";
 import { toCreditBalanceResponse } from "@/server/db/services/credits/response";
-import { createCreditTopUpCheckoutSession } from "@/server/db/services/credits/top-up";
 import { elysiaAuth } from "@/server/http/auth";
 import { requestPolicy } from "@/server/http/request-policy";
 import { getCreditSampleItem } from "@/shared/credits/sample-catalog";
-import { env } from "@/shared/env";
 import {
   creditBalanceResponseSchema,
   creditSampleCreateRequestSchema,
   creditSampleCreateResponseSchema,
-  creditTopUpCheckoutResponseSchema,
   messageResponseSchema,
 } from "@/shared/schemas";
 
@@ -54,53 +51,6 @@ export const creditsRoutes = new Elysia({ prefix: "/credits" })
         200: creditBalanceResponseSchema,
         401: messageResponseSchema,
         500: messageResponseSchema,
-      },
-    },
-  )
-  .post(
-    "/top-up/checkout",
-    async ({ status, user }) => {
-      try {
-        const baseUrl = env.NEXT_PUBLIC_BASE_URL;
-        const stripeCustomerId =
-          "stripeCustomerId" in user &&
-          typeof user.stripeCustomerId === "string"
-            ? user.stripeCustomerId
-            : null;
-        const checkoutSession = await createCreditTopUpCheckoutSession({
-          cancelUrl: `${baseUrl}/billing?checkout=cancelled`,
-          customerEmail: user.email,
-          stripeCustomerId,
-          successUrl: `${baseUrl}/billing?checkout=success&creditCheckoutSessionId={CHECKOUT_SESSION_ID}`,
-          userId: user.id,
-        });
-
-        if (!checkoutSession.url) {
-          return status(502, {
-            message: "Stripe did not return a checkout URL.",
-          });
-        }
-
-        return { url: checkoutSession.url };
-      } catch (error) {
-        console.error(
-          "Unable to create credit top-up checkout session:",
-          error,
-        );
-        return status(502, {
-          message: "Credit top-up checkout could not be started.",
-        });
-      }
-    },
-    {
-      auth: true,
-      sameOrigin: true,
-      response: {
-        200: creditTopUpCheckoutResponseSchema,
-        401: messageResponseSchema,
-        403: messageResponseSchema,
-        500: messageResponseSchema,
-        502: messageResponseSchema,
       },
     },
   )

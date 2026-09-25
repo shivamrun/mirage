@@ -1,5 +1,5 @@
 const appPathBase = "http://localhost";
-const defaultAuthRedirect = "/account";
+const defaultAuthRedirect = "/";
 
 export function getSafeAuthRedirect(value?: string) {
   if (!value || !/^\/(?!\/)/.test(value)) {

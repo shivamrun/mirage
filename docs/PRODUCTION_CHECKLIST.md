@@ -72,14 +72,15 @@ changes, security reviews, or reliability hardening passes.
 - Confirm `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are configured in the
   production environment.
 - Create the Stripe webhook endpoint for the production domain:
-  `https://<production-domain>/api/auth/stripe/webhook`.
+  `https://<production-domain>/api/stripe/webhook`.
 - Select at least these webhook events:
   `checkout.session.completed`, `customer.subscription.created`,
-  `customer.subscription.updated`, and `customer.subscription.deleted`.
-- Verify the Stripe lookup keys used by static paid plans exist in the
+  `customer.subscription.updated`, `customer.subscription.deleted`, and
+  `checkout.session.async_payment_succeeded`.
+- Verify the Stripe lookup keys used by the billing catalog exist in the
   production Stripe account: `mirage_pro_2_monthly`,
   `mirage_pro_2_yearly`, `mirage_hacker_monthly`, and
-  `mirage_hacker_yearly`.
+  `mirage_hacker_yearly`, plus `one_time_credit`.
 - Send a Stripe test webhook event in a production-like environment and confirm
   the request is accepted before launch.
 

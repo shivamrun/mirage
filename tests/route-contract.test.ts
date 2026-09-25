@@ -55,7 +55,7 @@ const mutationRoutes = [
     access: "user",
   },
   { method: "POST", path: "/api/contact/", access: "public" },
-  { method: "POST", path: "/api/credits/top-up/checkout", access: "user" },
+  { method: "POST", path: "/api/billing/checkout", access: "user" },
   { method: "POST", path: "/api/credits/sample-create", access: "user" },
   { method: "POST", path: "/api/email-list/", access: "public" },
   { method: "POST", path: "/api/uploads/", access: "user" },
@@ -148,6 +148,9 @@ function requestBody(path: string) {
       idempotencyKey: `phase-zero-${randomUUID()}`,
       itemKey: "tiny-note",
     });
+  }
+  if (path === "/api/billing/checkout") {
+    return JSON.stringify({ type: "credit_top_up" });
   }
   if (path === "/api/email-list/") {
     return JSON.stringify({

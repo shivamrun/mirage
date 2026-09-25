@@ -18,8 +18,10 @@ function AccountCreditTopUpButton() {
 
     startTransition(async () => {
       try {
-        const response = await api.api.credits["top-up"].checkout.post(
-          undefined,
+        const response = await api.api.billing.checkout.post(
+          {
+            type: "credit_top_up",
+          },
           {
             headers: {
               "content-type": "application/json",
@@ -30,7 +32,7 @@ function AccountCreditTopUpButton() {
         if (response.error) {
           setError(
             response.error.value.message ||
-              "Credit top-up checkout could not be started.",
+              "Billing checkout could not be started.",
           );
           return;
         }

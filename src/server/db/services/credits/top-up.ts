@@ -1,29 +1,24 @@
-import Stripe from "stripe";
+import type Stripe from "stripe";
 
+import { billingCatalog } from "@/server/db/services/billing/catalog";
+import {
+  type BillingStripeClient,
+  getBillingStripeClient,
+  setBillingStripeClientForTests,
+} from "@/server/db/services/billing/stripe-client";
 import { grantCreditTopUp } from "@/server/db/services/credits/ledger";
-import { env } from "@/shared/env";
 
 export const creditTopUpProduct = {
-  amount: 5000,
-  checkoutLookupKey: "one_time_credit",
-  credits: 200,
-  currency: "usd",
+  amount: billingCatalog.creditTopUp.amount,
+  checkoutLookupKey: billingCatalog.creditTopUp.lookupKey,
+  credits: billingCatalog.creditTopUp.credits,
+  currency: billingCatalog.creditTopUp.currency,
 } as const;
 
-type CreditTopUpStripeClient = Pick<Stripe, "checkout" | "prices" | "webhooks">;
-
-let stripeClient: CreditTopUpStripeClient = new Stripe(env.STRIPE_SECRET_KEY, {
-  apiVersion: "2026-08-26.dahlia",
-});
-
 export function setCreditTopUpStripeClientForTests(
-  client: CreditTopUpStripeClient,
+  client: BillingStripeClient,
 ) {
-  if (env.NODE_ENV !== "test") {
-    throw new Error("Stripe test client override is only available in tests.");
-  }
-
-  stripeClient = client;
+  setBillingStripeClientForTests(client);
 }
 
 function metadataValue(
@@ -33,65 +28,8 @@ function metadataValue(
   return metadata?.[key] ?? null;
 }
 
-async function resolveCreditTopUpPrice() {
-  const prices = await stripeClient.prices.list({
-    active: true,
-    expand: ["data.product"],
-    limit: 1,
-    lookup_keys: [creditTopUpProduct.checkoutLookupKey],
-  });
-  const price = prices.data[0];
-
-  if (
-    !price ||
-    price.lookup_key !== creditTopUpProduct.checkoutLookupKey ||
-    price.unit_amount !== creditTopUpProduct.amount ||
-    price.currency !== creditTopUpProduct.currency ||
-    price.recurring
-  ) {
-    throw new Error("Stripe credit top-up price is not configured correctly.");
-  }
-
-  return price;
-}
-
-export async function createCreditTopUpCheckoutSession({
-  cancelUrl,
-  customerEmail,
-  stripeCustomerId,
-  successUrl,
-  userId,
-}: {
-  cancelUrl: string;
-  customerEmail: string;
-  stripeCustomerId?: null | string;
-  successUrl: string;
-  userId: string;
-}) {
-  const price = await resolveCreditTopUpPrice();
-
-  return stripeClient.checkout.sessions.create({
-    cancel_url: cancelUrl,
-    client_reference_id: userId,
-    customer: stripeCustomerId ?? undefined,
-    customer_email: stripeCustomerId ? undefined : customerEmail,
-    line_items: [
-      {
-        price: price.id,
-        quantity: 1,
-      },
-    ],
-    metadata: {
-      credits: String(creditTopUpProduct.credits),
-      lookupKey: creditTopUpProduct.checkoutLookupKey,
-      userId,
-    },
-    mode: "payment",
-    success_url: successUrl,
-  });
-}
-
 async function assertCheckoutSessionUsesTopUpPrice(sessionId: string) {
+  const stripeClient = getBillingStripeClient();
   const lineItems = await stripeClient.checkout.sessions.listLineItems(
     sessionId,
     {
@@ -146,36 +84,4 @@ export async function grantCreditTopUpForCheckoutSession(
     sourceId: session.id,
     userId,
   });
-}
-
-export async function grantCreditTopUpForCheckoutSessionId({
-  sessionId,
-  userId,
-}: {
-  sessionId: string;
-  userId: string;
-}) {
-  const session = await stripeClient.checkout.sessions.retrieve(sessionId);
-  const sessionUserId =
-    metadataValue(session.metadata, "userId") ?? session.client_reference_id;
-
-  if (sessionUserId !== userId) {
-    throw new Error("Stripe checkout session does not belong to this user.");
-  }
-
-  return grantCreditTopUpForCheckoutSession(session);
-}
-
-export async function constructCreditTopUpStripeEvent({
-  body,
-  signature,
-}: {
-  body: string;
-  signature: string;
-}) {
-  return stripeClient.webhooks.constructEventAsync(
-    body,
-    signature,
-    env.STRIPE_WEBHOOK_SECRET,
-  );
 }

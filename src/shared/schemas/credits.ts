@@ -61,6 +61,21 @@ export const creditTopUpCheckoutResponseSchema = z.object({
   url: z.string().url(),
 });
 
+export const billingCheckoutRequestSchema = z.discriminatedUnion("type", [
+  z.object({
+    interval: z.enum(["monthly", "yearly"]),
+    plan: z.enum(["pro", "hacker"]),
+    type: z.literal("subscription"),
+  }),
+  z.object({
+    type: z.literal("credit_top_up"),
+  }),
+]);
+
+export const billingCheckoutResponseSchema = z.object({
+  url: z.string().url(),
+});
+
 export const adminCreditAdjustmentSchema = z.object({
   amount: z.preprocess(
     (value) => (typeof value === "string" ? Number(value) : value),
@@ -97,4 +112,8 @@ export type CreditSampleCreateResponse = z.infer<
 >;
 export type CreditTopUpCheckoutResponse = z.infer<
   typeof creditTopUpCheckoutResponseSchema
+>;
+export type BillingCheckoutInput = z.input<typeof billingCheckoutRequestSchema>;
+export type BillingCheckoutResponse = z.infer<
+  typeof billingCheckoutResponseSchema
 >;

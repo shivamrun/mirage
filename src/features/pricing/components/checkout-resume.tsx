@@ -2,13 +2,13 @@
 
 import { AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
-import { authClient } from "@/features/auth/better-auth/client";
 import { getUnexpectedAuthErrorMessage } from "@/features/auth/components/auth-errors";
-import type { BillingInterval } from "@/features/pricing/plans";
+import type { BillingInterval, PricingPlanKey } from "@/features/pricing/plans";
+import { pricingPlans } from "@/features/pricing/plans";
+import { api } from "@/shared/api/client";
 
 function CheckoutResume({
   interval,
@@ -17,9 +17,11 @@ function CheckoutResume({
   interval: BillingInterval;
   planName: string;
 }) {
-  const router = useRouter();
   const [error, setError] = React.useState<string>();
   const hasStartedCheckout = React.useRef(false);
+  const planKey = pricingPlans.find(
+    (plan) => "checkoutPlanName" in plan && plan.checkoutPlanName === planName,
+  )?.key;
 
   React.useEffect(() => {
     if (hasStartedCheckout.current) {
@@ -30,38 +32,39 @@ function CheckoutResume({
 
     async function startCheckout() {
       try {
-        const origin = window.location.origin;
-        const result = await authClient.subscription.upgrade({
-          annual: interval === "annual",
-          cancelUrl: `${origin}/pricing?checkout=cancelled`,
-          disableRedirect: true,
-          plan: planName,
-          returnUrl: `${origin}/billing?checkout=updated`,
-          successUrl: `${origin}/billing?checkout=success`,
-        });
+        if (!planKey || planKey === "free") {
+          setError("Choose a paid plan to continue checkout.");
+          return;
+        }
+
+        const result = await api.api.billing.checkout.post(
+          {
+            interval: interval === "annual" ? "yearly" : "monthly",
+            plan: planKey as Exclude<PricingPlanKey, "free">,
+            type: "subscription",
+          },
+          {
+            headers: {
+              "content-type": "application/json",
+            },
+          },
+        );
 
         if (result.error) {
-          setError(result.error.message || "Checkout could not be started.");
+          setError(
+            result.error.value.message || "Checkout could not be started.",
+          );
           return;
         }
 
-        const checkoutUrl =
-          result.data && "url" in result.data ? result.data.url : undefined;
-
-        if (checkoutUrl) {
-          window.location.assign(checkoutUrl);
-          return;
-        }
-
-        router.replace("/billing?checkout=success");
-        router.refresh();
+        window.location.assign(result.data.url);
       } catch (reason) {
         setError(getUnexpectedAuthErrorMessage(reason));
       }
     }
 
     void startCheckout();
-  }, [interval, planName, router]);
+  }, [interval, planKey]);
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-6 px-6 text-center">

@@ -89,6 +89,7 @@ async function createSubscription({
 
 function setStripeTopUpClient({
   checkoutUrl = "https://checkout.stripe.test/session",
+  topUpUnitAmount = 5000,
 } = {}) {
   setCreditTopUpStripeClientForTests({
     checkout: {
@@ -131,22 +132,35 @@ function setStripeTopUpClient({
       },
     },
     prices: {
-      list: async () => ({
-        data: [
-          {
-            active: true,
-            currency: "usd",
-            id: "price_top_up",
-            lookup_key: "one_time_credit",
-            object: "price",
-            recurring: null,
-            unit_amount: 5000,
-          },
-        ],
-        has_more: false,
-        object: "list",
-        url: "/v1/prices",
-      }),
+      list: async (params: { lookup_keys?: string[] }) => {
+        const lookupKey = params.lookup_keys?.[0];
+        const price =
+          lookupKey === "mirage_hacker_yearly"
+            ? {
+                active: true,
+                currency: "usd",
+                id: "price_hacker_yearly",
+                lookup_key: "mirage_hacker_yearly",
+                object: "price",
+                recurring: { interval: "year" },
+              }
+            : {
+                active: true,
+                currency: "usd",
+                id: "price_top_up",
+                lookup_key: "one_time_credit",
+                object: "price",
+                recurring: null,
+                unit_amount: topUpUnitAmount,
+              };
+
+        return {
+          data: [price],
+          has_more: false,
+          object: "list",
+          url: "/v1/prices",
+        };
+      },
     },
     webhooks: {
       constructEventAsync: async () => ({
@@ -553,26 +567,28 @@ describe("credit ledger", () => {
     const actor = await createTestActor();
     setStripeTopUpClient();
 
-    const unauthenticated = await httpRequest(
-      app,
-      "/api/credits/top-up/checkout",
-      {
-        headers: {
-          origin: "http://localhost:3000",
-        },
-        method: "POST",
+    const unauthenticated = await httpRequest(app, "/api/billing/checkout", {
+      body: JSON.stringify({ type: "credit_top_up" }),
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:3000",
       },
-    );
-    const wrongOrigin = await httpRequest(app, "/api/credits/top-up/checkout", {
+      method: "POST",
+    });
+    const wrongOrigin = await httpRequest(app, "/api/billing/checkout", {
+      body: JSON.stringify({ type: "credit_top_up" }),
       cookie: actor.cookie,
       headers: {
+        "content-type": "application/json",
         origin: "https://evil.example",
       },
       method: "POST",
     });
-    const checkout = await httpRequest(app, "/api/credits/top-up/checkout", {
+    const checkout = await httpRequest(app, "/api/billing/checkout", {
+      body: JSON.stringify({ type: "credit_top_up" }),
       cookie: actor.cookie,
       headers: {
+        "content-type": "application/json",
         origin: "http://localhost:3000",
       },
       method: "POST",
@@ -580,6 +596,50 @@ describe("credit ledger", () => {
 
     expect(unauthenticated.status).toBe(401);
     expect(wrongOrigin.status).toBe(403);
+    expect(checkout.status, await checkout.clone().text()).toBe(200);
+    await expect(checkout.json()).resolves.toEqual({
+      url: "https://checkout.stripe.test/session",
+    });
+  });
+
+  it("rejects credit top-up checkout when the Stripe price amount is misconfigured", async () => {
+    const actor = await createTestActor();
+    setStripeTopUpClient({ topUpUnitAmount: 4999 });
+
+    const checkout = await httpRequest(app, "/api/billing/checkout", {
+      body: JSON.stringify({ type: "credit_top_up" }),
+      cookie: actor.cookie,
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:3000",
+      },
+      method: "POST",
+    });
+
+    expect(checkout.status).toBe(502);
+    await expect(checkout.json()).resolves.toEqual({
+      message: "Billing checkout could not be started.",
+    });
+  });
+
+  it("starts subscription checkout through the billing API", async () => {
+    const actor = await createTestActor();
+    setStripeTopUpClient();
+
+    const checkout = await httpRequest(app, "/api/billing/checkout", {
+      body: JSON.stringify({
+        interval: "yearly",
+        plan: "hacker",
+        type: "subscription",
+      }),
+      cookie: actor.cookie,
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:3000",
+      },
+      method: "POST",
+    });
+
     expect(checkout.status, await checkout.clone().text()).toBe(200);
     await expect(checkout.json()).resolves.toEqual({
       url: "https://checkout.stripe.test/session",

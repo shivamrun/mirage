@@ -1,9 +1,9 @@
 import type Stripe from "stripe";
 
 import {
-  constructCreditTopUpStripeEvent,
-  grantCreditTopUpForCheckoutSession,
-} from "@/server/db/services/credits/top-up";
+  constructBillingStripeEvent,
+  handleBillingStripeEvent,
+} from "@/server/db/services/billing/webhook";
 
 export async function POST(request: Request) {
   const signature = request.headers.get("stripe-signature");
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 
   let event: Stripe.Event;
   try {
-    event = await constructCreditTopUpStripeEvent({
+    event = await constructBillingStripeEvent({
       body: await request.text(),
       signature,
     });
@@ -28,12 +28,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (
-    event.type === "checkout.session.completed" ||
-    event.type === "checkout.session.async_payment_succeeded"
-  ) {
-    await grantCreditTopUpForCheckoutSession(event.data.object);
-  }
+  await handleBillingStripeEvent(event);
 
   return Response.json({ received: true });
 }

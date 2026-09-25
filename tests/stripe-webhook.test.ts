@@ -1,7 +1,10 @@
+import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { POST } from "@/app/(backend)/api/auth/[...all]/route";
-import { POST as CREDIT_TOP_UP_WEBHOOK_POST } from "@/app/(backend)/api/stripe/credit-top-up/webhook/route";
+import { POST as STRIPE_WEBHOOK_POST } from "@/app/(backend)/api/stripe/webhook/route";
+import db from "@/server/db";
+import { subscription } from "@/server/db/schema";
 import { getCreditBalance } from "@/server/db/services/credits/ledger";
 import { setCreditTopUpStripeClientForTests } from "@/server/db/services/credits/top-up";
 import { createTestActor } from "./infra/admin-actor";
@@ -89,6 +92,82 @@ function setCreditTopUpWebhookStripeClient({
   } as never);
 }
 
+function setSubscriptionWebhookStripeClient({ userId }: { userId: string }) {
+  const periodStart = Math.floor(Date.now() / 1000) - 60;
+  const periodEnd = periodStart + 60 * 60 * 24 * 30;
+
+  setCreditTopUpStripeClientForTests({
+    checkout: {
+      sessions: {
+        create: async () => ({ id: "cs_test", object: "checkout.session" }),
+        listLineItems: async () => ({
+          data: [],
+          has_more: false,
+          object: "list",
+          url: "/v1/checkout/sessions/cs_test/line_items",
+        }),
+        retrieve: async () => ({ id: "cs_test", object: "checkout.session" }),
+      },
+    },
+    prices: {
+      list: async () => ({
+        data: [],
+        has_more: false,
+        object: "list",
+        url: "/v1/prices",
+      }),
+    },
+    subscriptions: {
+      retrieve: async () => ({ id: "sub_test", object: "subscription" }),
+    },
+    webhooks: {
+      constructEventAsync: async () => ({
+        data: {
+          object: {
+            cancel_at: null,
+            cancel_at_period_end: false,
+            canceled_at: null,
+            customer: "cus_test",
+            ended_at: null,
+            id: "sub_test",
+            items: {
+              data: [
+                {
+                  current_period_end: periodEnd,
+                  current_period_start: periodStart,
+                  id: "si_test",
+                  object: "subscription_item",
+                  price: {
+                    id: "price_pro_monthly",
+                    lookup_key: "mirage_pro_2_monthly",
+                    object: "price",
+                    recurring: {
+                      interval: "month",
+                    },
+                  },
+                  quantity: 1,
+                },
+              ],
+              object: "list",
+            },
+            metadata: {
+              lookupKey: "mirage_pro_2_monthly",
+              plan: "pro",
+              userId,
+            },
+            object: "subscription",
+            schedule: null,
+            status: "active",
+          },
+        },
+        id: "evt_test_subscription",
+        object: "event",
+        type: "customer.subscription.created",
+      }),
+    },
+  } as never);
+}
+
 describe("Stripe webhook route", () => {
   it("is mounted through the Better Auth handler", async () => {
     const response = await POST(
@@ -114,8 +193,8 @@ describe("Stripe webhook route", () => {
       userId: actor.id,
     });
 
-    const missingSignature = await CREDIT_TOP_UP_WEBHOOK_POST(
-      new Request("http://localhost:3000/api/stripe/credit-top-up/webhook", {
+    const missingSignature = await STRIPE_WEBHOOK_POST(
+      new Request("http://localhost:3000/api/stripe/webhook", {
         body: "{}",
         headers: {
           "content-type": "application/json",
@@ -123,8 +202,8 @@ describe("Stripe webhook route", () => {
         method: "POST",
       }),
     );
-    const invalidSignature = await CREDIT_TOP_UP_WEBHOOK_POST(
-      new Request("http://localhost:3000/api/stripe/credit-top-up/webhook", {
+    const invalidSignature = await STRIPE_WEBHOOK_POST(
+      new Request("http://localhost:3000/api/stripe/webhook", {
         body: "{}",
         headers: {
           "content-type": "application/json",
@@ -143,8 +222,8 @@ describe("Stripe webhook route", () => {
     setCreditTopUpWebhookStripeClient({ userId: actor.id });
 
     for (const attempt of [1, 2]) {
-      const response = await CREDIT_TOP_UP_WEBHOOK_POST(
-        new Request("http://localhost:3000/api/stripe/credit-top-up/webhook", {
+      const response = await STRIPE_WEBHOOK_POST(
+        new Request("http://localhost:3000/api/stripe/webhook", {
           body: JSON.stringify({ attempt }),
           headers: {
             "content-type": "application/json",
@@ -166,5 +245,42 @@ describe("Stripe webhook route", () => {
         (entry) => entry.idempotencyKey === "stripe_checkout:cs_test_top_up",
       ),
     ).toHaveLength(1);
+  });
+
+  it("reconciles subscription state and period credits from Stripe events", async () => {
+    const actor = await createTestActor();
+    setSubscriptionWebhookStripeClient({ userId: actor.id });
+
+    const response = await STRIPE_WEBHOOK_POST(
+      new Request("http://localhost:3000/api/stripe/webhook", {
+        body: "{}",
+        headers: {
+          "content-type": "application/json",
+          "stripe-signature": "valid_signature",
+        },
+        method: "POST",
+      }),
+    );
+
+    expect(response.status, await response.clone().text()).toBe(200);
+
+    const [record] = await db
+      .select()
+      .from(subscription)
+      .where(eq(subscription.stripeSubscriptionId, "sub_test"));
+    const balance = await getCreditBalance(actor.id);
+
+    expect(record).toMatchObject({
+      billingInterval: "month",
+      plan: "pro",
+      referenceId: actor.id,
+      status: "active",
+      stripeCustomerId: "cus_test",
+      stripeSubscriptionId: "sub_test",
+    });
+    expect(balance.currentPeriod).toMatchObject({
+      allowance: 50,
+      plan: "pro",
+    });
   });
 });
