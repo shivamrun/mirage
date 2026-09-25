@@ -59,6 +59,7 @@ type LedgerMetadata = Record<string, unknown>;
 
 type CreditWriteOptions = {
   amount: number;
+  carryForwardDelta?: number;
   idempotencyKey: string;
   metadata?: LedgerMetadata;
   periodEnd: Date;
@@ -278,12 +279,21 @@ function accountTotalsForEntry(
 ) {
   const nextAccount = {
     availableCredits: account.availableCredits + entry.amount,
+    carryForwardCredits: account.carryForwardCredits,
     lifetimeExpired: account.lifetimeExpired,
     lifetimeGranted: account.lifetimeGranted,
     lifetimeSpent: account.lifetimeSpent,
   };
 
-  if (entry.type === "grant" || entry.type === "manual_credit") {
+  if (typeof entry.carryForwardDelta === "number") {
+    nextAccount.carryForwardCredits += entry.carryForwardDelta;
+  }
+
+  if (
+    entry.type === "grant" ||
+    entry.type === "manual_credit" ||
+    entry.type === "top_up"
+  ) {
     nextAccount.lifetimeGranted += entry.amount;
   }
   if (entry.type === "spend") {
@@ -294,6 +304,53 @@ function accountTotalsForEntry(
   }
 
   return nextAccount;
+}
+
+function spendMetadataForAccount(account: CreditAccount, amount: number) {
+  const requestedCredits = Math.abs(amount);
+  const carryForwardAvailable = Math.min(
+    account.carryForwardCredits,
+    account.availableCredits,
+  );
+  const periodCreditsAvailable = Math.max(
+    0,
+    account.availableCredits - carryForwardAvailable,
+  );
+  const periodCreditsSpent = Math.min(requestedCredits, periodCreditsAvailable);
+  const carryForwardCreditsSpent = Math.max(
+    0,
+    requestedCredits - periodCreditsSpent,
+  );
+
+  return {
+    carryForwardCreditsSpent,
+    periodCreditsSpent,
+  };
+}
+
+function readCarryForwardCreditsSpent(metadata: LedgerMetadata | null) {
+  const value = metadata?.carryForwardCreditsSpent;
+  return Number.isInteger(value) && Number(value) > 0 ? Number(value) : 0;
+}
+
+function creditEntryForAccount(
+  account: CreditAccount,
+  entry: CreditWriteOptions,
+) {
+  if (entry.type === "spend") {
+    const spendMetadata = spendMetadataForAccount(account, entry.amount);
+
+    return {
+      ...entry,
+      carryForwardDelta: -spendMetadata.carryForwardCreditsSpent,
+      metadata: {
+        ...entry.metadata,
+        ...spendMetadata,
+      },
+    };
+  }
+
+  return entry;
 }
 
 async function findEntryByIdempotencyKey(idempotencyKey: string, tx: DBClient) {
@@ -339,28 +396,29 @@ async function appendLedgerEntry(tx: DBClient, entry: CreditWriteOptions) {
     return existingAfterLock;
   }
 
-  const nextAccount = accountTotalsForEntry(account, entry);
+  const ledgerWrite = creditEntryForAccount(account, entry);
+  const nextAccount = accountTotalsForEntry(account, ledgerWrite);
 
-  if (nextAccount.availableCredits < 0) {
+  if (nextAccount.availableCredits < 0 || nextAccount.carryForwardCredits < 0) {
     throw new InsufficientCreditsError(
       account.availableCredits,
-      Math.abs(entry.amount),
+      Math.abs(ledgerWrite.amount),
     );
   }
 
   const [ledgerEntry] = await tx
     .insert(creditLedgerEntries)
     .values({
-      amount: entry.amount,
-      idempotencyKey: entry.idempotencyKey,
-      metadata: entry.metadata,
-      periodEnd: entry.periodEnd,
-      periodStart: entry.periodStart,
-      reversesLedgerEntryId: entry.reversesLedgerEntryId,
-      source: entry.source,
-      sourceId: entry.sourceId,
-      type: entry.type,
-      userId: entry.userId,
+      amount: ledgerWrite.amount,
+      idempotencyKey: ledgerWrite.idempotencyKey,
+      metadata: ledgerWrite.metadata,
+      periodEnd: ledgerWrite.periodEnd,
+      periodStart: ledgerWrite.periodStart,
+      reversesLedgerEntryId: ledgerWrite.reversesLedgerEntryId,
+      source: ledgerWrite.source,
+      sourceId: ledgerWrite.sourceId,
+      type: ledgerWrite.type,
+      userId: ledgerWrite.userId,
     })
     .returning();
 
@@ -368,6 +426,7 @@ async function appendLedgerEntry(tx: DBClient, entry: CreditWriteOptions) {
     .update(creditAccounts)
     .set({
       availableCredits: nextAccount.availableCredits,
+      carryForwardCredits: nextAccount.carryForwardCredits,
       lifetimeExpired: nextAccount.lifetimeExpired,
       lifetimeGranted: nextAccount.lifetimeGranted,
       lifetimeSpent: nextAccount.lifetimeSpent,
@@ -388,7 +447,12 @@ async function expirePreviousPeriodCredits({
   tx: DBClient;
   userId: string;
 }) {
-  if (account.availableCredits <= 0) {
+  const expirableCredits = Math.max(
+    0,
+    account.availableCredits - account.carryForwardCredits,
+  );
+
+  if (expirableCredits <= 0) {
     return;
   }
 
@@ -407,7 +471,7 @@ async function expirePreviousPeriodCredits({
   }
 
   await appendLedgerEntry(tx, {
-    amount: -account.availableCredits,
+    amount: -expirableCredits,
     idempotencyKey: `expire:${userId}:${currentPeriod.periodStart.toISOString()}`,
     metadata: {
       expiredBeforePeriodKey: currentPeriod.key,
@@ -573,17 +637,63 @@ export async function refundCreditSpend({
     if (refundAmount > Math.abs(spendEntry.amount)) {
       throw new Error("Refund amount cannot exceed the original spend.");
     }
+    const carryForwardCreditsSpent = readCarryForwardCreditsSpent(
+      spendEntry.metadata,
+    );
+    const carryForwardRefunded = Math.min(
+      refundAmount,
+      carryForwardCreditsSpent,
+    );
 
     return appendLedgerEntry(tx, {
       amount: refundAmount,
+      carryForwardDelta: carryForwardRefunded,
       idempotencyKey,
-      metadata,
+      metadata: {
+        ...metadata,
+        carryForwardCreditsRefunded: carryForwardRefunded,
+      },
       periodEnd: spendEntry.periodEnd,
       periodStart: spendEntry.periodStart,
       reversesLedgerEntryId: spendEntry.id,
       source,
       sourceId: sourceId ?? spendEntry.sourceId,
       type: "refund",
+      userId,
+    });
+  });
+}
+
+export async function grantCreditTopUp({
+  amount,
+  idempotencyKey,
+  metadata,
+  source = "stripe_credit_top_up",
+  sourceId,
+  userId,
+}: {
+  amount: number;
+  idempotencyKey: string;
+  metadata?: LedgerMetadata;
+  source?: string;
+  sourceId?: null | string;
+  userId: string;
+}) {
+  assertPositiveInteger(amount, "Credit top-up amount");
+
+  return db.transaction(async (tx) => {
+    const period = await reconcilePeriodGrantForUser(userId, tx);
+
+    return appendLedgerEntry(tx, {
+      amount,
+      carryForwardDelta: amount,
+      idempotencyKey,
+      metadata,
+      periodEnd: period.periodEnd,
+      periodStart: period.periodStart,
+      source,
+      sourceId,
+      type: "top_up",
       userId,
     });
   });

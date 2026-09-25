@@ -162,6 +162,13 @@
       "when": 1790267019104,
       "tag": "0022_tranquil_dorian_gray",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790276160435,
+      "tag": "0023_friendly_lady_deathstrike",
+      "breakpoints": true
     }
   ]
 }

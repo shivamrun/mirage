@@ -13,8 +13,8 @@ import {
 import type { getCreditBalance } from "@/server/db/services/credits/ledger";
 import { api } from "@/shared/api/client";
 import {
-  creditSampleItems,
   type CreditSampleItemKey,
+  creditSampleItems,
 } from "@/shared/credits/sample-catalog";
 import type {
   CreditBalanceResponse,
@@ -35,6 +35,7 @@ function formatDate(value: Date | string) {
 function toBalanceResponse(balance: CreditBalance): CreditBalanceResponse {
   return {
     availableCredits: balance.account.availableCredits,
+    carryForwardCredits: balance.account.carryForwardCredits,
     currentPeriod: {
       allowance: balance.currentPeriod.allowance,
       periodEnd: balance.currentPeriod.periodEnd.toISOString(),

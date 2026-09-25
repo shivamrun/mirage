@@ -20,11 +20,13 @@ import {
   adjustCredits,
   CreditIdempotencyConflictError,
   getCreditBalance,
+  grantCreditTopUp,
   InsufficientCreditsError,
   reconcileCreditGrantForSubscription,
   refundCreditSpend,
   spendCredits,
 } from "@/server/db/services/credits/ledger";
+import { setCreditTopUpStripeClientForTests } from "@/server/db/services/credits/top-up";
 import { app } from "@/server/routes";
 import { createTestActor } from "./infra/admin-actor";
 import { httpRequest } from "./infra/http-request";
@@ -83,6 +85,93 @@ async function createSubscription({
     .where(eq(subscription.id, id));
   if (!record) throw new Error("Subscription was not created.");
   return record;
+}
+
+function setStripeTopUpClient({
+  checkoutUrl = "https://checkout.stripe.test/session",
+} = {}) {
+  setCreditTopUpStripeClientForTests({
+    checkout: {
+      sessions: {
+        create: async () => ({
+          id: "cs_test_top_up",
+          object: "checkout.session",
+          url: checkoutUrl,
+        }),
+        retrieve: async () => ({
+          amount_total: 5000,
+          client_reference_id: "unused",
+          currency: "usd",
+          id: "cs_test_top_up",
+          metadata: {
+            credits: "200",
+            lookupKey: "one_time_credit",
+            userId: "unused",
+          },
+          mode: "payment",
+          object: "checkout.session",
+          payment_status: "paid",
+        }),
+        listLineItems: async () => ({
+          data: [
+            {
+              id: "li_test",
+              object: "item",
+              price: {
+                id: "price_top_up",
+                lookup_key: "one_time_credit",
+                object: "price",
+              },
+            },
+          ],
+          has_more: false,
+          object: "list",
+          url: "/v1/checkout/sessions/cs_test/line_items",
+        }),
+      },
+    },
+    prices: {
+      list: async () => ({
+        data: [
+          {
+            active: true,
+            currency: "usd",
+            id: "price_top_up",
+            lookup_key: "one_time_credit",
+            object: "price",
+            recurring: null,
+            unit_amount: 5000,
+          },
+        ],
+        has_more: false,
+        object: "list",
+        url: "/v1/prices",
+      }),
+    },
+    webhooks: {
+      constructEventAsync: async () => ({
+        data: {
+          object: {
+            amount_total: 5000,
+            client_reference_id: "unused",
+            currency: "usd",
+            id: "cs_test_top_up",
+            metadata: {
+              credits: "200",
+              lookupKey: "one_time_credit",
+              userId: "unused",
+            },
+            mode: "payment",
+            object: "checkout.session",
+            payment_status: "paid",
+          },
+        },
+        id: "evt_test",
+        object: "event",
+        type: "checkout.session.completed",
+      }),
+    },
+  } as never);
 }
 
 describe("credit ledger", () => {
@@ -277,6 +366,115 @@ describe("credit ledger", () => {
     ]);
   });
 
+  it("top-up credits carry forward and are idempotent", async () => {
+    const userId = await createUser();
+
+    const first = await grantCreditTopUp({
+      amount: 200,
+      idempotencyKey: "stripe_checkout:cs_top_up",
+      sourceId: "cs_top_up",
+      userId,
+    });
+    const second = await grantCreditTopUp({
+      amount: 200,
+      idempotencyKey: "stripe_checkout:cs_top_up",
+      sourceId: "cs_top_up",
+      userId,
+    });
+    const balance = await getCreditBalance(userId);
+
+    expect(second.id).toBe(first.id);
+    expect(balance.account.availableCredits).toBe(210);
+    expect(balance.account.carryForwardCredits).toBe(200);
+    expect(balance.account.lifetimeGranted).toBe(210);
+  });
+
+  it("spends period credits before purchased carry-forward credits", async () => {
+    const userId = await createUser();
+    await grantCreditTopUp({
+      amount: 200,
+      idempotencyKey: "stripe_checkout:cs_spend_order",
+      sourceId: "cs_spend_order",
+      userId,
+    });
+
+    await spendCredits({
+      amount: 15,
+      idempotencyKey: "spend:period-first",
+      source: "test",
+      userId,
+    });
+    const balance = await getCreditBalance(userId);
+    const spend = balance.recentLedger.find(
+      (entry) => entry.idempotencyKey === "spend:period-first",
+    );
+
+    expect(balance.account.availableCredits).toBe(195);
+    expect(balance.account.carryForwardCredits).toBe(195);
+    expect(spend?.metadata).toMatchObject({
+      carryForwardCreditsSpent: 5,
+      periodCreditsSpent: 10,
+    });
+  });
+
+  it("restores carry-forward credits on spend refunds", async () => {
+    const userId = await createUser();
+    await grantCreditTopUp({
+      amount: 200,
+      idempotencyKey: "stripe_checkout:cs_refund_bucket",
+      sourceId: "cs_refund_bucket",
+      userId,
+    });
+    const spend = await spendCredits({
+      amount: 15,
+      idempotencyKey: "spend:refund-bucket",
+      source: "test",
+      userId,
+    });
+
+    await refundCreditSpend({
+      amount: 5,
+      idempotencyKey: "refund:carry-forward-bucket",
+      spendLedgerEntryId: spend.id,
+      userId,
+    });
+    const balance = await getCreditBalance(userId);
+
+    expect(balance.account.availableCredits).toBe(200);
+    expect(balance.account.carryForwardCredits).toBe(200);
+  });
+
+  it("expires only period credits when purchased credits exist", async () => {
+    const userId = await createUser();
+    const expiredPeriodStart = new Date("2025-01-01T00:00:00.000Z");
+    const expiredPeriodEnd = new Date("2025-02-01T00:00:00.000Z");
+    const record = await createSubscription({
+      periodEnd: expiredPeriodEnd,
+      periodStart: expiredPeriodStart,
+      userId,
+    });
+
+    await reconcileCreditGrantForSubscription(record);
+    await grantCreditTopUp({
+      amount: 200,
+      idempotencyKey: "stripe_checkout:cs_period_rollover",
+      sourceId: "cs_period_rollover",
+      userId,
+    });
+    const balance = await getCreditBalance(userId);
+    const expiredEntries = balance.recentLedger.filter(
+      (entry) => entry.type === "expire",
+    );
+
+    expect(balance.account.availableCredits).toBe(210);
+    expect(balance.account.carryForwardCredits).toBe(200);
+    expect(expiredEntries).toEqual([
+      expect.objectContaining({
+        amount: -50,
+      }),
+    ]);
+  });
+
   it("reconciles period credits before manual debit adjustments", async () => {
     const userId = await createUser();
 
@@ -348,6 +546,43 @@ describe("credit ledger", () => {
         allowance: 10,
         plan: "free",
       },
+    });
+  });
+
+  it("guards credit top-up checkout and returns a Stripe checkout URL", async () => {
+    const actor = await createTestActor();
+    setStripeTopUpClient();
+
+    const unauthenticated = await httpRequest(
+      app,
+      "/api/credits/top-up/checkout",
+      {
+        headers: {
+          origin: "http://localhost:3000",
+        },
+        method: "POST",
+      },
+    );
+    const wrongOrigin = await httpRequest(app, "/api/credits/top-up/checkout", {
+      cookie: actor.cookie,
+      headers: {
+        origin: "https://evil.example",
+      },
+      method: "POST",
+    });
+    const checkout = await httpRequest(app, "/api/credits/top-up/checkout", {
+      cookie: actor.cookie,
+      headers: {
+        origin: "http://localhost:3000",
+      },
+      method: "POST",
+    });
+
+    expect(unauthenticated.status).toBe(401);
+    expect(wrongOrigin.status).toBe(403);
+    expect(checkout.status, await checkout.clone().text()).toBe(200);
+    await expect(checkout.json()).resolves.toEqual({
+      url: "https://checkout.stripe.test/session",
     });
   });
 
@@ -555,7 +790,9 @@ describe("credit ledger", () => {
 
     expect(html).toContain("Credits");
     expect(html).toContain("16 / 10");
-    expect(html).toContain("Credits remaining this period");
+    expect(html).toContain("Buy 200 credits");
+    expect(html).toContain("Purchased carry-forward");
+    expect(html).toContain("Purchased credits carry forward until spent");
   });
 
   it("renders the credit lab items and prices", async () => {

@@ -1,0 +1,1 @@
+ALTER TABLE "mirage_credit_accounts" ADD COLUMN "carry_forward_credits" integer DEFAULT 0 NOT NULL;

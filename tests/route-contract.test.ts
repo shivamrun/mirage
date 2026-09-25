@@ -55,6 +55,7 @@ const mutationRoutes = [
     access: "user",
   },
   { method: "POST", path: "/api/contact/", access: "public" },
+  { method: "POST", path: "/api/credits/top-up/checkout", access: "user" },
   { method: "POST", path: "/api/credits/sample-create", access: "user" },
   { method: "POST", path: "/api/email-list/", access: "public" },
   { method: "POST", path: "/api/uploads/", access: "user" },
@@ -204,8 +205,8 @@ describe("current Elysia HTTP contract", () => {
     );
   });
 
-  it("guards all 25 mutations with the current origin response", async () => {
-    expect(mutationRoutes).toHaveLength(25);
+  it("guards all 26 mutations with the current origin response", async () => {
+    expect(mutationRoutes).toHaveLength(26);
     const user = await createTestActor();
     const admin = await createTestActor({ role: "admin", emailVerified: true });
     const sentBefore = testEmailOutbox.length;

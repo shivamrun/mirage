@@ -25,6 +25,7 @@ export const creditLedgerEntryResponseSchema = z.object({
 
 export const creditBalanceResponseSchema = z.object({
   availableCredits: z.number().int(),
+  carryForwardCredits: z.number().int(),
   lifetimeGranted: z.number().int(),
   lifetimeSpent: z.number().int(),
   lifetimeExpired: z.number().int(),
@@ -54,6 +55,10 @@ export const creditSampleCreatedEntrySchema = z.object({
 export const creditSampleCreateResponseSchema = z.object({
   balance: creditBalanceResponseSchema,
   created: creditSampleCreatedEntrySchema,
+});
+
+export const creditTopUpCheckoutResponseSchema = z.object({
+  url: z.string().url(),
 });
 
 export const adminCreditAdjustmentSchema = z.object({
@@ -89,4 +94,7 @@ export type CreditSampleCreateInput = z.input<
 >;
 export type CreditSampleCreateResponse = z.infer<
   typeof creditSampleCreateResponseSchema
+>;
+export type CreditTopUpCheckoutResponse = z.infer<
+  typeof creditTopUpCheckoutResponseSchema
 >;

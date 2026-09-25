@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AccountBillingActions } from "@/features/account/components/account-billing-actions";
 import { AccountBillingPortalButton } from "@/features/account/components/account-billing-portal-button";
+import { AccountCreditTopUpButton } from "@/features/account/components/account-credit-top-up-button";
 import {
   AccountSection,
   AccountSectionStack,
@@ -275,21 +276,28 @@ function AccountBillingPage({
           </AccountSection>
 
           <AccountSection
-            description="Your current ledger balance for this billing period."
+            description="Monthly credits reset by period. Purchased credits carry forward until spent."
             title="Credits"
           >
             <div className="space-y-5">
-              <div>
-                <p className="font-semibold text-3xl tracking-normal">
-                  {creditBalance.account.availableCredits} /{" "}
-                  {creditBalance.currentPeriod.allowance}
-                </p>
-                <p className="mt-1 text-muted-foreground text-sm">
-                  Credits remaining this period
-                </p>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="font-semibold text-3xl tracking-normal">
+                    {creditBalance.account.availableCredits} /{" "}
+                    {creditBalance.currentPeriod.allowance}
+                  </p>
+                  <p className="mt-1 text-muted-foreground text-sm">
+                    Credits available, including purchased carry-forward credits
+                  </p>
+                </div>
+                <AccountCreditTopUpButton />
               </div>
 
               <dl>
+                <DetailRow
+                  label="Purchased carry-forward"
+                  value={`${creditBalance.account.carryForwardCredits} credits`}
+                />
                 <DetailRow
                   label="Plan"
                   value={formatPlanName(creditBalance.currentPeriod.plan)}

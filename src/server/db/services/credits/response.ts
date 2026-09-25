@@ -5,6 +5,7 @@ type CreditBalance = Awaited<ReturnType<typeof getCreditBalance>>;
 export function toCreditBalanceResponse(balance: CreditBalance) {
   return {
     availableCredits: balance.account.availableCredits,
+    carryForwardCredits: balance.account.carryForwardCredits,
     currentPeriod: {
       allowance: balance.currentPeriod.allowance,
       periodEnd: balance.currentPeriod.periodEnd.toISOString(),

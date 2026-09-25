@@ -14,6 +14,7 @@ import { user } from "./auth-schema";
 
 export const creditLedgerEntryTypes = [
   "grant",
+  "top_up",
   "spend",
   "refund",
   "manual_credit",
@@ -27,6 +28,7 @@ export const creditAccounts = createTable("credit_accounts", {
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
   availableCredits: integer("available_credits").notNull().default(0),
+  carryForwardCredits: integer("carry_forward_credits").notNull().default(0),
   lifetimeGranted: integer("lifetime_granted").notNull().default(0),
   lifetimeSpent: integer("lifetime_spent").notNull().default(0),
   lifetimeExpired: integer("lifetime_expired").notNull().default(0),
