@@ -28,8 +28,10 @@ import {
 } from "@/server/db/services/credits/ledger";
 import { setCreditTopUpStripeClientForTests } from "@/server/db/services/credits/top-up";
 import { app } from "@/server/routes";
+import { creditBalanceResponseSchema } from "@/shared/schemas";
 import { createTestActor } from "./infra/admin-actor";
 import { httpRequest } from "./infra/http-request";
+import { installMemoryCacheStore } from "./infra/memory-cache";
 
 function currentSubscriptionPeriod() {
   const now = new Date();
@@ -561,6 +563,177 @@ describe("credit ledger", () => {
         plan: "free",
       },
     });
+  });
+
+  it("caches the credit balance API with schema-validated payloads", async () => {
+    const memoryCache = installMemoryCacheStore();
+
+    try {
+      const actor = await createTestActor();
+      const first = await httpRequest(app, "/api/credits/balance", {
+        cookie: actor.cookie,
+      });
+      const second = await httpRequest(app, "/api/credits/balance", {
+        cookie: actor.cookie,
+      });
+
+      expect(first.status, await first.clone().text()).toBe(200);
+      expect(second.status, await second.clone().text()).toBe(200);
+      expect(first.headers.get("X-Cache")).toBe("MISS");
+      expect(second.headers.get("X-Cache")).toBe("HIT");
+
+      const firstBody = creditBalanceResponseSchema.parse(await first.json());
+      const secondBody = creditBalanceResponseSchema.parse(await second.json());
+
+      expect(secondBody).toEqual(firstBody);
+    } finally {
+      memoryCache.restore();
+    }
+  });
+
+  it("invalidates the cached credit balance after sample credit spend", async () => {
+    const memoryCache = installMemoryCacheStore();
+
+    try {
+      const actor = await createTestActor();
+      const initial = await httpRequest(app, "/api/credits/balance", {
+        cookie: actor.cookie,
+      });
+      const cached = await httpRequest(app, "/api/credits/balance", {
+        cookie: actor.cookie,
+      });
+
+      expect(initial.headers.get("X-Cache")).toBe("MISS");
+      expect(cached.headers.get("X-Cache")).toBe("HIT");
+
+      const spend = await httpRequest(app, "/api/credits/sample-create", {
+        body: JSON.stringify({
+          idempotencyKey: "sample-create:cache-invalidation",
+          itemKey: "tiny-note",
+        }),
+        cookie: actor.cookie,
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+        },
+        method: "POST",
+      });
+      const updated = await httpRequest(app, "/api/credits/balance", {
+        cookie: actor.cookie,
+      });
+
+      expect(spend.status, await spend.clone().text()).toBe(200);
+      expect(updated.headers.get("X-Cache")).toBe("MISS");
+      await expect(updated.json()).resolves.toMatchObject({
+        availableCredits: 0,
+        lifetimeSpent: 10,
+      });
+    } finally {
+      memoryCache.restore();
+    }
+  });
+
+  it("misses the cached credit balance when the current credit period changes", async () => {
+    const memoryCache = installMemoryCacheStore();
+
+    try {
+      const actor = await createTestActor();
+      const initial = await httpRequest(app, "/api/credits/balance", {
+        cookie: actor.cookie,
+      });
+      const cached = await httpRequest(app, "/api/credits/balance", {
+        cookie: actor.cookie,
+      });
+
+      expect(initial.headers.get("X-Cache")).toBe("MISS");
+      expect(cached.headers.get("X-Cache")).toBe("HIT");
+
+      await db
+        .update(user)
+        .set({
+          createdAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000),
+        })
+        .where(eq(user.id, actor.id));
+
+      const newPeriod = await httpRequest(app, "/api/credits/balance", {
+        cookie: actor.cookie,
+      });
+
+      expect(newPeriod.status, await newPeriod.clone().text()).toBe(200);
+      expect(newPeriod.headers.get("X-Cache")).toBe("MISS");
+      await expect(newPeriod.json()).resolves.toMatchObject({
+        currentPeriod: {
+          allowance: 10,
+          plan: "free",
+        },
+      });
+    } finally {
+      memoryCache.restore();
+    }
+  });
+
+  it("admin credit adjustment invalidates the affected user, not the admin", async () => {
+    const memoryCache = installMemoryCacheStore();
+
+    try {
+      const admin = await createTestActor({
+        emailVerified: true,
+        role: "admin",
+      });
+      const target = await createTestActor();
+
+      await httpRequest(app, "/api/credits/balance", {
+        cookie: admin.cookie,
+      });
+      const cachedAdmin = await httpRequest(app, "/api/credits/balance", {
+        cookie: admin.cookie,
+      });
+      await httpRequest(app, "/api/credits/balance", {
+        cookie: target.cookie,
+      });
+      const cachedTarget = await httpRequest(app, "/api/credits/balance", {
+        cookie: target.cookie,
+      });
+
+      expect(cachedAdmin.headers.get("X-Cache")).toBe("HIT");
+      expect(cachedTarget.headers.get("X-Cache")).toBe("HIT");
+
+      const adjustment = await httpRequest(
+        app,
+        `/api/admin/users/${target.id}/credits/adjust`,
+        {
+          body: JSON.stringify({
+            amount: 5,
+            idempotencyKey: "admin:cache-invalidation",
+            reason: "cache invalidation test",
+          }),
+          cookie: admin.cookie,
+          headers: {
+            "content-type": "application/json",
+            origin: "http://localhost:3000",
+          },
+          method: "POST",
+        },
+      );
+      const afterAdmin = await httpRequest(app, "/api/credits/balance", {
+        cookie: admin.cookie,
+      });
+      const afterTarget = await httpRequest(app, "/api/credits/balance", {
+        cookie: target.cookie,
+      });
+
+      expect(adjustment.status, await adjustment.clone().text()).toBe(200);
+      expect(afterAdmin.headers.get("X-Cache")).toBe("HIT");
+      expect(afterTarget.headers.get("X-Cache")).toBe("MISS");
+      await expect(afterAdmin.json()).resolves.toMatchObject({
+        availableCredits: 10,
+      });
+      await expect(afterTarget.json()).resolves.toMatchObject({
+        availableCredits: 15,
+      });
+    } finally {
+      memoryCache.restore();
+    }
   });
 
   it("guards credit top-up checkout and returns a Stripe checkout URL", async () => {

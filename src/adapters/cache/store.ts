@@ -38,6 +38,7 @@ type CacheGetOrSetInput<T> = CacheGetInput<T> & {
 export type CacheStore = {
   delete(input: CacheKeyInput): Promise<void>;
   get<T>(input: CacheGetInput<T>): Promise<T | null>;
+  getGeneration(input: CacheKeyInput): Promise<number | null>;
   getOrSet<T>(input: CacheGetOrSetInput<T>): Promise<T>;
   incrementGeneration(input: CacheKeyInput): Promise<number | null>;
   set<T>(input: CacheSetInput<T>): Promise<void>;
@@ -115,6 +116,19 @@ export const cacheStore: CacheStore = {
     await this.set({ parts, policy, value });
 
     return value;
+  },
+
+  async getGeneration(input) {
+    if (!shouldTryRedis()) {
+      return null;
+    }
+
+    try {
+      return await redisCacheStore.getGeneration(input);
+    } catch (error) {
+      markRedisUnavailable(error);
+      return null;
+    }
   },
 
   async incrementGeneration(input) {

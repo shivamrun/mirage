@@ -9,6 +9,7 @@ import {
   subscription,
   user,
 } from "@/server/db/schema";
+import { invalidateCreditBalanceCache } from "./cache";
 
 const activeSubscriptionStatuses = ["active", "trialing"] as const;
 const freePlanKey = "free";
@@ -568,7 +569,13 @@ async function reconcilePeriodGrantForUser(
 }
 
 export async function reconcileCreditGrantsForUser(userId: string) {
-  return db.transaction(async (tx) => reconcilePeriodGrantForUser(userId, tx));
+  const result = await db.transaction(async (tx) =>
+    reconcilePeriodGrantForUser(userId, tx),
+  );
+
+  await invalidateCreditBalanceCache(userId);
+
+  return result;
 }
 
 export async function reconcileCreditGrantForSubscription(
@@ -580,9 +587,19 @@ export async function reconcileCreditGrantForSubscription(
     return null;
   }
 
-  return db.transaction(async (tx) =>
+  const result = await db.transaction(async (tx) =>
     reconcilePeriodGrantForUser(record.referenceId, tx, period),
   );
+
+  await invalidateCreditBalanceCache(record.referenceId);
+
+  return result;
+}
+
+export async function getCreditBalanceCacheParts(userId: string) {
+  const period = await resolveCurrentPeriod(userId);
+
+  return ["period", period.key];
 }
 
 export async function spendCredits({
@@ -600,7 +617,7 @@ export async function spendCredits({
 }) {
   assertPositiveInteger(amount, "Credit spend amount");
 
-  return db.transaction(async (tx) => {
+  const entry = await db.transaction(async (tx) => {
     const result = await reconcilePeriodGrantForUser(userId, tx);
 
     return appendLedgerEntry(tx, {
@@ -614,6 +631,10 @@ export async function spendCredits({
       userId,
     });
   });
+
+  await invalidateCreditBalanceCache(userId);
+
+  return entry;
 }
 
 export async function refundCreditSpend({
@@ -633,7 +654,7 @@ export async function refundCreditSpend({
   spendLedgerEntryId: string;
   userId: string;
 }) {
-  return db.transaction(async (tx) => {
+  const entry = await db.transaction(async (tx) => {
     const [spendEntry] = await tx
       .select()
       .from(creditLedgerEntries)
@@ -679,6 +700,10 @@ export async function refundCreditSpend({
       userId,
     });
   });
+
+  await invalidateCreditBalanceCache(userId);
+
+  return entry;
 }
 
 export async function grantCreditTopUp({
@@ -698,7 +723,7 @@ export async function grantCreditTopUp({
 }) {
   assertPositiveInteger(amount, "Credit top-up amount");
 
-  return db.transaction(async (tx) => {
+  const entry = await db.transaction(async (tx) => {
     const result = await reconcilePeriodGrantForUser(userId, tx);
 
     const topUpResult = await appendLedgerEntryWithResult(tx, {
@@ -719,6 +744,10 @@ export async function grantCreditTopUp({
       created: topUpResult.created,
     };
   });
+
+  await invalidateCreditBalanceCache(userId);
+
+  return entry;
 }
 
 export async function adjustCredits({
@@ -740,7 +769,7 @@ export async function adjustCredits({
     throw new Error("Credit adjustment amount must be a non-zero integer.");
   }
 
-  return db.transaction(async (tx) => {
+  const entry = await db.transaction(async (tx) => {
     const result = await reconcilePeriodGrantForUser(userId, tx);
 
     return appendLedgerEntry(tx, {
@@ -755,6 +784,10 @@ export async function adjustCredits({
       userId,
     });
   });
+
+  await invalidateCreditBalanceCache(userId);
+
+  return entry;
 }
 
 export async function getCreditBalance(userId: string) {

@@ -1,15 +1,19 @@
 import { Elysia } from "elysia";
 
 import { analytics } from "@/adapters/analytics/server";
+import { creditBalanceGenerationParts } from "@/server/db/services/credits/cache";
 import {
   CreditIdempotencyConflictError,
   getCreditBalance,
+  getCreditBalanceCacheParts,
   InsufficientCreditsError,
   spendCredits,
 } from "@/server/db/services/credits/ledger";
 import { toCreditBalanceResponse } from "@/server/db/services/credits/response";
+import type { AuthSession } from "@/server/http/auth";
 import { elysiaAuth } from "@/server/http/auth";
 import { requestPolicy } from "@/server/http/request-policy";
+import { responseCache } from "@/server/http/response-cache";
 import { getCreditSampleItem } from "@/shared/credits/sample-catalog";
 import {
   creditBalanceResponseSchema,
@@ -17,6 +21,10 @@ import {
   creditSampleCreateResponseSchema,
   messageResponseSchema,
 } from "@/shared/schemas";
+
+type AuthenticatedRouteContext = {
+  user: AuthSession["user"];
+};
 
 function sampleEntryForItem({
   creditsSpent,
@@ -40,14 +48,23 @@ function sampleEntryForItem({
 export const creditsRoutes = new Elysia({ prefix: "/credits" })
   .use(elysiaAuth)
   .use(requestPolicy)
+  .use(responseCache)
   .get(
     "/balance",
-    async ({ user }) => {
+    async (context: unknown) => {
+      const { user } = context as unknown as AuthenticatedRouteContext;
       const balance = await getCreditBalance(user.id);
       return toCreditBalanceResponse(balance);
     },
     {
       auth: true,
+      routeCache: {
+        generationParts: (context) =>
+          creditBalanceGenerationParts(context.user?.id ?? ""),
+        parts: (context) => getCreditBalanceCacheParts(context.user?.id ?? ""),
+        policy: "apiCreditBalance",
+        validator: creditBalanceResponseSchema.parse,
+      },
       response: {
         200: creditBalanceResponseSchema,
         401: messageResponseSchema,

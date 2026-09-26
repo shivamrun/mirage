@@ -20,6 +20,13 @@ export const cachePolicies = {
     ttlSeconds: 30,
     version: 1,
   },
+  apiCreditBalance: {
+    privacy: "private",
+    staleDataNotes:
+      "Credit mutations increment the per-user generation so API balance reads miss stale entries.",
+    ttlSeconds: 15,
+    version: 1,
+  },
   creditBalance: {
     privacy: "private",
     staleDataNotes:

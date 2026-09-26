@@ -34,6 +34,14 @@ export const redisCacheStore = {
     return value as T | null;
   },
 
+  async getGeneration(input: CacheKeyInput) {
+    const value = await runRedisCommand((client) =>
+      client.get(generationKeyFor(input)),
+    );
+
+    return value === null ? null : Number(value);
+  },
+
   async incrementGeneration(input: CacheKeyInput) {
     return runRedisCommand((client) => client.incr(generationKeyFor(input)));
   },
