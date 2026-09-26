@@ -108,6 +108,7 @@ export const emailListRoutes = new Elysia({ prefix: "/email-list" })
     {
       sameOrigin: true,
       body: emailSubscriptionSchema,
+      routeLimit: "email-list-signup",
       response: {
         200: emailListSignupSuccessResponseSchema,
         400: messageResponseSchema,

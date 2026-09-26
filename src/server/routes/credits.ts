@@ -129,6 +129,7 @@ export const creditsRoutes = new Elysia({ prefix: "/credits" })
       auth: true,
       sameOrigin: true,
       body: creditSampleCreateRequestSchema,
+      routeLimit: "credits-sample-create",
       response: {
         200: creditSampleCreateResponseSchema,
         400: messageResponseSchema,

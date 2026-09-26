@@ -110,6 +110,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       auth: true,
       sameOrigin: true,
       body: twoFactorCodeSchema,
+      routeLimit: "account-two-factor-mutation",
       response: {
         200: twoFactorEmailCodeResponseSchema,
         400: messageResponseSchema,
@@ -143,6 +144,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       auth: true,
       sameOrigin: true,
       body: twoFactorEmailCodeActionSchema,
+      routeLimit: "account-two-factor-mutation",
       response: {
         200: twoFactorEmailCodeResponseSchema,
         400: messageResponseSchema,
@@ -176,6 +178,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       auth: true,
       sameOrigin: true,
       body: twoFactorCodeSchema,
+      routeLimit: "account-two-factor-mutation",
       response: {
         200: twoFactorStartSetupResponseSchema,
         400: messageResponseSchema,
@@ -208,6 +211,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       auth: true,
       sameOrigin: true,
       body: twoFactorCodeSchema,
+      routeLimit: "account-two-factor-mutation",
       response: {
         200: twoFactorEnabledResponseSchema,
         400: messageResponseSchema,
@@ -240,6 +244,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       auth: true,
       sameOrigin: true,
       body: twoFactorCodeSchema,
+      routeLimit: "account-two-factor-mutation",
       response: {
         200: twoFactorEnabledResponseSchema,
         400: messageResponseSchema,
@@ -373,6 +378,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       auth: true,
       sameOrigin: true,
       body: changeAccountEmailBodySchema,
+      routeLimit: "account-email-mutation",
       response: {
         200: accountEmailMutationResponseSchema,
         400: messageResponseSchema,
@@ -404,6 +410,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
     {
       auth: true,
       sameOrigin: true,
+      routeLimit: "account-email-mutation",
       response: {
         200: accountEmailMutationResponseSchema,
         400: messageResponseSchema,
@@ -435,6 +442,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
     {
       auth: true,
       sameOrigin: true,
+      routeLimit: "account-email-mutation",
       response: {
         200: accountEmailMutationResponseSchema,
         400: messageResponseSchema,
@@ -465,6 +473,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
     {
       auth: true,
       sameOrigin: true,
+      routeLimit: "account-email-mutation",
       response: {
         200: accountEmailMutationResponseSchema,
         400: messageResponseSchema,

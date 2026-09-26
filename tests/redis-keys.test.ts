@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  redisCacheGenerationKey,
   redisCacheKey,
   redisIdempotencyKey,
   redisLockKey,
@@ -13,6 +14,9 @@ describe("Redis key helpers", () => {
     expect(redisCacheKey("email-list", 1, ["summary"], "mirage:test:")).toMatch(
       /^mirage:test:cache:email-list:v1:[a-f0-9]{64}$/,
     );
+    expect(
+      redisCacheGenerationKey("user-posts", 1, ["user-1"], "mirage:test"),
+    ).toMatch(/^mirage:test:cache-generation:user-posts:v1:[a-f0-9]{64}$/);
     expect(redisTempKey("email-change", 2, ["token"], "mirage:test")).toMatch(
       /^mirage:test:temp:email-change:v2:[a-f0-9]{64}$/,
     );

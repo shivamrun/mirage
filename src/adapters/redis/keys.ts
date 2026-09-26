@@ -27,6 +27,21 @@ export function redisCacheKey(
   ].join(":");
 }
 
+export function redisCacheGenerationKey(
+  domain: string,
+  version: number,
+  parts: string[] = [],
+  prefix?: string,
+) {
+  return [
+    normalizePrefix(prefix),
+    "cache-generation",
+    domain,
+    `v${version}`,
+    ...parts.map(hashRedisKeyPart),
+  ].join(":");
+}
+
 export function redisTempKey(
   purpose: string,
   version: number,

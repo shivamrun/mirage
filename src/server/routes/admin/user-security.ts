@@ -62,10 +62,12 @@ export const adminUserSecurityRoutes = new Elysia()
     {
       sameOrigin: true,
       params: linkedAccountParamsSchema,
+      routeLimit: "admin-security-mutation",
       response: {
         200: adminStatusResponseSchema,
         400: messageResponseSchema,
         403: messageResponseSchema,
+        429: messageResponseSchema,
         404: messageResponseSchema,
         500: messageResponseSchema,
       },
@@ -98,10 +100,12 @@ export const adminUserSecurityRoutes = new Elysia()
     {
       sameOrigin: true,
       params: userSessionParamsSchema,
+      routeLimit: "admin-security-mutation",
       response: {
         200: adminStatusResponseSchema,
         400: messageResponseSchema,
         403: messageResponseSchema,
+        429: messageResponseSchema,
         404: messageResponseSchema,
         500: messageResponseSchema,
       },
@@ -139,10 +143,12 @@ export const adminUserSecurityRoutes = new Elysia()
     {
       sameOrigin: true,
       body: forcePasswordResetSchema,
+      routeLimit: "admin-security-mutation",
       response: {
         200: adminPasswordResetSuccessResponseSchema,
         400: messageResponseSchema,
         403: messageResponseSchema,
+        429: messageResponseSchema,
         404: messageResponseSchema,
         500: messageResponseSchema,
         503: adminPasswordResetPartialFailureResponseSchema,
@@ -151,9 +157,11 @@ export const adminUserSecurityRoutes = new Elysia()
   )
   .post("/security/revoke-all-sessions", async () => revokeEverySession(), {
     sameOrigin: true,
+    routeLimit: "admin-security-mutation",
     response: {
       200: adminRevokeAllSessionsResponseSchema,
       403: messageResponseSchema,
+      429: messageResponseSchema,
       500: messageResponseSchema,
     },
   });

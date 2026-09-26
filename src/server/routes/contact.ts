@@ -53,6 +53,7 @@ export const contactRoutes = new Elysia({ prefix: "/contact" })
     {
       sameOrigin: true,
       body: contactSubmissionSchema,
+      routeLimit: "contact-submit",
       response: {
         200: contactSuccessResponseSchema,
         400: messageResponseSchema,

@@ -67,6 +67,7 @@ export const billingRoutes = new Elysia({ prefix: "/billing" })
     {
       auth: true,
       body: billingCheckoutRequestSchema,
+      routeLimit: "billing-checkout",
       response: {
         200: billingCheckoutResponseSchema,
         400: messageResponseSchema,

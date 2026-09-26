@@ -1,6 +1,7 @@
 import { isUploadSDKError } from "@marinedotsh/upload-sdk";
 import { Elysia } from "elysia";
 import { createUploadSigner, getUploadPublicUrl } from "@/adapters/uploads";
+import { consumeUploadPrepareLimit } from "@/features/uploads/rate-limit";
 import { elysiaAuth } from "@/server/http/auth";
 import { requestPolicy } from "@/server/http/request-policy";
 import {
@@ -15,8 +16,18 @@ export const uploadsRoutes = new Elysia({ prefix: "/uploads" })
   .use(requestPolicy)
   .post(
     "/",
-    async ({ body, status }) => {
+    async ({ body, request, set, status, user }) => {
       const { key, ...file } = body;
+      const rateLimit = await consumeUploadPrepareLimit({
+        headers: request.headers,
+        key,
+        userId: user.id,
+      });
+
+      if (!rateLimit.allowed) {
+        set.headers["Retry-After"] = String(rateLimit.retryAfterSeconds);
+        return status(429, { message: rateLimit.message });
+      }
 
       try {
         const upload = await createUploadSigner().prepareUpload(key, file);
@@ -57,11 +68,13 @@ export const uploadsRoutes = new Elysia({ prefix: "/uploads" })
       auth: true,
       sameOrigin: true,
       body: prepareUploadRequestSchema,
+      routeLimit: "uploads-prepare",
       response: {
         200: prepareUploadResponseSchema,
         400: uploadErrorResponseSchema,
         401: messageResponseSchema,
         403: messageResponseSchema,
+        429: messageResponseSchema,
         500: uploadErrorResponseSchema,
       },
     },
