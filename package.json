@@ -18,7 +18,7 @@
     "db:seed": "tsx scripts/seed.ts",
     "smoke": "tsx scripts/smoke-test.ts",
     "db:studio": "drizzle-kit studio --config drizzle.config.ts",
-    "db:up": "docker compose up -d",
+    "db:up": "docker compose up -d db redis",
     "db:down": "docker compose down --volumes --remove-orphans",
     "shadcn:add": "pnpm dlx shadcn@latest add"
   },
@@ -60,6 +60,7 @@
     "react-qr-code": "^2.2.0",
     "react-resizable-panels": "^4.12.4",
     "recharts": "3.8.0",
+    "redis": "^6.2.1",
     "resend": "^6.18.1",
     "shadcn": "^4.16.1",
     "sonner": "^2.0.8",

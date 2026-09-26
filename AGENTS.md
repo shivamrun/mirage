@@ -13,8 +13,8 @@ Tests live in the top-level `tests` directory. Keep integration helpers there, a
 - `pnpm start`: run the built production app.
 - `pnpm lint`: run Biome checks for formatting, lint rules, and import organization.
 - `pnpm format`: apply Biome formatting.
-- `pnpm db:up`: start local Postgres via Docker Compose.
-- `pnpm db:down`: stop Postgres and remove local volumes.
+- `pnpm db:up`: start local Postgres and Redis via Docker Compose.
+- `pnpm db:down`: stop local infrastructure and remove local volumes.
 - `pnpm db:generate`: generate Drizzle migrations from schema changes.
 - `pnpm db:migrate`: apply Drizzle migrations.
 - `pnpm db:studio`: open Drizzle Studio.

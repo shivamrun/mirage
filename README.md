@@ -14,7 +14,7 @@ Install dependencies:
 pnpm install
 ```
 
-Start Postgres:
+Start Postgres and Redis:
 
 ```bash
 pnpm db:up
