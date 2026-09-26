@@ -1,4 +1,6 @@
 import { Elysia } from "elysia";
+import { compactAnalyticsAttribution } from "@/adapters/analytics/events";
+import { analytics } from "@/adapters/analytics/server";
 import { submitContactForm } from "@/server/db/services/contact/service";
 import { requestPolicy } from "@/server/http/request-policy";
 import { verifyTurnstileToken } from "@/server/http/turnstile";
@@ -33,6 +35,17 @@ export const contactRoutes = new Elysia({ prefix: "/contact" })
         return status(429, {
           message: "Too many contact submissions. Please try again later.",
         });
+      }
+
+      if (result.status === "success") {
+        void analytics.track(
+          "contact_submitted",
+          {
+            attribution: compactAnalyticsAttribution(body.attribution),
+            hasCompany: Boolean(body.company),
+          },
+          { context: { url: "/contact" } },
+        );
       }
 
       return { status: true as const };

@@ -5,6 +5,7 @@ import type { TurnstileInstance } from "@marsidev/react-turnstile";
 import { Send } from "lucide-react";
 import * as React from "react";
 import { useForm } from "react-hook-form";
+import { getAnalyticsAttribution } from "@/adapters/analytics/attribution";
 import { TurnstileField } from "@/components/turnstile-field";
 import { Button } from "@/components/ui/button";
 import {
@@ -67,6 +68,7 @@ function ContactForm() {
     try {
       const result = await api.api.contact.post({
         ...values,
+        attribution: getAnalyticsAttribution(),
         turnstileToken,
       });
 

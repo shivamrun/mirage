@@ -55,6 +55,7 @@ function getSignupMetadata(): EmailSubscriptionValues["metadata"] {
   if (!hasAttribution(attribution)) return null;
 
   return {
+    creator: attribution.creator ?? undefined,
     landing_path: attribution.landingPath ?? undefined,
     referrer: attribution.referrer ?? undefined,
     utm_campaign: attribution.utmCampaign ?? undefined,

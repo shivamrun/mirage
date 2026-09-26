@@ -53,6 +53,11 @@ export const emailSubscriptionSchema = z.object({
         .trim()
         .max(EMAIL_LIST_METADATA_VALUE_MAX_LENGTH)
         .optional(),
+      creator: z
+        .string()
+        .trim()
+        .max(EMAIL_LIST_METADATA_VALUE_MAX_LENGTH)
+        .optional(),
       utm_campaign: z
         .string()
         .trim()

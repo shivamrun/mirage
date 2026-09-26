@@ -38,6 +38,30 @@ function _booleanFlagSchema(defaultValue: boolean) {
     });
 }
 
+function optionalBooleanFlagSchema() {
+  return z
+    .preprocess((value) => {
+      if (typeof value === "string") {
+        const normalizedValue = value.trim().toLowerCase();
+
+        return normalizedValue === "" ? undefined : normalizedValue;
+      }
+
+      return value;
+    }, z.union([z.boolean(), z.enum(booleanFlagEnvValues)]).optional())
+    .transform((value) => {
+      if (value == null) {
+        return undefined;
+      }
+
+      if (typeof value === "boolean") {
+        return value;
+      }
+
+      return trueEnvValueSet.has(value);
+    });
+}
+
 export const env = createEnv({
   server: {
     NODE_ENV: z.enum(["development", "production", "test"]),
@@ -62,9 +86,14 @@ export const env = createEnv({
     STRIPE_WEBHOOK_SECRET: z.string().min(1),
     STRIPE_CREDIT_TOP_UP_WEBHOOK_SECRET: optionalEnvString,
     TURNSTILE_SECRET_KEY: z.string().min(1),
+    UMAMI_HOST_URL: z.url().optional(),
   },
   client: {
     NEXT_PUBLIC_BASE_URL: z.url(),
+    NEXT_PUBLIC_UMAMI_DOMAINS: optionalEnvString,
+    NEXT_PUBLIC_UMAMI_ENABLED: optionalBooleanFlagSchema(),
+    NEXT_PUBLIC_UMAMI_SCRIPT_URL: z.url().optional(),
+    NEXT_PUBLIC_UMAMI_WEBSITE_ID: optionalEnvString,
     NEXT_PUBLIC_UPLOAD_BASE_URL: optionalEnvString,
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().min(1),
   },
@@ -91,8 +120,13 @@ export const env = createEnv({
     STRIPE_CREDIT_TOP_UP_WEBHOOK_SECRET:
       process.env.STRIPE_CREDIT_TOP_UP_WEBHOOK_SECRET,
     TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
+    UMAMI_HOST_URL: process.env.UMAMI_HOST_URL,
     NEXT_PUBLIC_UPLOAD_BASE_URL: process.env.NEXT_PUBLIC_UPLOAD_BASE_URL,
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+    NEXT_PUBLIC_UMAMI_DOMAINS: process.env.NEXT_PUBLIC_UMAMI_DOMAINS,
+    NEXT_PUBLIC_UMAMI_ENABLED: process.env.NEXT_PUBLIC_UMAMI_ENABLED,
+    NEXT_PUBLIC_UMAMI_SCRIPT_URL: process.env.NEXT_PUBLIC_UMAMI_SCRIPT_URL,
+    NEXT_PUBLIC_UMAMI_WEBSITE_ID: process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID,
   },
 });
 

@@ -3,6 +3,7 @@
 import { CreditCard, Loader2 } from "lucide-react";
 import * as React from "react";
 
+import { getAnalyticsAttribution } from "@/adapters/analytics/attribution";
 import { Button } from "@/components/ui/button";
 import { getUnexpectedAuthErrorMessage } from "@/features/auth/components/auth-errors";
 import { api } from "@/shared/api/client";
@@ -20,6 +21,7 @@ function AccountCreditTopUpButton() {
       try {
         const response = await api.api.billing.checkout.post(
           {
+            attribution: getAnalyticsAttribution(),
             type: "credit_top_up",
           },
           {

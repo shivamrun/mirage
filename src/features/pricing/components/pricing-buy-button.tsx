@@ -4,6 +4,8 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
+import { getAnalyticsAttribution } from "@/adapters/analytics/attribution";
+import { analytics } from "@/adapters/analytics/client";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/features/auth/better-auth/client";
 import { getUnexpectedAuthErrorMessage } from "@/features/auth/components/auth-errors";
@@ -70,6 +72,12 @@ function PricingBuyButton({
           result.data && "url" in result.data ? result.data.url : undefined;
 
         if (checkoutUrl) {
+          analytics.track("subscription_checkout_started", {
+            attribution: getAnalyticsAttribution(),
+            billingInterval: interval,
+            plan,
+            scheduleAtPeriodEnd: Boolean(scheduleAtPeriodEnd),
+          });
           setIsRedirecting(true);
           window.location.assign(checkoutUrl);
           return;

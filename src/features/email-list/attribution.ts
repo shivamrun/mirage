@@ -1,6 +1,7 @@
 import { EMAIL_LIST_METADATA_VALUE_MAX_LENGTH } from "@/shared/schemas";
 
 export type BrowserAttribution = {
+  creator: string | null;
   landingPath: string | null;
   referrer: string | null;
   utmCampaign: string | null;
@@ -25,6 +26,7 @@ function readSearchParam(params: URLSearchParams, key: string) {
 export function captureBrowserAttribution(): BrowserAttribution {
   if (typeof window === "undefined") {
     return {
+      creator: null,
       landingPath: null,
       referrer: null,
       utmCampaign: null,
@@ -38,6 +40,7 @@ export function captureBrowserAttribution(): BrowserAttribution {
   const params = new URLSearchParams(window.location.search);
 
   return {
+    creator: truncateAttributionValue(params.get("creator")),
     landingPath: truncateAttributionValue(window.location.pathname),
     referrer: truncateAttributionValue(document.referrer),
     utmCampaign: readSearchParam(params, "utm_campaign"),

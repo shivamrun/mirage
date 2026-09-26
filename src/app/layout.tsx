@@ -1,5 +1,6 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { UmamiAnalyticsScript } from "@/adapters/analytics/script";
 import AppProvider from "@/components/app/app-provider";
 import { AppThemeScript } from "@/components/app/app-theme-script";
 
@@ -28,6 +29,7 @@ export default function RootLayout({
     >
       <head>
         <AppThemeScript />
+        <UmamiAnalyticsScript />
       </head>
       <body className="min-h-full flex flex-col">
         <AppProvider>{children}</AppProvider>

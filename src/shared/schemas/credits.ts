@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { creditSampleItemKeys } from "@/shared/credits/sample-catalog";
+import { analyticsAttributionSchema } from "./analytics";
 
 const optionalTrimmedStringSchema = z
   .string()
@@ -62,6 +63,7 @@ export const creditTopUpCheckoutResponseSchema = z.object({
 });
 
 export const billingCheckoutRequestSchema = z.object({
+  attribution: analyticsAttributionSchema,
   type: z.literal("credit_top_up"),
 });
 

@@ -1,5 +1,10 @@
 import { Elysia } from "elysia";
-
+import {
+  compactAnalyticsAttribution,
+  normalizeAnalyticsCurrency,
+} from "@/adapters/analytics/events";
+import { analytics } from "@/adapters/analytics/server";
+import { billingCatalog } from "@/server/db/services/billing/catalog";
 import { createBillingCheckoutSession } from "@/server/db/services/billing/checkout";
 import { elysiaAuth } from "@/server/http/auth";
 import { requestPolicy } from "@/server/http/request-policy";
@@ -24,6 +29,7 @@ export const billingRoutes = new Elysia({ prefix: "/billing" })
 
         const checkoutSession = await createBillingCheckoutSession({
           ...body,
+          attribution: compactAnalyticsAttribution(body.attribution),
           customerEmail: user.email,
           stripeCustomerId,
           userId: user.id,
@@ -34,6 +40,21 @@ export const billingRoutes = new Elysia({ prefix: "/billing" })
             message: "Stripe did not return a checkout URL.",
           });
         }
+
+        void analytics.track(
+          "credit_top_up_checkout_started",
+          {
+            attribution: compactAnalyticsAttribution(body.attribution),
+            amountCents: billingCatalog.creditTopUp.amount,
+            credits: billingCatalog.creditTopUp.credits,
+            currency: normalizeAnalyticsCurrency(
+              billingCatalog.creditTopUp.currency,
+            ),
+          },
+          {
+            context: { distinctId: user.id, url: "/billing" },
+          },
+        );
 
         return { url: checkoutSession.url };
       } catch (error) {

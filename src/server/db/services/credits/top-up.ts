@@ -1,5 +1,9 @@
 import type Stripe from "stripe";
-
+import {
+  analyticsAttributionFromMetadata,
+  normalizeAnalyticsCurrency,
+} from "@/adapters/analytics/events";
+import { analytics } from "@/adapters/analytics/server";
 import { billingCatalog } from "@/server/db/services/billing/catalog";
 import {
   type BillingStripeClient,
@@ -72,7 +76,7 @@ export async function grantCreditTopUpForCheckoutSession(
 
   await assertCheckoutSessionUsesTopUpPrice(session.id);
 
-  return grantCreditTopUp({
+  const result = await grantCreditTopUp({
     amount: creditTopUpProduct.credits,
     idempotencyKey: `stripe_checkout:${session.id}`,
     metadata: {
@@ -84,4 +88,21 @@ export async function grantCreditTopUpForCheckoutSession(
     sourceId: session.id,
     userId,
   });
+
+  if (result.created) {
+    await analytics.trackAuthoritative(
+      "credits_purchased",
+      {
+        attribution: analyticsAttributionFromMetadata(session.metadata),
+        credits: creditTopUpProduct.credits,
+        currency: normalizeAnalyticsCurrency(creditTopUpProduct.currency),
+        revenue: creditTopUpProduct.amount / 100,
+      },
+      {
+        context: { distinctId: userId, url: "/billing" },
+      },
+    );
+  }
+
+  return result;
 }

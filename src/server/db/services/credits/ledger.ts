@@ -379,11 +379,14 @@ function assertMatchingIdempotentEntry(
   }
 }
 
-async function appendLedgerEntry(tx: DBClient, entry: CreditWriteOptions) {
+async function appendLedgerEntryWithResult(
+  tx: DBClient,
+  entry: CreditWriteOptions,
+) {
   const existing = await findEntryByIdempotencyKey(entry.idempotencyKey, tx);
   if (existing) {
     assertMatchingIdempotentEntry(existing, entry);
-    return existing;
+    return { created: false, entry: existing };
   }
 
   const account = await lockCreditAccount(entry.userId, tx);
@@ -393,7 +396,7 @@ async function appendLedgerEntry(tx: DBClient, entry: CreditWriteOptions) {
   );
   if (existingAfterLock) {
     assertMatchingIdempotentEntry(existingAfterLock, entry);
-    return existingAfterLock;
+    return { created: false, entry: existingAfterLock };
   }
 
   const ledgerWrite = creditEntryForAccount(account, entry);
@@ -433,7 +436,13 @@ async function appendLedgerEntry(tx: DBClient, entry: CreditWriteOptions) {
     })
     .where(eq(creditAccounts.userId, entry.userId));
 
-  return ledgerEntry;
+  return { created: true, entry: ledgerEntry };
+}
+
+async function appendLedgerEntry(tx: DBClient, entry: CreditWriteOptions) {
+  const result = await appendLedgerEntryWithResult(tx, entry);
+
+  return result.entry;
 }
 
 async function expirePreviousPeriodCredits({
@@ -531,7 +540,7 @@ async function reconcilePeriodGrantForUser(
   }
 
   if (topUpAmount > 0) {
-    await appendLedgerEntry(tx, {
+    const grantResult = await appendLedgerEntryWithResult(tx, {
       amount: topUpAmount,
       idempotencyKey: `grant:${currentPeriod.key}:allowance:${currentPeriod.allowance}`,
       metadata: {
@@ -545,9 +554,17 @@ async function reconcilePeriodGrantForUser(
       type: "grant",
       userId,
     });
+
+    return {
+      grantCreated: grantResult.created,
+      period: currentPeriod,
+    };
   }
 
-  return currentPeriod;
+  return {
+    grantCreated: false,
+    period: currentPeriod,
+  };
 }
 
 export async function reconcileCreditGrantsForUser(userId: string) {
@@ -584,13 +601,13 @@ export async function spendCredits({
   assertPositiveInteger(amount, "Credit spend amount");
 
   return db.transaction(async (tx) => {
-    const period = await reconcilePeriodGrantForUser(userId, tx);
+    const result = await reconcilePeriodGrantForUser(userId, tx);
 
     return appendLedgerEntry(tx, {
       amount: -amount,
       idempotencyKey,
-      periodEnd: period.periodEnd,
-      periodStart: period.periodStart,
+      periodEnd: result.period.periodEnd,
+      periodStart: result.period.periodStart,
       source,
       sourceId,
       type: "spend",
@@ -682,20 +699,25 @@ export async function grantCreditTopUp({
   assertPositiveInteger(amount, "Credit top-up amount");
 
   return db.transaction(async (tx) => {
-    const period = await reconcilePeriodGrantForUser(userId, tx);
+    const result = await reconcilePeriodGrantForUser(userId, tx);
 
-    return appendLedgerEntry(tx, {
+    const topUpResult = await appendLedgerEntryWithResult(tx, {
       amount,
       carryForwardDelta: amount,
       idempotencyKey,
       metadata,
-      periodEnd: period.periodEnd,
-      periodStart: period.periodStart,
+      periodEnd: result.period.periodEnd,
+      periodStart: result.period.periodStart,
       source,
       sourceId,
       type: "top_up",
       userId,
     });
+
+    return {
+      ...topUpResult.entry,
+      created: topUpResult.created,
+    };
   });
 }
 
@@ -719,14 +741,14 @@ export async function adjustCredits({
   }
 
   return db.transaction(async (tx) => {
-    const period = await reconcilePeriodGrantForUser(userId, tx);
+    const result = await reconcilePeriodGrantForUser(userId, tx);
 
     return appendLedgerEntry(tx, {
       amount,
       idempotencyKey,
       metadata,
-      periodEnd: period.periodEnd,
-      periodStart: period.periodStart,
+      periodEnd: result.period.periodEnd,
+      periodStart: result.period.periodStart,
       source,
       sourceId,
       type: amount > 0 ? "manual_credit" : "manual_debit",
@@ -737,7 +759,7 @@ export async function adjustCredits({
 
 export async function getCreditBalance(userId: string) {
   return db.transaction(async (tx) => {
-    const period = await reconcilePeriodGrantForUser(userId, tx);
+    const result = await reconcilePeriodGrantForUser(userId, tx);
     const account = await lockCreditAccount(userId, tx);
     const recentLedger = await tx
       .select()
@@ -749,10 +771,10 @@ export async function getCreditBalance(userId: string) {
     return {
       account,
       currentPeriod: {
-        allowance: period.allowance,
-        periodEnd: period.periodEnd,
-        periodStart: period.periodStart,
-        plan: period.plan,
+        allowance: result.period.allowance,
+        periodEnd: result.period.periodEnd,
+        periodStart: result.period.periodStart,
+        plan: result.period.plan,
       },
       recentLedger,
     };

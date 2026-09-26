@@ -1,5 +1,6 @@
 import { Elysia } from "elysia";
 
+import { analytics } from "@/adapters/analytics/server";
 import {
   CreditIdempotencyConflictError,
   getCreditBalance,
@@ -73,6 +74,18 @@ export const creditsRoutes = new Elysia({ prefix: "/credits" })
         });
         const balance = await getCreditBalance(user.id);
 
+        void analytics.track(
+          "credits_consumed",
+          {
+            credits: item.credits,
+            itemKey: item.key,
+            source: "sample_credit_lab",
+          },
+          {
+            context: { distinctId: user.id, url: "/credits" },
+          },
+        );
+
         return {
           balance: toCreditBalanceResponse(balance),
           created: sampleEntryForItem({
@@ -84,6 +97,19 @@ export const creditsRoutes = new Elysia({ prefix: "/credits" })
         };
       } catch (error) {
         if (error instanceof InsufficientCreditsError) {
+          void analytics.track(
+            "credits_exhausted",
+            {
+              availableCredits: error.availableCredits,
+              itemKey: item.key,
+              requestedCredits: error.requestedCredits,
+              source: "sample_credit_lab",
+            },
+            {
+              context: { distinctId: user.id, url: "/credits" },
+            },
+          );
+
           return status(402, {
             message: `Insufficient credits. Available: ${error.availableCredits}. Required: ${error.requestedCredits}.`,
           });

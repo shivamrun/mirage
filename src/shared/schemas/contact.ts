@@ -1,5 +1,5 @@
 import { z } from "zod";
-
+import { analyticsAttributionSchema } from "./analytics";
 import { statusSuccessResponseSchema } from "./api";
 import { emailSchema } from "./helpers";
 
@@ -28,6 +28,7 @@ export const contactSubmissionSchema = z.object({
       `Message must be ${CONTACT_MESSAGE_MAX_LENGTH} characters or fewer.`,
     ),
   turnstileToken: z.string().trim().optional(),
+  attribution: analyticsAttributionSchema,
   website: z.string().optional(),
 });
 

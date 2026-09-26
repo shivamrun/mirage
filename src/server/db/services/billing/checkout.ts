@@ -1,8 +1,11 @@
+import type { AnalyticsAttribution } from "@/adapters/analytics/events";
+import { compactAnalyticsAttribution } from "@/adapters/analytics/events";
 import { billingCatalog } from "@/server/db/services/billing/catalog";
 import { getBillingStripeClient } from "@/server/db/services/billing/stripe-client";
 import { env } from "@/shared/env";
 
 type CreateBillingCheckoutSessionInput = {
+  attribution?: AnalyticsAttribution;
   customerEmail: string;
   stripeCustomerId?: null | string;
   type: "credit_top_up";
@@ -56,6 +59,27 @@ function customerFields({
   };
 }
 
+function attributionMetadata(attribution: AnalyticsAttribution | undefined) {
+  const compacted = compactAnalyticsAttribution(attribution);
+
+  if (!compacted) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries({
+      analytics_creator: compacted.creator,
+      analytics_landing_path: compacted.landingPath,
+      analytics_referrer_domain: compacted.referrerDomain,
+      analytics_utm_campaign: compacted.utmCampaign,
+      analytics_utm_content: compacted.utmContent,
+      analytics_utm_medium: compacted.utmMedium,
+      analytics_utm_source: compacted.utmSource,
+      analytics_utm_term: compacted.utmTerm,
+    }).filter(([, value]) => Boolean(value)),
+  ) as Record<string, string>;
+}
+
 export async function createBillingCheckoutSession(
   input: CreateBillingCheckoutSessionInput,
 ) {
@@ -77,6 +101,7 @@ export async function createBillingCheckoutSession(
       lookupKey: billingCatalog.creditTopUp.lookupKey,
       purchaseType: "credit_top_up",
       userId: input.userId,
+      ...attributionMetadata(input.attribution),
     },
     mode: "payment",
     success_url: `${baseUrl}/billing?checkout=success`,

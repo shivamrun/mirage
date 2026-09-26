@@ -3,6 +3,7 @@
 import { ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
+import { analytics } from "@/adapters/analytics/client";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
 import { authClient } from "@/features/auth/better-auth/client";
@@ -72,6 +73,10 @@ function TwoFactorForm({
           setError(stepUpResult.error.value.message);
           return;
         }
+      }
+
+      if (mode === "login") {
+        analytics.track("login_completed");
       }
 
       router.push(redirectTo);
