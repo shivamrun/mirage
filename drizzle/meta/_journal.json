@@ -169,6 +169,13 @@
       "when": 1790276160435,
       "tag": "0023_friendly_lady_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790503048692,
+      "tag": "0024_magical_tomorrow_man",
+      "breakpoints": true
     }
   ]
 }

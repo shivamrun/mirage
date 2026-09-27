@@ -4,8 +4,16 @@ import { AppSidebar } from "@/components/app/app-sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { VerifiedRoleGate } from "@/features/auth/components/verified-role-gate";
+import { NotificationBell } from "@/features/notifications/components/notification-bell";
+import { requireAuth } from "@/server/db/services/auth/access";
 
-export default function UserLayout({ children }: { children: ReactNode }) {
+export default async function UserLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  const user = await requireAuth();
+
   return (
     <VerifiedRoleGate gateUnverifiedUsers={false} requiredRole="user">
       <SidebarProvider className="h-svh max-h-svh min-h-0 overflow-hidden">
@@ -14,6 +22,9 @@ export default function UserLayout({ children }: { children: ReactNode }) {
         <SidebarInset className="h-svh min-h-0 min-w-0 flex-1 overflow-hidden">
           <ScrollArea className="h-full min-h-0 w-full min-w-0 overflow-hidden">
             <div className="mx-auto flex min-h-full w-full min-w-0 max-w-6xl flex-col px-4 py-4 sm:px-6">
+              <div className="mb-4 flex shrink-0 justify-end">
+                <NotificationBell userId={user.id} />
+              </div>
               {children}
             </div>
           </ScrollArea>

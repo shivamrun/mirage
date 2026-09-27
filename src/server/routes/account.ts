@@ -16,10 +16,18 @@ import {
   verifyAccountTwoFactorSetup,
 } from "@/server/db/services/account/two-factor";
 import { completeAdminTotpStepUp } from "@/server/db/services/auth/admin-step-up";
+import {
+  getUnreadNotificationCount,
+  listNotificationsView,
+  markUserNotificationRead,
+  markUserNotificationsRead,
+  markUserNotificationUnread,
+} from "@/server/db/services/notifications/service";
 import { elysiaAuth } from "@/server/http/auth";
 import { requestPolicy } from "@/server/http/request-policy";
 import { accountErrorResponse } from "@/server/http/result-response";
 import { env } from "@/shared/env";
+import { DEFAULT_PAGE_SIZE } from "@/shared/pagination";
 import {
   accountEmailMutationResponseSchema,
   accountEmailStateResponseSchema,
@@ -29,13 +37,19 @@ import {
   emailChangeRedirectQuerySchema,
   emailChangeTokenSchema,
   messageResponseSchema,
+  notificationIdParamsSchema,
+  notificationMutationResponseSchema,
+  notificationsListResponseSchema,
+  statusSuccessResponseSchema,
   twoFactorCodeSchema,
   twoFactorDeliveryRecoveryResponseSchema,
   twoFactorEmailCodeActionSchema,
   twoFactorEmailCodeResponseSchema,
   twoFactorEnabledResponseSchema,
   twoFactorStartSetupResponseSchema,
+  unreadNotificationCountResponseSchema,
 } from "@/shared/schemas";
+import { paginationQuerySchema } from "@/shared/schemas/pagination";
 
 function emailChangePageURL({
   action,
@@ -59,6 +73,116 @@ function invalidEmailChangePageURL() {
 export const accountRoutes = new Elysia({ prefix: "/account" })
   .use(elysiaAuth)
   .use(requestPolicy)
+  .get(
+    "/notifications",
+    async ({ query, user }) => {
+      const { limit, page } = paginationQuerySchema.parse(query);
+      const result = await listNotificationsView({
+        limit,
+        page,
+        recipientId: user.id,
+      });
+
+      return {
+        items: result.notifications,
+        pagination: {
+          firstItem: result.firstItem,
+          hasNextPage: result.hasNextPage,
+          hasPreviousPage: result.hasPreviousPage,
+          lastItem: result.lastItem,
+          limit: result.limit,
+          offset: result.offset,
+          page: result.page,
+          total: result.total,
+          totalPages: result.totalPages,
+        },
+      };
+    },
+    {
+      auth: true,
+      query: paginationQuerySchema.default({
+        limit: DEFAULT_PAGE_SIZE,
+        page: 1,
+      }),
+      response: {
+        200: notificationsListResponseSchema,
+        401: messageResponseSchema,
+      },
+    },
+  )
+  .get(
+    "/notifications/unread-count",
+    async ({ user }) => {
+      const unreadCount = await getUnreadNotificationCount({
+        recipientId: user.id,
+      });
+
+      return { unreadCount };
+    },
+    {
+      auth: true,
+      response: {
+        200: unreadNotificationCountResponseSchema,
+        401: messageResponseSchema,
+      },
+    },
+  )
+  .post(
+    "/notifications/:id/read",
+    async ({ params, user }) => {
+      const notification = await markUserNotificationRead({
+        id: params.id,
+        recipientId: user.id,
+      });
+
+      return { notification };
+    },
+    {
+      auth: true,
+      params: notificationIdParamsSchema,
+      sameOrigin: true,
+      response: {
+        200: notificationMutationResponseSchema,
+        401: messageResponseSchema,
+      },
+    },
+  )
+  .post(
+    "/notifications/:id/unread",
+    async ({ params, user }) => {
+      const notification = await markUserNotificationUnread({
+        id: params.id,
+        recipientId: user.id,
+      });
+
+      return { notification };
+    },
+    {
+      auth: true,
+      params: notificationIdParamsSchema,
+      sameOrigin: true,
+      response: {
+        200: notificationMutationResponseSchema,
+        401: messageResponseSchema,
+      },
+    },
+  )
+  .post(
+    "/notifications/read-all",
+    async ({ user }) => {
+      await markUserNotificationsRead({ recipientId: user.id });
+
+      return { status: true as const };
+    },
+    {
+      auth: true,
+      sameOrigin: true,
+      response: {
+        200: statusSuccessResponseSchema,
+        401: messageResponseSchema,
+      },
+    },
+  )
   .get(
     "/",
     async ({ authSession }) => {

@@ -46,6 +46,21 @@ const mutationRoutes = [
   { method: "POST", path: "/api/account/resend-verification", access: "user" },
   {
     method: "POST",
+    path: "/api/account/notifications/:id/read",
+    access: "user",
+  },
+  {
+    method: "POST",
+    path: "/api/account/notifications/:id/unread",
+    access: "user",
+  },
+  {
+    method: "POST",
+    path: "/api/account/notifications/read-all",
+    access: "user",
+  },
+  {
+    method: "POST",
     path: "/api/account/resend-email-change-verification",
     access: "user",
   },
@@ -97,6 +112,7 @@ const mutationRoutes = [
 function concretePath(path: string) {
   return path
     .replace(":userId", randomUUID())
+    .replace(":id", randomUUID())
     .replace(":accountRowId", randomUUID())
     .replace(":sessionId", randomUUID())
     .replace(":key", "phase-zero-missing");
@@ -188,6 +204,8 @@ describe("current Elysia HTTP contract", () => {
       "GET /api/health",
       "GET /api/account/",
       "GET /api/account/google-account",
+      "GET /api/account/notifications",
+      "GET /api/account/notifications/unread-count",
       "GET /api/account/confirm-email-change",
       "GET /api/account/approve-email-change",
       "GET /api/credits/balance",
@@ -208,8 +226,8 @@ describe("current Elysia HTTP contract", () => {
     );
   });
 
-  it("guards all 26 mutations with the current origin response", async () => {
-    expect(mutationRoutes).toHaveLength(26);
+  it("guards all 29 mutations with the current origin response", async () => {
+    expect(mutationRoutes).toHaveLength(29);
     const user = await createTestActor();
     const admin = await createTestActor({ role: "admin", emailVerified: true });
     const sentBefore = testEmailOutbox.length;

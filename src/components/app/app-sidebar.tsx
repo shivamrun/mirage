@@ -2,6 +2,7 @@
 
 import {
   ArrowLeft,
+  Bell,
   ChevronRight,
   Coins,
   CreditCard,
@@ -59,6 +60,11 @@ const userData = {
       title: "Credit Lab",
       url: "/credits",
       icon: Coins,
+    },
+    {
+      title: "Notifications",
+      url: "/account/notifications",
+      icon: Bell,
     },
     {
       title: "Account",
