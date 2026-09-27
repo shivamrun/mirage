@@ -22,6 +22,7 @@ import {
   markUserNotificationRead,
   markUserNotificationsRead,
   markUserNotificationUnread,
+  toNotificationResponse,
 } from "@/server/db/services/notifications/service";
 import { elysiaAuth } from "@/server/http/auth";
 import { requestPolicy } from "@/server/http/request-policy";
@@ -84,7 +85,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       });
 
       return {
-        items: result.notifications,
+        items: result.notifications.map(toNotificationResponse),
         pagination: {
           firstItem: result.firstItem,
           hasNextPage: result.hasNextPage,
@@ -135,7 +136,11 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
         recipientId: user.id,
       });
 
-      return { notification };
+      return {
+        notification: notification
+          ? toNotificationResponse(notification)
+          : null,
+      };
     },
     {
       auth: true,
@@ -155,7 +160,11 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
         recipientId: user.id,
       });
 
-      return { notification };
+      return {
+        notification: notification
+          ? toNotificationResponse(notification)
+          : null,
+      };
     },
     {
       auth: true,

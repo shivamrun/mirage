@@ -12,7 +12,10 @@ import {
   parseNotificationsSearchParams,
 } from "@/features/notifications/query/notifications-query";
 import { requireAuth } from "@/server/db/services/auth/access";
-import { listNotificationsView } from "@/server/db/services/notifications/service";
+import {
+  getUnreadNotificationCount,
+  listNotificationsView,
+} from "@/server/db/services/notifications/service";
 import { getPageMetadata } from "@/shared/metadata";
 
 import {
@@ -47,6 +50,9 @@ export default async function NotificationsPage({
     page,
     recipientId: user.id,
   });
+  const unreadCount = await getUnreadNotificationCount({
+    recipientId: user.id,
+  });
 
   if (page !== result.page) {
     redirect(notificationsPageHref({ page: result.page }));
@@ -65,13 +71,7 @@ export default async function NotificationsPage({
         </div>
 
         <form action={markAllNotificationsReadAction}>
-          <Button
-            disabled={result.notifications.every(
-              (notification) => notification.readAt,
-            )}
-            type="submit"
-            variant="outline"
-          >
+          <Button disabled={unreadCount === 0} type="submit" variant="outline">
             Mark all read
           </Button>
         </form>

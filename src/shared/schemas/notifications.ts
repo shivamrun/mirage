@@ -28,9 +28,9 @@ export const notificationSubjectSchema = z.object({
 
 export const notificationResponseSchema = z.object({
   actorId: z.string().nullable(),
-  archivedAt: z.date().nullable(),
+  archivedAt: z.iso.datetime().nullable(),
   category: notificationCategorySchema,
-  createdAt: z.date(),
+  createdAt: z.iso.datetime(),
   data: z.union([
     notificationPayloadSchemas.ACCOUNT_EMAIL_CHANGED,
     notificationPayloadSchemas.ACCOUNT_SECURITY_ALERT,
@@ -40,13 +40,13 @@ export const notificationResponseSchema = z.object({
   ]),
   id: z.string(),
   idempotencyKey: z.string().nullable(),
-  readAt: z.date().nullable(),
+  readAt: z.iso.datetime().nullable(),
   recipientId: z.string(),
-  seenAt: z.date().nullable(),
+  seenAt: z.iso.datetime().nullable(),
   subjectId: z.string().nullable(),
   subjectType: z.string().nullable(),
   type: notificationTypeSchema,
-  updatedAt: z.date(),
+  updatedAt: z.iso.datetime(),
 });
 
 export const notificationsListResponseSchema = paginatedResponseSchema(

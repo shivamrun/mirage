@@ -1,5 +1,6 @@
 import type { NotifyInput } from "@/features/notifications";
 import { inAppNotificationChannel } from "@/features/notifications/channels/in-app";
+import type { NotificationRecord } from "@/features/notifications/domain/types";
 import { getNotificationDefinition } from "@/features/notifications/registry/registry";
 import {
   countUnreadNotificationsForRecipient,
@@ -10,6 +11,21 @@ import {
   markNotificationUnread,
 } from "@/server/db/dal/notifications";
 import { resolvePaginatedView } from "@/server/db/services/pagination";
+
+function optionalDateToISOString(value: Date | null) {
+  return value ? value.toISOString() : null;
+}
+
+export function toNotificationResponse(notification: NotificationRecord) {
+  return {
+    ...notification,
+    archivedAt: optionalDateToISOString(notification.archivedAt),
+    createdAt: notification.createdAt.toISOString(),
+    readAt: optionalDateToISOString(notification.readAt),
+    seenAt: optionalDateToISOString(notification.seenAt),
+    updatedAt: notification.updatedAt.toISOString(),
+  };
+}
 
 export async function notify<Type extends NotifyInput["type"]>(
   input: NotifyInput<Type>,
