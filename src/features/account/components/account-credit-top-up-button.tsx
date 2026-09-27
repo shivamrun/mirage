@@ -5,10 +5,15 @@ import * as React from "react";
 
 import { getAnalyticsAttribution } from "@/adapters/analytics/attribution";
 import { Button } from "@/components/ui/button";
+import { markBillingCheckoutStarted } from "@/features/account/billing-finalization";
 import { getUnexpectedAuthErrorMessage } from "@/features/auth/components/auth-errors";
 import { api } from "@/shared/api/client";
 
-function AccountCreditTopUpButton() {
+function AccountCreditTopUpButton({
+  billingSnapshotKey,
+}: {
+  billingSnapshotKey: string;
+}) {
   const [error, setError] = React.useState<string>();
   const [isRedirecting, setIsRedirecting] = React.useState(false);
   const [isPending, startTransition] = React.useTransition();
@@ -40,6 +45,7 @@ function AccountCreditTopUpButton() {
         }
 
         setIsRedirecting(true);
+        markBillingCheckoutStarted(billingSnapshotKey);
         window.location.assign(response.data.url);
       } catch (reason) {
         setError(getUnexpectedAuthErrorMessage(reason));

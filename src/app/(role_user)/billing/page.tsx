@@ -8,7 +8,14 @@ export const metadata = getPageMetadata("Billing", {
   path: "/billing",
 });
 
-export default async function Page() {
+type BillingPageProps = {
+  searchParams: Promise<{
+    checkout?: string;
+  }>;
+};
+
+export default async function Page({ searchParams }: BillingPageProps) {
+  const { checkout } = await searchParams;
   const user = await requireAuth({
     callbackUrl: "/billing",
   });
@@ -18,6 +25,7 @@ export default async function Page() {
 
   return (
     <AccountBillingPage
+      checkoutStatus={checkout}
       creditBalance={creditBalance}
       subscriptions={subscriptions}
       user={user}

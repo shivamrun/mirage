@@ -1,8 +1,6 @@
-import { stripe } from "@better-auth/stripe";
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { admin, captcha, twoFactor } from "better-auth/plugins";
-import Stripe from "stripe";
 import { analytics } from "@/adapters/analytics/server";
 import {
   sendVerificationEmail as sendAuthVerificationEmail,
@@ -10,52 +8,15 @@ import {
   sendWelcomeEmail,
 } from "@/adapters/email";
 import { authHooks } from "@/features/auth/better-auth/hooks";
-import { subscriptionPlans } from "@/features/auth/better-auth/subscription-plans";
+import { authStripePlugin } from "@/features/auth/better-auth/plugins/stripe";
 import { authAccessControl, authRolePermissions } from "@/features/auth/roles";
 import { createAuthDatabaseAdapter } from "@/server/db/dal/auth";
-import type {
-  BillingCheckoutInterval,
-  BillingCheckoutPlan,
-} from "@/server/db/services/billing/catalog";
-import { reconcileCreditGrantForSubscription } from "@/server/db/services/credits/ledger";
 import { env } from "@/shared/env";
 import { siteConfig } from "@/shared/metadata";
 
 export const isGoogleAuthConfigured = Boolean(
   env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET,
 );
-
-const stripeClient = new Stripe(env.STRIPE_SECRET_KEY, {
-  apiVersion: "2026-08-26.dahlia",
-});
-
-function normalizeSubscriptionPlan(value: null | string | undefined) {
-  const normalizedValue = value?.toLowerCase().trim();
-
-  if (normalizedValue === "pro" || normalizedValue === "mirage pro") {
-    return "pro" satisfies BillingCheckoutPlan;
-  }
-
-  if (normalizedValue === "hacker" || normalizedValue === "mirage hacker") {
-    return "hacker" satisfies BillingCheckoutPlan;
-  }
-
-  return null;
-}
-
-function normalizeSubscriptionInterval(value: null | string | undefined) {
-  const normalizedValue = value?.toLowerCase().trim();
-
-  if (normalizedValue === "month" || normalizedValue === "monthly") {
-    return "monthly" satisfies BillingCheckoutInterval;
-  }
-
-  if (normalizedValue === "year" || normalizedValue === "annual") {
-    return "yearly" satisfies BillingCheckoutInterval;
-  }
-
-  return null;
-}
 
 const authCaptchaPlugins =
   env.NODE_ENV === "test"
@@ -153,67 +114,6 @@ export const auth = betterAuth({
     }),
     ...authCaptchaPlugins,
     nextCookies(),
-    stripe({
-      stripeClient,
-      stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET,
-      createCustomerOnSignUp: true,
-      subscription: {
-        enabled: true,
-        async onSubscriptionComplete({ subscription }) {
-          const result =
-            await reconcileCreditGrantForSubscription(subscription);
-          const plan = normalizeSubscriptionPlan(subscription.plan);
-          const billingInterval = normalizeSubscriptionInterval(
-            subscription.billingInterval,
-          );
-
-          if (result?.grantCreated && plan && billingInterval) {
-            await analytics.trackAuthoritative(
-              "subscription_started",
-              { billingInterval, plan },
-              { context: { distinctId: subscription.referenceId } },
-            );
-          }
-        },
-        async onSubscriptionCreated({ subscription }) {
-          const result =
-            await reconcileCreditGrantForSubscription(subscription);
-          const plan = normalizeSubscriptionPlan(subscription.plan);
-          const billingInterval = normalizeSubscriptionInterval(
-            subscription.billingInterval,
-          );
-
-          if (result?.grantCreated && plan && billingInterval) {
-            await analytics.trackAuthoritative(
-              "subscription_started",
-              { billingInterval, plan },
-              { context: { distinctId: subscription.referenceId } },
-            );
-          }
-        },
-        async onSubscriptionCancel({ subscription }) {
-          const plan = normalizeSubscriptionPlan(subscription.plan);
-          const billingInterval = normalizeSubscriptionInterval(
-            subscription.billingInterval,
-          );
-
-          if (plan && billingInterval) {
-            await analytics.trackAuthoritative(
-              "subscription_cancelled",
-              {
-                billingInterval,
-                cancelAtPeriodEnd: Boolean(subscription.cancelAtPeriodEnd),
-                plan,
-              },
-              { context: { distinctId: subscription.referenceId } },
-            );
-          }
-        },
-        async onSubscriptionUpdate({ subscription }) {
-          await reconcileCreditGrantForSubscription(subscription);
-        },
-        plans: subscriptionPlans,
-      },
-    }),
+    authStripePlugin,
   ],
 });

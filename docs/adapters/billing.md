@@ -1,9 +1,10 @@
 # Billing adapter
 
-The billing system is split between Better Auth's Stripe subscription plugin,
-Mirage's own Stripe Checkout flow for one-time credit top-ups, and a local
-credit ledger. Product code should use these adapter/service entry points
-instead of talking to Stripe or mutating billing tables directly.
+The billing system uses Better Auth's Stripe plugin as the single webhook
+entrypoint, Mirage's own Stripe Checkout flow to create one-time credit top-up
+sessions, and a local credit ledger. Product code should use these
+adapter/service entry points instead of talking to Stripe or mutating billing
+tables directly.
 
 This document describes the implementation as it exists today. If Stripe,
 Better Auth, or UI copy disagree with this file, inspect the code paths named
@@ -12,7 +13,8 @@ below and treat the implementation as the source of truth.
 ## Architecture
 
 Subscription billing and one-time credit purchases intentionally use different
-paths.
+checkout creation paths, but both are finalized through the Better Auth Stripe
+webhook.
 
 ```mermaid
 flowchart TD
@@ -41,17 +43,17 @@ flowchart TD
   api[/POST /api/billing/checkout/]
   customCheckout[createBillingCheckoutSession]
   stripePayment[Stripe Checkout payment]
-  webhook[/POST /api/stripe/webhook/]
-  verify[constructBillingStripeEvent]
+  webhook[/POST /api/auth/stripe/webhook/]
+  onEvent[Better Auth Stripe onEvent]
   grant[grantCreditTopUpForCheckoutSession]
   ledger[(credit ledger and account)]
 
-  topupButton --> api --> customCheckout --> stripePayment --> webhook --> verify --> grant --> ledger
+  topupButton --> api --> customCheckout --> stripePayment --> webhook --> onEvent --> grant --> ledger
 ```
 
-The custom `/api/stripe/webhook` route only processes one-time payment checkout
-events for credit top-ups. Subscription webhooks belong to Better Auth at
-`/api/auth/stripe/webhook`.
+Better Auth handles subscription webhook events with its built-in lifecycle
+logic. Mirage handles one-time top-up checkout events from Better Auth's
+`onEvent` hook only after the plugin has verified the Stripe signature.
 
 ## Source Of Truth
 
@@ -167,8 +169,8 @@ Important symbols: `getCreditBalance`, `reconcileCreditGrantsForUser`,
 `grantCreditTopUp`, `adjustCredits`, `InsufficientCreditsError`,
 `CreditIdempotencyConflictError`.
 
-Called by: billing UI page, Better Auth Stripe callbacks, custom Stripe
-webhook, credit sample API, admin adjustment API.
+Called by: billing UI page, Better Auth Stripe callbacks, Better Auth Stripe
+`onEvent`, credit sample API, admin adjustment API.
 
 Notes: do not update `credit_accounts` directly. This service locks the account
 row, appends the ledger entry, updates cached totals, and enforces idempotency.
@@ -195,20 +197,18 @@ Called by: mounted under `/api` in `src/server/routes/index.ts`.
 Notes: authenticated and same-origin protected. It only accepts
 `{ type: "credit_top_up" }`; subscription checkout is deliberately not here.
 
-`src/app/(backend)/api/stripe/webhook/route.ts` and
-`src/server/db/services/billing/webhook.ts`
+`src/features/auth/better-auth/server.ts`
 
-Purpose: custom Stripe webhook for credit top-ups.
+Purpose: Better Auth configuration, including the Stripe webhook endpoint,
+subscription lifecycle hooks, and top-up webhook event handling.
 
-Important symbols: `constructBillingStripeEvent`, `handleBillingStripeEvent`,
-`reconcileStripeSubscription`.
+Important symbols: `stripe({ subscription, onEvent })`.
 
-Called by: Stripe at `/api/stripe/webhook`.
+Called by: Stripe at `/api/auth/stripe/webhook`.
 
-Notes: `handleBillingStripeEvent` only acts on `checkout.session.completed` and
-`checkout.session.async_payment_succeeded`. Subscription event comments and
-tests confirm those are left to Better Auth. `reconcileStripeSubscription(...)`
-exists but is not wired into this custom route today.
+Notes: Better Auth owns subscription events. Mirage's `onEvent` handler only
+grants one-time top-up credits for paid checkout sessions with the
+`one_time_credit` lookup key.
 
 `src/server/db/services/credits/top-up.ts`
 
@@ -217,7 +217,7 @@ Purpose: validates paid top-up checkout sessions and grants purchased credits.
 Important symbols: `creditTopUpProduct`,
 `grantCreditTopUpForCheckoutSession`, `setCreditTopUpStripeClientForTests`.
 
-Called by: custom Stripe webhook.
+Called by: Better Auth Stripe `onEvent`.
 
 Notes: validates payment status, amount, currency, lookup key, metadata credits,
 and the actual line item price lookup key before granting.
@@ -562,10 +562,10 @@ Top-ups are independent of subscriptions.
    attribution.
 7. The route emits best-effort `credit_top_up_checkout_started`.
 8. Stripe sends `checkout.session.completed` or
-   `checkout.session.async_payment_succeeded` to `/api/stripe/webhook`.
-9. The route verifies the Stripe signature with
-   `STRIPE_CREDIT_TOP_UP_WEBHOOK_SECRET`, falling back to
-   `STRIPE_WEBHOOK_SECRET` if the top-up secret is absent.
+   `checkout.session.async_payment_succeeded` to
+   `/api/auth/stripe/webhook`.
+9. Better Auth verifies the Stripe signature with `STRIPE_WEBHOOK_SECRET`,
+   then Mirage's Stripe `onEvent` handler filters for the top-up lookup key.
 10. `grantCreditTopUpForCheckoutSession(...)` verifies mode, paid status,
     metadata lookup key, metadata credits, user ID, amount, currency, and line
     item price lookup key.
@@ -640,8 +640,7 @@ Required billing-related environment variables:
 | Env var | Purpose |
 | --- | --- |
 | `STRIPE_SECRET_KEY` | Stripe API client for Better Auth and custom billing services. |
-| `STRIPE_WEBHOOK_SECRET` | Better Auth subscription webhook secret. Also fallback for the custom top-up webhook if no top-up secret is set. |
-| `STRIPE_CREDIT_TOP_UP_WEBHOOK_SECRET` | Custom `/api/stripe/webhook` top-up webhook secret. Optional in schema but expected for production separation. |
+| `STRIPE_WEBHOOK_SECRET` | Better Auth Stripe webhook secret for subscriptions and one-time top-up completion events. |
 | `NEXT_PUBLIC_BASE_URL` | Checkout success/cancel URLs, return URLs, trusted origins. |
 | `BETTER_AUTH_URL` | Better Auth base URL. |
 | `BETTER_AUTH_SECRET` | Better Auth secret. |
@@ -649,8 +648,7 @@ Required billing-related environment variables:
 
 Production Stripe endpoints from `docs/PRODUCTION_CHECKLIST.md`:
 
-- Subscriptions: `https://<production-domain>/api/auth/stripe/webhook`
-- Credit top-ups: `https://<production-domain>/api/stripe/webhook`
+- Billing webhooks: `https://<production-domain>/api/auth/stripe/webhook`
 
 ## How To Change Billing Safely
 

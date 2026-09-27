@@ -94,7 +94,6 @@ export const env = createEnv({
     RESEND_API_KEY: optionalEnvString,
     STRIPE_SECRET_KEY: z.string().min(1),
     STRIPE_WEBHOOK_SECRET: z.string().min(1),
-    STRIPE_CREDIT_TOP_UP_WEBHOOK_SECRET: optionalEnvString,
     TURNSTILE_SECRET_KEY: z.string().min(1),
     UMAMI_HOST_URL: z.url().optional(),
   },
@@ -129,8 +128,6 @@ export const env = createEnv({
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
-    STRIPE_CREDIT_TOP_UP_WEBHOOK_SECRET:
-      process.env.STRIPE_CREDIT_TOP_UP_WEBHOOK_SECRET,
     TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
     UMAMI_HOST_URL: process.env.UMAMI_HOST_URL,
     NEXT_PUBLIC_UPLOAD_BASE_URL: process.env.NEXT_PUBLIC_UPLOAD_BASE_URL,

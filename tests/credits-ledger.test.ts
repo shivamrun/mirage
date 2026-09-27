@@ -59,11 +59,13 @@ async function createUser(
 }
 
 async function createSubscription({
+  billingInterval = "month",
   periodEnd = currentSubscriptionPeriod().periodEnd,
   periodStart = currentSubscriptionPeriod().periodStart,
   plan = "mirage pro",
   userId,
 }: {
+  billingInterval?: "month" | "year";
   periodEnd?: Date;
   periodStart?: Date;
   plan?: string;
@@ -71,7 +73,7 @@ async function createSubscription({
 }) {
   const id = randomUUID();
   await db.insert(subscription).values({
-    billingInterval: "month",
+    billingInterval,
     id,
     periodEnd,
     periodStart,
@@ -93,14 +95,20 @@ function setStripeTopUpClient({
   checkoutUrl = "https://checkout.stripe.test/session",
   topUpUnitAmount = 5000,
 } = {}) {
+  const checkoutSessionCreateParams: unknown[] = [];
+
   setCreditTopUpStripeClientForTests({
     checkout: {
       sessions: {
-        create: async () => ({
-          id: "cs_test_top_up",
-          object: "checkout.session",
-          url: checkoutUrl,
-        }),
+        create: async (params: unknown) => {
+          checkoutSessionCreateParams.push(params);
+
+          return {
+            id: "cs_test_top_up",
+            object: "checkout.session",
+            url: checkoutUrl,
+          };
+        },
         retrieve: async () => ({
           amount_total: 5000,
           client_reference_id: "unused",
@@ -188,6 +196,8 @@ function setStripeTopUpClient({
       }),
     },
   } as never);
+
+  return { checkoutSessionCreateParams };
 }
 
 describe("credit ledger", () => {
@@ -222,11 +232,40 @@ describe("credit ledger", () => {
 
     const balance = await getCreditBalance(userId);
 
-    expect(balance.account.availableCredits).toBe(50);
+    expect(balance.account.availableCredits).toBe(60);
     expect(balance.currentPeriod).toMatchObject({
       allowance: 50,
       plan: "pro",
     });
+  });
+
+  it("grants annual subscriptions as monthly credit periods", async () => {
+    const userId = await createUser();
+    const now = new Date();
+    const periodStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+    );
+    const periodEnd = new Date(
+      Date.UTC(now.getUTCFullYear() + 1, now.getUTCMonth(), 1),
+    );
+    await createSubscription({
+      billingInterval: "year",
+      periodEnd,
+      periodStart,
+      plan: "mirage hacker",
+      userId,
+    });
+
+    const balance = await getCreditBalance(userId);
+
+    expect(balance.account.availableCredits).toBe(110);
+    expect(balance.currentPeriod).toMatchObject({
+      allowance: 100,
+      plan: "hacker",
+    });
+    expect(balance.currentPeriod.periodEnd).toEqual(
+      new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)),
+    );
   });
 
   it("tops up upgrades and does not claw back downgrades", async () => {
@@ -248,7 +287,7 @@ describe("credit ledger", () => {
       .select()
       .from(creditAccounts)
       .where(eq(creditAccounts.userId, userId));
-    expect(account.availableCredits).toBe(100);
+    expect(account.availableCredits).toBe(110);
 
     await db
       .update(subscription)
@@ -268,15 +307,18 @@ describe("credit ledger", () => {
       .select()
       .from(creditLedgerEntries)
       .where(eq(creditLedgerEntries.userId, userId));
-    const [grant] = await db
+    const grants = await db
       .select()
       .from(creditPeriodGrants)
       .where(eq(creditPeriodGrants.userId, userId));
+    const paidGrant = grants.find((grant) => grant.plan === "pro");
+    const freeBenefitGrant = grants.find((grant) => grant.plan === "free");
 
-    expect(account.availableCredits).toBe(100);
-    expect(grant.allowance).toBe(50);
+    expect(account.availableCredits).toBe(110);
+    expect(paidGrant?.allowance).toBe(50);
+    expect(freeBenefitGrant?.allowance).toBe(10);
     expect(ledger.map((entry) => entry.amount).sort((a, b) => a - b)).toEqual([
-      50, 50,
+      10, 50, 50,
     ]);
   });
 
@@ -486,7 +528,7 @@ describe("credit ledger", () => {
     expect(balance.account.carryForwardCredits).toBe(200);
     expect(expiredEntries).toEqual([
       expect.objectContaining({
-        amount: -50,
+        amount: -60,
       }),
     ]);
   });
@@ -738,7 +780,7 @@ describe("credit ledger", () => {
 
   it("guards credit top-up checkout and returns a Stripe checkout URL", async () => {
     const actor = await createTestActor();
-    setStripeTopUpClient();
+    const { checkoutSessionCreateParams } = setStripeTopUpClient();
 
     const unauthenticated = await httpRequest(app, "/api/billing/checkout", {
       body: JSON.stringify({ type: "credit_top_up" }),
@@ -772,6 +814,27 @@ describe("credit ledger", () => {
     expect(checkout.status, await checkout.clone().text()).toBe(200);
     await expect(checkout.json()).resolves.toEqual({
       url: "https://checkout.stripe.test/session",
+    });
+    expect(checkoutSessionCreateParams[0]).toMatchObject({
+      invoice_creation: {
+        enabled: true,
+        invoice_data: {
+          description: "Mirage credit top-up",
+          metadata: {
+            credits: "200",
+            lookupKey: "one_time_credit",
+            purchaseType: "credit_top_up",
+            userId: actor.id,
+          },
+        },
+      },
+      metadata: {
+        credits: "200",
+        lookupKey: "one_time_credit",
+        purchaseType: "credit_top_up",
+        userId: actor.id,
+      },
+      mode: "payment",
     });
   });
 

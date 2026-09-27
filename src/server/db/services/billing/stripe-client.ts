@@ -4,11 +4,23 @@ import { env } from "@/shared/env";
 
 export type BillingStripeClient = Pick<
   Stripe,
-  "checkout" | "prices" | "subscriptions" | "webhooks"
+  | "billingPortal"
+  | "checkout"
+  | "customers"
+  | "prices"
+  | "subscriptionSchedules"
+  | "subscriptions"
+  | "webhooks"
 >;
 
 let stripeClient: BillingStripeClient = new Stripe(env.STRIPE_SECRET_KEY, {
   apiVersion: "2026-08-26.dahlia",
+});
+
+export const billingStripeClientProxy = new Proxy({} as Stripe, {
+  get(_target, property) {
+    return Reflect.get(getBillingStripeClient(), property);
+  },
 });
 
 export function getBillingStripeClient() {

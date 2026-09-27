@@ -166,6 +166,10 @@ function addMonthsClamped(date: Date, months: number) {
   );
 }
 
+function minDate(first: Date, second: Date) {
+  return first <= second ? first : second;
+}
+
 function freePeriodForUser(userRecord: UserRecord, now = new Date()) {
   let periodStart = new Date(userRecord.createdAt);
   let periodEnd = addMonthsClamped(periodStart, 1);
@@ -185,14 +189,43 @@ function freePeriodForUser(userRecord: UserRecord, now = new Date()) {
   } satisfies CreditPeriod;
 }
 
-function paidPeriodForSubscription(record: SubscriptionGrantRecord) {
-  const plan = normalizePlanKey(record.plan) ?? record.plan;
-  const periodStart = record.periodStart;
-  const periodEnd = record.periodEnd;
+function monthlyPeriodWithinRange({
+  end,
+  now = new Date(),
+  start,
+}: {
+  end: Date;
+  now?: Date;
+  start: Date;
+}) {
+  let periodStart = start;
+  let periodEnd = minDate(addMonthsClamped(periodStart, 1), end);
 
-  if (!periodStart || !periodEnd) {
+  while (periodEnd <= now && periodEnd < end) {
+    periodStart = periodEnd;
+    periodEnd = minDate(addMonthsClamped(periodStart, 1), end);
+  }
+
+  return { periodEnd, periodStart };
+}
+
+function paidPeriodForSubscription(
+  record: SubscriptionGrantRecord,
+  now = new Date(),
+) {
+  const plan = normalizePlanKey(record.plan) ?? record.plan;
+  const billingPeriodStart = record.periodStart;
+  const billingPeriodEnd = record.periodEnd;
+
+  if (!billingPeriodStart || !billingPeriodEnd) {
     return null;
   }
+
+  const { periodEnd, periodStart } = monthlyPeriodWithinRange({
+    end: billingPeriodEnd,
+    now,
+    start: billingPeriodStart,
+  });
 
   return {
     allowance: planAllowance(plan),
@@ -201,6 +234,23 @@ function paidPeriodForSubscription(record: SubscriptionGrantRecord) {
     periodStart,
     plan,
     subscriptionId: record.stripeSubscriptionId ?? record.id,
+  } satisfies CreditPeriod;
+}
+
+function freeBenefitPeriodForPaidPeriod({
+  paidPeriod,
+  userId,
+}: {
+  paidPeriod: CreditPeriod;
+  userId: string;
+}) {
+  return {
+    allowance: planAllowance(freePlanKey),
+    key: `free-benefit:${userId}:${paidPeriod.subscriptionId ?? "subscription"}:${paidPeriod.periodStart.toISOString()}:${paidPeriod.periodEnd.toISOString()}`,
+    periodEnd: paidPeriod.periodEnd,
+    periodStart: paidPeriod.periodStart,
+    plan: freePlanKey,
+    subscriptionId: paidPeriod.subscriptionId,
   } satisfies CreditPeriod;
 }
 
@@ -495,20 +545,15 @@ async function expirePreviousPeriodCredits({
   });
 }
 
-async function reconcilePeriodGrantForUser(
-  userId: string,
-  tx: DBClient,
-  period?: CreditPeriod,
-) {
-  const currentPeriod = period ?? (await resolveCurrentPeriod(userId, tx));
-  const account = await lockCreditAccount(userId, tx);
-  await expirePreviousPeriodCredits({
-    account,
-    currentPeriod,
-    tx,
-    userId,
-  });
-
+async function grantPeriodCredits({
+  currentPeriod,
+  tx,
+  userId,
+}: {
+  currentPeriod: CreditPeriod;
+  tx: DBClient;
+  userId: string;
+}) {
   const [existingGrant] = await tx
     .select()
     .from(creditPeriodGrants)
@@ -566,6 +611,58 @@ async function reconcilePeriodGrantForUser(
     grantCreated: false,
     period: currentPeriod,
   };
+}
+
+async function reconcilePeriodGrantsForUser(
+  userId: string,
+  tx: DBClient,
+  period?: CreditPeriod,
+) {
+  const currentPeriod = period ?? (await resolveCurrentPeriod(userId, tx));
+  const grantPeriods = [currentPeriod];
+
+  if (currentPeriod.plan !== freePlanKey) {
+    const freeBenefitPeriod = freeBenefitPeriodForPaidPeriod({
+      paidPeriod: currentPeriod,
+      userId,
+    });
+
+    if (freeBenefitPeriod.allowance > 0) {
+      grantPeriods.push(freeBenefitPeriod);
+    }
+  }
+
+  const account = await lockCreditAccount(userId, tx);
+  await expirePreviousPeriodCredits({
+    account,
+    currentPeriod,
+    tx,
+    userId,
+  });
+
+  let grantCreated = false;
+
+  for (const grantPeriod of grantPeriods) {
+    const result = await grantPeriodCredits({
+      currentPeriod: grantPeriod,
+      tx,
+      userId,
+    });
+    grantCreated ||= result.grantCreated;
+  }
+
+  return {
+    grantCreated,
+    period: currentPeriod,
+  };
+}
+
+async function reconcilePeriodGrantForUser(
+  userId: string,
+  tx: DBClient,
+  period?: CreditPeriod,
+) {
+  return reconcilePeriodGrantsForUser(userId, tx, period);
 }
 
 export async function reconcileCreditGrantsForUser(userId: string) {

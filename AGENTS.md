@@ -27,6 +27,12 @@ Never modify ignored or generated output directly. This includes `node_modules`,
 Never edit migration files directly. For database changes, update the Drizzle
 schema first, then generate a new migration with `pnpm db:generate`.
 
+For billing architecture, Stripe webhook routing, subscription checkout, or
+Better Auth Stripe optimizations, consult the Better Auth Stripe plugin docs
+first: https://better-auth.com/docs/plugins/stripe.md. Prefer the documented
+Better Auth plugin flow over inventing parallel webhook endpoints or custom
+subscription plumbing.
+
 ## Coding Style & Naming Conventions
 
 Use TypeScript with strict mode. Biome is the source of truth for formatting: 2-space indentation, semicolons, organized imports, and recommended React/Next rules. Prefer path aliases like `@/shared/env` over deep relative imports when practical.
@@ -43,6 +49,8 @@ Vitest is configured for tests. For most changes, validate with:
 pnpm lint
 pnpm build
 ```
+
+DO NOT RUN `pnpm build` temporarily ask the user to run it in the terminal, cuzz of some issues.
 
 For future tests, prefer Vitest for unit tests and Playwright for browser flows. Name tests after the behavior under review, for example `auth-session.test.ts` or `api-health.spec.ts`.
 

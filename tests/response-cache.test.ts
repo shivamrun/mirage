@@ -106,6 +106,10 @@ describe("responseCache macro", () => {
       .get(
         "/admin",
         ({ authUser }) => {
+          if (!authUser) {
+            throw new Error("Expected authenticated user.");
+          }
+
           calls += 1;
           return { calls, userId: authUser.id };
         },

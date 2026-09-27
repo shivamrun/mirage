@@ -90,20 +90,28 @@ export async function createBillingCheckoutSession(
     currency: billingCatalog.creditTopUp.currency,
     lookupKey: billingCatalog.creditTopUp.lookupKey,
   });
+  const metadata = {
+    credits: String(billingCatalog.creditTopUp.credits),
+    lookupKey: billingCatalog.creditTopUp.lookupKey,
+    purchaseType: "credit_top_up",
+    userId: input.userId,
+    ...attributionMetadata(input.attribution),
+  };
 
   return getBillingStripeClient().checkout.sessions.create({
     cancel_url: `${baseUrl}/billing?checkout=cancelled`,
     client_reference_id: input.userId,
     ...customerFields(input),
-    line_items: [{ price: price.id, quantity: 1 }],
-    metadata: {
-      credits: String(billingCatalog.creditTopUp.credits),
-      lookupKey: billingCatalog.creditTopUp.lookupKey,
-      purchaseType: "credit_top_up",
-      userId: input.userId,
-      ...attributionMetadata(input.attribution),
+    invoice_creation: {
+      enabled: true,
+      invoice_data: {
+        description: "Mirage credit top-up",
+        metadata,
+      },
     },
+    line_items: [{ price: price.id, quantity: 1 }],
+    metadata,
     mode: "payment",
-    success_url: `${baseUrl}/billing?checkout=success`,
+    success_url: `${baseUrl}/billing?checkout=credit_top_up_success`,
   });
 }

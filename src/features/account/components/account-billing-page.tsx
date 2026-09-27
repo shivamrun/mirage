@@ -4,6 +4,7 @@ import { HeadingBlock } from "@/components/heading-block";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AccountBillingActions } from "@/features/account/components/account-billing-actions";
+import { AccountBillingFinalizer } from "@/features/account/components/account-billing-finalizer";
 import { AccountBillingPortalButton } from "@/features/account/components/account-billing-portal-button";
 import { AccountCreditTopUpButton } from "@/features/account/components/account-credit-top-up-button";
 import {
@@ -89,6 +90,36 @@ function getCurrentSubscription(subscriptions: BillingSubscriptionRecord[]) {
       activeStatuses.has(subscription.status ?? ""),
     ) ?? subscriptions[0]
   );
+}
+
+function getBillingSnapshotKey({
+  creditBalance,
+  subscription,
+}: {
+  creditBalance: CreditBalance;
+  subscription?: BillingSubscriptionRecord;
+}) {
+  return JSON.stringify({
+    credits: {
+      allowance: creditBalance.currentPeriod.allowance,
+      available: creditBalance.account.availableCredits,
+      carryForward: creditBalance.account.carryForwardCredits,
+      periodEnd: creditBalance.currentPeriod.periodEnd.toISOString(),
+      periodStart: creditBalance.currentPeriod.periodStart.toISOString(),
+      plan: creditBalance.currentPeriod.plan,
+    },
+    subscription: subscription
+      ? {
+          billingInterval: subscription.billingInterval,
+          id: subscription.id,
+          periodEnd: subscription.periodEnd?.toISOString() ?? null,
+          periodStart: subscription.periodStart?.toISOString() ?? null,
+          plan: subscription.plan,
+          status: subscription.status,
+          stripeSubscriptionId: subscription.stripeSubscriptionId,
+        }
+      : null,
+  });
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -237,10 +268,12 @@ function TransactionHistory({
 }
 
 function AccountBillingPage({
+  checkoutStatus,
   creditBalance,
   subscriptions,
   user,
 }: {
+  checkoutStatus?: string;
   creditBalance: CreditBalance;
   subscriptions: BillingSubscriptionRecord[];
   user: CurrentUser;
@@ -251,6 +284,10 @@ function AccountBillingPage({
     user.stripeCustomerId ?? currentSubscription?.stripeCustomerId;
 
   const hasStripeCustomer = Boolean(stripeCustomerId);
+  const billingSnapshotKey = getBillingSnapshotKey({
+    creditBalance,
+    subscription: currentSubscription,
+  });
 
   return (
     <main className="w-full">
@@ -262,6 +299,11 @@ function AccountBillingPage({
           size="xl"
           title="Billing"
           titleAs="h1"
+        />
+
+        <AccountBillingFinalizer
+          checkoutStatus={checkoutStatus}
+          snapshotKey={billingSnapshotKey}
         />
 
         <AccountSectionStack>
@@ -290,7 +332,9 @@ function AccountBillingPage({
                     Credits available, including purchased carry-forward credits
                   </p>
                 </div>
-                <AccountCreditTopUpButton />
+                <AccountCreditTopUpButton
+                  billingSnapshotKey={billingSnapshotKey}
+                />
               </div>
 
               <dl>
