@@ -99,6 +99,8 @@ changes, security reviews, or reliability hardening passes.
 - Confirm request IDs are preserved through the hosting layer.
 - Add alerts for elevated 4xx/5xx rates, email delivery failures, database
   errors, and rate-limit spikes.
+- Verify Redis availability before running multiple app instances, because
+  notification SSE fanout across instances depends on `REDIS_URL`.
 - Document incident response ownership and escalation paths.
 
 ## Deployment

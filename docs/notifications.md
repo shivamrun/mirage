@@ -3,8 +3,8 @@
 Notifications support registry-driven delivery through in-app and email
 channels. In-app notifications are backed by Postgres. Email notifications use
 the low-level email adapter and keep React templates in `src/adapters/email`.
-The system deliberately does not include queues, realtime delivery, push,
-preferences, digests, or analytics.
+The system deliberately does not include durable queues, push, preferences,
+digests, or analytics.
 
 ## Structure
 
@@ -19,7 +19,9 @@ preferences, digests, or analytics.
 - `src/server/db/schema/notifications.ts`: Drizzle table and indexes.
 - `src/server/db/dal/notifications.ts`: owner-scoped database operations.
 - `src/server/db/services/notifications/service.ts`: stable service API.
-- `src/server/routes/account.ts`: authenticated JSON endpoints.
+- `src/server/db/services/notifications/realtime-broker.ts`: best-effort SSE
+  event broker with optional Redis pub/sub transport.
+- `src/server/routes/account.ts`: authenticated JSON and SSE endpoints.
 
 ## Lifecycle
 
@@ -139,6 +141,27 @@ require a user recipient.
 Feature code should not insert notification rows directly, call channels, or
 call email sender wrappers. Use `notify()` or `notifyBestEffort()` so
 dispatching stays registry-driven.
+
+## Realtime Delivery
+
+The account SSE route streams notification events from the realtime broker.
+Postgres remains the source of truth for notification rows, unread counts, and
+read state. Redis pub/sub is only a best-effort transport for low-latency
+delivery to currently connected browsers.
+
+When `REDIS_URL` is configured, each app process subscribes to hashed
+recipient-specific Redis channels for its local SSE subscribers. Notification
+publishes go through Redis so events can reach subscribers connected to other
+app instances. Redis payloads are validated against the existing realtime event
+schema before local delivery. Malformed messages or Redis outages cause a
+`notifications.resync` event so clients can refresh from the canonical inbox
+state.
+
+When Redis is missing or a publish fails, the broker falls back to local
+process fanout. This keeps development, tests, and single-process deployments
+working, but it does not provide cross-instance realtime delivery. Production
+deployments running multiple app instances should configure `REDIS_URL` and
+verify Redis availability before rollout.
 
 ## Pagination
 

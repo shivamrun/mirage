@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   notificationsPageHref,
@@ -86,8 +86,97 @@ async function expectNoRealtimeEvent(
   expect(result).toBe(marker);
 }
 
+async function waitForMicrotasks() {
+  await new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
+type MockRedisBrokerOptions = {
+  configured?: boolean;
+  publishSucceeds?: boolean;
+};
+
+async function importBrokerWithMockRedis({
+  configured = true,
+  publishSucceeds = true,
+}: MockRedisBrokerOptions = {}) {
+  vi.resetModules();
+
+  const listeners = new Map<string, (message: string) => void>();
+  const eventHandlers = new Map<string, () => void>();
+  const published: { channel: string; payload: string }[] = [];
+  const subscriberClient: {
+    close: ReturnType<typeof vi.fn>;
+    connect: ReturnType<typeof vi.fn>;
+    isOpen: boolean;
+    on: ReturnType<typeof vi.fn>;
+    subscribe: ReturnType<typeof vi.fn>;
+    unsubscribe: ReturnType<typeof vi.fn>;
+  } = {
+    close: vi.fn(async () => {
+      subscriberClient.isOpen = false;
+    }),
+    connect: vi.fn(async () => {
+      subscriberClient.isOpen = true;
+      return subscriberClient;
+    }),
+    isOpen: false,
+    on: vi.fn((event: string, listener: () => void) => {
+      eventHandlers.set(event, listener);
+      return subscriberClient;
+    }),
+    subscribe: vi.fn(
+      async (channel: string, listener: (message: string) => void) => {
+        listeners.set(channel, listener);
+      },
+    ),
+    unsubscribe: vi.fn(async (channel: string) => {
+      listeners.delete(channel);
+    }),
+  };
+  const commandClient = {
+    publish: vi.fn(async (channel: string, payload: string) => {
+      if (!publishSucceeds) {
+        throw new Error("Redis publish failed.");
+      }
+
+      published.push({ channel, payload });
+      listeners.get(channel)?.(payload);
+      return 1;
+    }),
+  };
+
+  vi.doMock("redis", () => ({
+    createClient: vi.fn(() => subscriberClient),
+  }));
+  vi.doMock("@/adapters/redis/client", () => ({
+    isRedisConfigured: () => configured,
+    RedisUnavailableError: class RedisUnavailableError extends Error {},
+    runRedisCommand: vi.fn(
+      async (command: (client: typeof commandClient) => Promise<unknown>) =>
+        command(commandClient),
+    ),
+  }));
+
+  const broker = await import(
+    "@/server/db/services/notifications/realtime-broker"
+  );
+
+  return {
+    broker,
+    commandClient,
+    eventHandlers,
+    listeners,
+    published,
+    subscriberClient,
+  };
+}
+
 beforeEach(() => {
   resetNotificationRealtimeBrokerForTests();
+  vi.doUnmock("redis");
+  vi.doUnmock("@/adapters/redis/client");
 });
 
 describe("notification realtime broker", () => {
@@ -177,6 +266,133 @@ describe("notification realtime broker", () => {
       pendingEvents: 0,
       waiting: false,
     });
+  });
+});
+
+describe("notification realtime broker Redis pub/sub", () => {
+  it("does not duplicate same-process delivery when Redis publish succeeds", async () => {
+    const { broker, commandClient, subscriberClient } =
+      await importBrokerWithMockRedis();
+    const subscription = broker.subscribe("owner");
+    await vi.waitFor(() => {
+      expect(subscriberClient.subscribe).toHaveBeenCalledTimes(1);
+    });
+
+    broker.publish("owner", realtimeEvent());
+
+    expect(await subscription.next()).toEqual(realtimeEvent());
+    await expectNoRealtimeEvent(subscription);
+    expect(commandClient.publish).toHaveBeenCalledTimes(1);
+  });
+
+  it("isolates recipients across Redis channels", async () => {
+    const { broker, subscriberClient } = await importBrokerWithMockRedis();
+    const owner = broker.subscribe("owner");
+    const other = broker.subscribe("other");
+    await vi.waitFor(() => {
+      expect(subscriberClient.subscribe).toHaveBeenCalledTimes(2);
+    });
+
+    broker.publish("owner", realtimeEvent());
+
+    expect(await owner.next()).toEqual(realtimeEvent());
+    await expectNoRealtimeEvent(other);
+  });
+
+  it("turns malformed Redis payloads into resync events", async () => {
+    const { broker, listeners, subscriberClient } =
+      await importBrokerWithMockRedis();
+    const subscription = broker.subscribe("owner");
+    await vi.waitFor(() => {
+      expect(subscriberClient.subscribe).toHaveBeenCalledTimes(1);
+    });
+    const [[channel]] = subscriberClient.subscribe.mock.calls;
+
+    expect(() => listeners.get(channel)?.("{malformed-json")).not.toThrow();
+    expect(await subscription.next()).toEqual({
+      data: {},
+      event: notificationRealtimeEventNames.resync,
+    });
+  });
+
+  it("falls back to local fanout when Redis is disabled", async () => {
+    const { broker, commandClient, subscriberClient } =
+      await importBrokerWithMockRedis({ configured: false });
+    const subscription = broker.subscribe("owner");
+
+    broker.publish("owner", realtimeEvent());
+
+    expect(await subscription.next()).toEqual(realtimeEvent());
+    expect(subscriberClient.subscribe).not.toHaveBeenCalled();
+    expect(commandClient.publish).not.toHaveBeenCalled();
+  });
+
+  it("falls back to local fanout when Redis publish fails", async () => {
+    const { broker } = await importBrokerWithMockRedis({
+      publishSucceeds: false,
+    });
+    const subscription = broker.subscribe("owner");
+
+    broker.publish("owner", realtimeEvent());
+    await waitForMicrotasks();
+
+    expect(await subscription.next()).toEqual(realtimeEvent());
+  });
+
+  it("clears stale Redis subscription state after subscriber outages", async () => {
+    const { broker, commandClient, eventHandlers, subscriberClient } =
+      await importBrokerWithMockRedis();
+    const subscription = broker.subscribe("owner");
+    await vi.waitFor(() => {
+      expect(subscriberClient.subscribe).toHaveBeenCalledTimes(1);
+    });
+
+    subscriberClient.isOpen = false;
+    eventHandlers.get("end")?.();
+
+    expect(await subscription.next()).toEqual({
+      data: {},
+      event: notificationRealtimeEventNames.resync,
+    });
+
+    broker.publish("owner", realtimeEvent());
+    await waitForMicrotasks();
+
+    expect(commandClient.publish).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => {
+      expect(subscriberClient.subscribe).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("subscribes on the first local subscriber and unsubscribes on the last close", async () => {
+    const { broker, subscriberClient } = await importBrokerWithMockRedis();
+    const first = broker.subscribe("owner");
+    const second = broker.subscribe("owner");
+    await vi.waitFor(() => {
+      expect(subscriberClient.subscribe).toHaveBeenCalledTimes(1);
+    });
+
+    first.close();
+    await waitForMicrotasks();
+    expect(subscriberClient.unsubscribe).not.toHaveBeenCalled();
+
+    second.close();
+    await vi.waitFor(() => {
+      expect(subscriberClient.unsubscribe).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("reports local-process subscriber counts only", async () => {
+    const { broker } = await importBrokerWithMockRedis();
+    const first = broker.subscribe("owner");
+    const second = broker.subscribe("owner");
+
+    expect(broker.getSubscriberCount("owner")).toBe(2);
+
+    first.close();
+    expect(broker.getSubscriberCount("owner")).toBe(1);
+    second.close();
+    expect(broker.getSubscriberCount("owner")).toBe(0);
   });
 });
 

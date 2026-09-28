@@ -4,6 +4,7 @@ import {
   redisCacheKey,
   redisIdempotencyKey,
   redisLockKey,
+  redisNotificationChannel,
   redisRateLimitFixedWindowKey,
   redisRateLimitHashTag,
   redisTempKey,
@@ -26,13 +27,18 @@ describe("Redis key helpers", () => {
     expect(
       redisIdempotencyKey("stripe", 1, ["checkout"], "mirage:test"),
     ).toMatch(/^mirage:test:idempotency:stripe:v1:[a-f0-9]{64}$/);
+    expect(redisNotificationChannel("user-1", "mirage:test")).toMatch(
+      /^mirage:test:pubsub:notifications:v1:[a-f0-9]{64}$/,
+    );
   });
 
   it("hashes user-controlled key parts", () => {
     const email = "person@example.com";
     const key = redisCacheKey("contact", 1, [email], "mirage:test");
+    const channel = redisNotificationChannel(email, "mirage:test");
 
     expect(key).not.toContain(email);
+    expect(channel).not.toContain(email);
     expect(key).not.toContain("mirage:mirage");
   });
 

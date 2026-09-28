@@ -87,6 +87,16 @@ export function redisIdempotencyKey(
   ].join(":");
 }
 
+export function redisNotificationChannel(recipientId: string, prefix?: string) {
+  return [
+    normalizePrefix(prefix),
+    "pubsub",
+    "notifications",
+    "v1",
+    hashRedisKeyPart(recipientId),
+  ].join(":");
+}
+
 export function redisRateLimitHashTag(prefix?: string) {
   return `{${normalizePrefix(prefix)}:ratelimit}`;
 }
