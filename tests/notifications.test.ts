@@ -18,6 +18,7 @@ import {
   markUserNotificationUnread,
   notify,
 } from "@/server/db/services/notifications/service";
+import { testEmailOutbox } from "./infra/email-fake";
 
 async function createUser(name: string) {
   const id = randomUUID();
@@ -30,6 +31,14 @@ async function createUser(name: string) {
   });
 
   return id;
+}
+
+function expectNotificationRecord(
+  value: Awaited<ReturnType<typeof notify>>["notification"],
+) {
+  expect(value).not.toBeNull();
+
+  return value as NonNullable<typeof value>;
 }
 
 describe("notifications", () => {
@@ -48,7 +57,7 @@ describe("notifications", () => {
       }),
     ).rejects.toThrow();
 
-    const created = await notify({
+    const result = await notify({
       actorId,
       data: {
         message: "Phase 1 is live.",
@@ -62,6 +71,7 @@ describe("notifications", () => {
       },
       type: "system.announcement",
     });
+    const created = result.notification;
 
     expect(created).toMatchObject({
       actorId,
@@ -71,7 +81,7 @@ describe("notifications", () => {
       subjectType: "release",
       type: "system.announcement",
     });
-    expect(created.data).toEqual({
+    expect(created?.data).toEqual({
       message: "Phase 1 is live.",
       title: "Notifications ready",
     });
@@ -96,8 +106,31 @@ describe("notifications", () => {
       }),
     ]);
 
-    expect(second.id).toBe(first.id);
+    expect(second.notification?.id).toBe(first.notification?.id);
     expect(await db.select().from(notification)).toHaveLength(1);
+  });
+
+  it("sends email-only notifications without creating in-app rows", async () => {
+    const result = await notify({
+      data: {
+        email: "recipient@example.com",
+        name: "Recipient",
+        verificationUrl: "http://localhost:3000/verify",
+      },
+      type: "auth.email_verification",
+    });
+
+    expect(result.notification).toBeNull();
+    expect(result.deliveries.email).toMatchObject({
+      id: "test-email-1",
+      skipped: false,
+    });
+    expect(testEmailOutbox).toHaveLength(1);
+    expect(testEmailOutbox[0]).toMatchObject({
+      subject: "Verify your Mirage email",
+      to: "recipient@example.com",
+    });
+    expect(await db.select().from(notification)).toHaveLength(0);
   });
 
   it("scopes reads, unread counts, and mutations to the recipient", async () => {
@@ -108,6 +141,7 @@ describe("notifications", () => {
       recipientId: ownerId,
       type: "security.account_alert",
     });
+    const ownedNotification = expectNotificationRecord(owned.notification);
     await notify({
       data: { action: "Other sign-in detected" },
       recipientId: otherId,
@@ -117,21 +151,21 @@ describe("notifications", () => {
     expect(await getUnreadNotificationCount({ recipientId: ownerId })).toBe(1);
     expect(
       await markUserNotificationRead({
-        id: owned.id,
+        id: ownedNotification.id,
         recipientId: otherId,
       }),
     ).toBeNull();
     expect(await getUnreadNotificationCount({ recipientId: ownerId })).toBe(1);
 
     const read = await markUserNotificationRead({
-      id: owned.id,
+      id: ownedNotification.id,
       recipientId: ownerId,
     });
     expect(read?.readAt).toBeInstanceOf(Date);
     expect(await getUnreadNotificationCount({ recipientId: ownerId })).toBe(0);
 
     const unread = await markUserNotificationUnread({
-      id: owned.id,
+      id: ownedNotification.id,
       recipientId: ownerId,
     });
     expect(unread?.readAt).toBeNull();
@@ -175,7 +209,9 @@ describe("notifications", () => {
       page,
       recipientId,
     });
-    const expectedIds = rows.map((row) => row.id).sort();
+    const expectedIds = rows
+      .map((row) => expectNotificationRecord(row.notification).id)
+      .sort();
 
     expect(result.total).toBe(13);
     expect(result.totalPages).toBe(2);

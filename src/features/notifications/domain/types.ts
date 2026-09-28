@@ -8,7 +8,7 @@ export type NotificationType = keyof typeof notificationRegistry;
 export type NotificationCategory =
   (typeof notificationRegistry)[NotificationType]["category"];
 
-export type NotificationChannel = "in_app";
+export type NotificationChannel = "email" | "in_app";
 
 export type NotificationPayloadMap = {
   [Type in keyof typeof notificationPayloadSchemas]: z.infer<
@@ -21,14 +21,27 @@ export type NotificationSubject = {
   type: string;
 };
 
-export type NotifyInput<Type extends NotificationType = NotificationType> = {
+type NotificationTypesForChannel<Channel extends NotificationChannel> = {
+  [Type in NotificationType]: Channel extends (typeof notificationRegistry)[Type]["channels"][number]
+    ? Type
+    : never;
+}[NotificationType];
+
+type BaseNotifyInput<Type extends NotificationType> = {
   actorId?: null | string;
   data: NotificationPayloadMap[Type];
   idempotencyKey?: null | string;
-  recipientId: string;
   subject?: null | NotificationSubject;
   type: Type;
 };
+
+export type NotifyInput<Type extends NotificationType = NotificationType> =
+  Type extends NotificationType
+    ? BaseNotifyInput<Type> &
+        (Type extends NotificationTypesForChannel<"in_app">
+          ? { recipientId: string }
+          : { recipientId?: string })
+    : never;
 
 export type NotificationRecord = {
   actorId: null | string;

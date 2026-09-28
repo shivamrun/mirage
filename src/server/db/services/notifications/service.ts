@@ -1,5 +1,7 @@
 import type { NotifyInput } from "@/features/notifications";
+import { emailNotificationChannel } from "@/features/notifications/channels/email";
 import { inAppNotificationChannel } from "@/features/notifications/channels/in-app";
+import type { NotificationDeliveryResult } from "@/features/notifications/channels/types";
 import type { NotificationRecord } from "@/features/notifications/domain/types";
 import {
   getNotificationDefinition,
@@ -31,12 +33,19 @@ export function toNotificationResponse(notification: NotificationRecord) {
   };
 }
 
+type NotifyResult = {
+  deliveries: {
+    email?: NotificationDeliveryResult["email"];
+  };
+  notification: NotificationRecord | null;
+};
+
 export async function notify<Type extends NotifyInput["type"]>(
   input: NotifyInput<Type>,
-) {
+): Promise<NotifyResult> {
   const definition = getNotificationDefinition(input.type);
   const data = definition.payloadSchema.parse(input.data);
-  const result = await inAppNotificationChannel.deliver({
+  const deliveryInput = {
     actorId: input.actorId,
     category: definition.category,
     data,
@@ -44,10 +53,38 @@ export async function notify<Type extends NotifyInput["type"]>(
     recipientId: input.recipientId,
     subject: input.subject,
     type: input.type,
-  });
+  };
+  const deliveries: NotifyResult["deliveries"] = {};
+  let notificationId: string | undefined;
+
+  for (const channel of definition.channels) {
+    const result: NotificationDeliveryResult =
+      channel === "in_app"
+        ? await inAppNotificationChannel.deliver(deliveryInput)
+        : await emailNotificationChannel.deliver(deliveryInput);
+
+    if (result.email) {
+      deliveries.email = result.email;
+    }
+
+    if (result.notificationId) {
+      notificationId = result.notificationId;
+    }
+  }
+
+  if (!notificationId) {
+    return {
+      deliveries,
+      notification: null,
+    };
+  }
+
+  if (!input.recipientId) {
+    throw new Error("Created in-app notification is missing a recipientId.");
+  }
 
   const notification = await getNotificationForRecipient({
-    id: result.notificationId,
+    id: notificationId,
     recipientId: input.recipientId,
   });
 
@@ -55,7 +92,10 @@ export async function notify<Type extends NotifyInput["type"]>(
     throw new Error("Created notification could not be loaded.");
   }
 
-  return notification;
+  return {
+    deliveries,
+    notification,
+  };
 }
 
 export async function notifyBestEffort<Type extends NotifyInput["type"]>(

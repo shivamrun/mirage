@@ -37,7 +37,9 @@ function asNotificationRecord(row: typeof notification.$inferSelect) {
   return row satisfies NotificationRecord;
 }
 
-export async function createNotification(input: NotificationDeliveryInput) {
+export async function createNotification(
+  input: NotificationDeliveryInput & { recipientId: string },
+) {
   const [created] = await db
     .insert(notification)
     .values({

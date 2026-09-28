@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { sendVerificationEmail } from "@/adapters/email/senders/send-verification-email";
+import { notify } from "@/server/db/services/notifications/service";
 import { testEmailOutbox } from "./email-fake";
 import { getSafeTestDatabaseUrl, openTestDatabase } from "./test-database";
 
@@ -64,9 +64,12 @@ describe("test harness", () => {
       await client.end();
     }
 
-    await sendVerificationEmail({
-      email: "test@example.com",
-      verificationUrl: "http://localhost:3000/verify",
+    await notify({
+      data: {
+        email: "test@example.com",
+        verificationUrl: "http://localhost:3000/verify",
+      },
+      type: "auth.email_verification",
     });
     expect(testEmailOutbox).toHaveLength(1);
     expect(testEmailOutbox[0]?.to).toBe("test@example.com");

@@ -18,6 +18,26 @@ export const notificationRegistry = {
     channels: ["in_app"],
     payloadSchema: notificationPayloadSchemas["account.email_change_requested"],
   },
+  "account.two_factor_email_code": {
+    category: "security",
+    channels: ["email"],
+    payloadSchema: notificationPayloadSchemas["account.two_factor_email_code"],
+  },
+  "auth.email_verification": {
+    category: "security",
+    channels: ["email"],
+    payloadSchema: notificationPayloadSchemas["auth.email_verification"],
+  },
+  "auth.password_reset": {
+    category: "security",
+    channels: ["email"],
+    payloadSchema: notificationPayloadSchemas["auth.password_reset"],
+  },
+  "auth.welcome": {
+    category: "account",
+    channels: ["email"],
+    payloadSchema: notificationPayloadSchemas["auth.welcome"],
+  },
   "billing.credit_top_up_completed": {
     category: "billing",
     channels: ["in_app"],
@@ -48,6 +68,11 @@ export const notificationRegistry = {
     category: "product",
     channels: ["in_app"],
     payloadSchema: notificationPayloadSchemas["credits.low_balance"],
+  },
+  "email_list.verification": {
+    category: "product",
+    channels: ["email"],
+    payloadSchema: notificationPayloadSchemas["email_list.verification"],
   },
   "security.account_alert": {
     category: "security",

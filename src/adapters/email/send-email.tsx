@@ -12,7 +12,7 @@ type SendEmailOptions = {
   to: string | string[];
 } & Pick<CreateEmailOptions, "replyTo" | "tags">;
 
-type SendEmailResult =
+export type SendEmailResult =
   | {
       id: string;
       skipped: false;

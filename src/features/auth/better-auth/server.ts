@@ -2,15 +2,14 @@ import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { admin, captcha, twoFactor } from "better-auth/plugins";
 import { analytics } from "@/adapters/analytics/server";
-import {
-  sendVerificationEmail as sendAuthVerificationEmail,
-  sendPasswordResetEmail,
-  sendWelcomeEmail,
-} from "@/adapters/email";
 import { authHooks } from "@/features/auth/better-auth/hooks";
 import { authStripePlugin } from "@/features/auth/better-auth/plugins/stripe";
 import { authAccessControl, authRolePermissions } from "@/features/auth/roles";
 import { createAuthDatabaseAdapter } from "@/server/db/dal/auth";
+import {
+  notify,
+  notifyBestEffort,
+} from "@/server/db/services/notifications/service";
 import { env } from "@/shared/env";
 import { siteConfig } from "@/shared/metadata";
 
@@ -70,12 +69,17 @@ export const auth = betterAuth({
           void analytics.track("signup_completed", {
             context: { distinctId: user.id },
           });
-          void sendWelcomeEmail({
-            email: user.email,
-            name: user.name,
-          }).catch((reason) => {
-            console.error("Failed to send welcome email:", reason);
-          });
+          void notifyBestEffort(
+            {
+              data: {
+                email: user.email,
+                name: user.name,
+              },
+              recipientId: user.id,
+              type: "auth.welcome",
+            },
+            "auth.welcome",
+          );
         },
       },
     },
@@ -84,20 +88,28 @@ export const auth = betterAuth({
     enabled: true,
     revokeSessionsOnPasswordReset: true,
     async sendResetPassword({ url, user }) {
-      await sendPasswordResetEmail({
-        email: user.email,
-        name: user.name,
-        resetUrl: url,
+      await notify({
+        data: {
+          email: user.email,
+          name: user.name,
+          resetUrl: url,
+        },
+        recipientId: user.id,
+        type: "auth.password_reset",
       });
     },
   },
   emailVerification: {
     sendOnSignUp: true,
     async sendVerificationEmail({ url, user }) {
-      await sendAuthVerificationEmail({
-        email: user.email,
-        name: user.name,
-        verificationUrl: url,
+      await notify({
+        data: {
+          email: user.email,
+          name: user.name,
+          verificationUrl: url,
+        },
+        recipientId: user.id,
+        type: "auth.email_verification",
       });
     },
   },

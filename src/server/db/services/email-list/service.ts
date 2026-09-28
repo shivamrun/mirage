@@ -1,4 +1,3 @@
-import { sendEmailListVerificationEmail } from "@/adapters/email";
 import { consumePublicWriteLimit } from "@/adapters/rate-limit";
 import {
   confirmEmailListVerificationTransaction,
@@ -15,6 +14,7 @@ import {
   isValidEmailListVerificationToken,
   parseEmailListVerificationPayload,
 } from "@/server/db/services/email-list/verification";
+import { notify } from "@/server/db/services/notifications/service";
 import { env } from "@/shared/env";
 import type { EmailSubscriptionValues } from "@/shared/schemas";
 
@@ -122,13 +122,16 @@ export async function subscribeToEmailList(
   });
 
   try {
-    await sendEmailListVerificationEmail({
-      email: subscription.contact.email,
-      listKey: subscription.subscription.listKey,
-      listName: subscription.list.name,
-      verificationUrl: createEmailListVerificationUrl(
-        createdVerification.token,
-      ),
+    await notify({
+      data: {
+        email: subscription.contact.email,
+        listKey: subscription.subscription.listKey,
+        listName: subscription.list.name,
+        verificationUrl: createEmailListVerificationUrl(
+          createdVerification.token,
+        ),
+      },
+      type: "email_list.verification",
     });
   } catch {
     await deleteEmailListVerification(

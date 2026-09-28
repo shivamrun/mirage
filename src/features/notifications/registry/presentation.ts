@@ -28,6 +28,26 @@ const notificationPresenters = {
     href: "/account",
     title: "Email change pending",
   }),
+  "account.two_factor_email_code": () => ({
+    description: "A two-factor authentication email code was sent.",
+    href: "/account/security",
+    title: "Two-factor email code",
+  }),
+  "auth.email_verification": () => ({
+    description: "An email verification message was sent.",
+    href: "/account",
+    title: "Email verification",
+  }),
+  "auth.password_reset": () => ({
+    description: "A password reset email was sent.",
+    href: "/sign-in",
+    title: "Password reset",
+  }),
+  "auth.welcome": () => ({
+    description: "A welcome email was sent.",
+    href: "/account",
+    title: "Welcome email",
+  }),
   "billing.credit_top_up_completed": (notification) => ({
     description: `${notification.data.amount} credits were added to your account.`,
     href: "/billing",
@@ -72,6 +92,10 @@ const notificationPresenters = {
     href: "/credits",
     title: "Low credit balance",
   }),
+  "email_list.verification": (notification) => ({
+    description: `A verification email was sent for ${notification.data.listName}.`,
+    title: "Email list verification",
+  }),
   "security.account_alert": (notification) => ({
     description: notification.data.ipAddress
       ? `${notification.data.action} from ${notification.data.ipAddress}.`
@@ -88,7 +112,9 @@ const notificationPresenters = {
   [Type in keyof NotificationPayloadMap]: NotificationPresenter<Type>;
 };
 
-export function presentNotification(notification: NotificationRecord) {
+export function presentNotification(
+  notification: NotificationRecord,
+): NotificationPresentation {
   const type = normalizeNotificationType(notification.type);
   const presenter = type ? notificationPresenters[type] : null;
 

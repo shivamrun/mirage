@@ -6,10 +6,7 @@ import {
   symmetricDecrypt,
   symmetricEncrypt,
 } from "better-auth/crypto";
-import {
-  logEmailDeliveryFailure,
-  sendTwoFactorEmailCode,
-} from "@/adapters/email";
+import { logEmailDeliveryFailure } from "@/adapters/email";
 import { consumeAccountEmailSendLimit } from "@/adapters/rate-limit";
 import {
   createVerification,
@@ -31,6 +28,7 @@ import {
   TOTP_PERIOD_SECONDS,
   verifyTotpCode,
 } from "@/server/db/services/auth/totp";
+import { notify } from "@/server/db/services/notifications/service";
 import { env } from "@/shared/env";
 import { siteConfig } from "@/shared/metadata";
 
@@ -154,11 +152,15 @@ export async function sendAccountTwoFactorEmailCode({
   });
 
   try {
-    await sendTwoFactorEmailCode({
-      action,
-      code,
-      email: authSession.user.email,
-      name: authSession.user.name,
+    await notify({
+      data: {
+        action,
+        code,
+        email: authSession.user.email,
+        name: authSession.user.name,
+      },
+      recipientId: authSession.user.id,
+      type: "account.two_factor_email_code",
     });
   } catch (error) {
     logEmailDeliveryFailure("two-factor-code", error);

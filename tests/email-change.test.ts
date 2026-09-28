@@ -452,33 +452,10 @@ describe("email-change tokens", () => {
         notification.type === "account.email_changed",
     );
 
-    expect(emailChangeNotifications).toHaveLength(2);
-    expect(emailChangeNotifications).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          category: "account",
-          data: { email: newEmail },
-          recipientId: actor.id,
-          subjectId: actor.id,
-          subjectType: "account",
-          type: "account.email_change_requested",
-        }),
-        expect.objectContaining({
-          category: "account",
-          data: { email: newEmail },
-          recipientId: actor.id,
-          subjectId: actor.id,
-          subjectType: "account",
-          type: "account.email_changed",
-        }),
-      ]),
-    );
-    expect(
-      emailChangeNotifications.find(
-        (notification) => notification.type === "account.email_changed",
-      ),
-    ).toMatchObject({
+    expect(emailChangeNotifications).toHaveLength(1);
+    expect(emailChangeNotifications[0]).toMatchObject({
       category: "account",
+      data: { email: newEmail },
       recipientId: actor.id,
       subjectId: actor.id,
       subjectType: "account",

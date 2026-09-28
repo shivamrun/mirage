@@ -1,15 +1,19 @@
 # Notifications
 
-Phase 1 implements in-app notifications backed by Postgres. It deliberately does
-not include queues, realtime delivery, email, push, preferences, digests, or
-analytics.
+Notifications support registry-driven delivery through in-app and email
+channels. In-app notifications are backed by Postgres. Email notifications use
+the low-level email adapter and keep React templates in `src/adapters/email`.
+The system deliberately does not include queues, realtime delivery, push,
+preferences, digests, or analytics.
 
 ## Structure
 
 - `src/features/notifications/domain`: public notification types.
 - `src/features/notifications/registry`: notification definitions, payload
   schemas, and presentation mapping.
-- `src/features/notifications/channels/in-app`: Phase 1 delivery channel.
+- `src/features/notifications/channels/in-app`: inbox delivery channel.
+- `src/features/notifications/channels/email`: transactional email delivery
+  channel.
 - `src/features/notifications/components`: account inbox UI pieces.
 - `src/features/notifications/query`: page/limit URL parsing and href helpers.
 - `src/server/db/schema/notifications.ts`: Drizzle table and indexes.
@@ -40,8 +44,8 @@ await notify({
 ```
 
 `notify()` validates the type against the registry, validates the type-specific
-payload with Zod, routes to the `in_app` channel, persists the row, and returns
-the stored notification.
+payload with Zod, routes to the configured channels, and returns the created
+in-app notification when the type includes `in_app`.
 
 For user-facing or webhook flows where the primary business action has already
 succeeded, use `notifyBestEffort()`:
@@ -66,8 +70,9 @@ await notifyBestEffort(
 
 `notifyBestEffort()` calls `notify()`, logs failures, and returns `null` instead
 of throwing. Use it after critical state changes such as email changes, credit
-grants, and Stripe webhook reconciliation so a notification write failure does
-not roll back the user-visible outcome or cause webhook retries.
+grants, welcome emails, and Stripe webhook reconciliation so a secondary
+notification failure does not roll back the user-visible outcome or cause
+webhook retries.
 
 ## Strict Vs Best-Effort
 
@@ -119,16 +124,21 @@ repeatable workflows. The database has a unique index on the key. If a duplicate
 request races or retries, the DAL resolves and returns the existing row instead
 of surfacing a raw constraint error.
 
-## In-App Delivery
+## Channels
 
-Phase 1 has one channel: `in_app`. The channel writes structured notification
-data to `mirage_notification`. Stored rows include recipient, optional actor,
-type, category, optional subject, JSON payload, idempotency key, `seenAt`,
-`readAt`, `archivedAt`, and timestamps.
+`in_app` writes structured notification data to `mirage_notification`. Stored
+rows include recipient, optional actor, type, category, optional subject, JSON
+payload, idempotency key, `seenAt`, `readAt`, `archivedAt`, and timestamps.
 
-Feature code should not insert notification rows directly or call the channel.
-Use `notify()` or `notifyBestEffort()` so later phases can add dispatching,
-preferences, and additional channels without changing callers.
+`email` sends transactional email through `sendEmail()`. Email templates and UI
+components stay in `src/adapters/email`; sender orchestration such as subject,
+tags, plaintext body, and template selection lives in the notification email
+channel. Email-only notification types do not create inbox rows and do not
+require a user recipient.
+
+Feature code should not insert notification rows directly, call channels, or
+call email sender wrappers. Use `notify()` or `notifyBestEffort()` so
+dispatching stays registry-driven.
 
 ## Pagination
 

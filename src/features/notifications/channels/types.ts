@@ -1,3 +1,5 @@
+import type { SendEmailResult } from "@/adapters/email";
+
 import type {
   NotificationCategory,
   NotificationChannel,
@@ -13,13 +15,14 @@ export type NotificationDeliveryInput<
   category: NotificationCategory;
   data: NotificationPayloadMap[Type];
   idempotencyKey?: null | string;
-  recipientId: string;
+  recipientId?: string;
   subject?: null | NotificationSubject;
   type: Type;
 };
 
 export type NotificationDeliveryResult = {
-  notificationId: string;
+  email?: SendEmailResult;
+  notificationId?: string;
 };
 
 export type NotificationChannelHandler = {

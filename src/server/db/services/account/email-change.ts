@@ -1,8 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import {
-  logEmailDeliveryFailure,
-  sendVerificationEmail,
-} from "@/adapters/email";
+import { logEmailDeliveryFailure } from "@/adapters/email";
 import { consumeAccountEmailSendLimit } from "@/adapters/rate-limit";
 import { auth } from "@/features/auth/better-auth/server";
 import {
@@ -22,7 +19,10 @@ import {
   parsePendingEmailChange,
 } from "@/server/db/services/account/verification-schemas";
 import type { AuthSession } from "@/server/db/services/auth/current-user";
-import { notifyBestEffort } from "@/server/db/services/notifications/service";
+import {
+  notify,
+  notifyBestEffort,
+} from "@/server/db/services/notifications/service";
 import { env } from "@/shared/env";
 import type { ChangeEmailValues } from "@/shared/schemas";
 
@@ -82,30 +82,6 @@ function getApprovalIdentifierPrefix(userId: string) {
 
 function getApprovalIdentifier(userId: string, token: string) {
   return `${getApprovalIdentifierPrefix(userId)}${token}`;
-}
-
-async function notifyEmailChangeRequested({
-  challengeId,
-  newEmail,
-  userId,
-}: {
-  challengeId: string;
-  newEmail: string;
-  userId: string;
-}) {
-  await notifyBestEffort(
-    {
-      data: { email: newEmail },
-      idempotencyKey: `account:email_change_requested:${challengeId}`,
-      recipientId: userId,
-      subject: {
-        id: userId,
-        type: "account",
-      },
-      type: "account.email_change_requested",
-    },
-    "account.email_change_requested",
-  );
 }
 
 async function getPendingEmailChange(userId: string) {
@@ -180,11 +156,6 @@ async function createPendingEmailChange({
     value: JSON.stringify(pendingChange),
     expiresAt,
   });
-  await notifyEmailChangeRequested({
-    challengeId: verificationId,
-    newEmail,
-    userId,
-  });
 
   // A provider timeout can happen after acceptance. Keep this exact challenge
   // so a delivered link still works and the account owner can resend it.
@@ -212,13 +183,17 @@ async function sendPendingEmailChangeConfirmation(
   );
   confirmationURL.searchParams.set("token", pendingChange.token);
 
-  await sendVerificationEmail({
-    actionLabel: "Confirm email change",
-    email: pendingChange.newEmail,
-    heading: "Confirm your new email",
-    intro:
-      "Use this link to confirm the email address for your Mirage account.",
-    verificationUrl: confirmationURL.toString(),
+  await notify({
+    data: {
+      actionLabel: "Confirm email change",
+      email: pendingChange.newEmail,
+      heading: "Confirm your new email",
+      intro:
+        "Use this link to confirm the email address for your Mirage account.",
+      verificationUrl: confirmationURL.toString(),
+    },
+    recipientId: pendingChange.userId,
+    type: "auth.email_verification",
   });
 }
 
@@ -248,11 +223,6 @@ async function createPendingEmailChangeApproval({
     value: JSON.stringify(pendingChange),
     expiresAt,
   });
-  await notifyEmailChangeRequested({
-    challengeId: verificationId,
-    newEmail,
-    userId,
-  });
 
   const approvalURL = new URL(
     "/api/account/approve-email-change",
@@ -262,12 +232,16 @@ async function createPendingEmailChangeApproval({
 
   let deliveryFailed = false;
   try {
-    await sendVerificationEmail({
-      actionLabel: "Approve email change",
-      email: currentEmail,
-      heading: "Approve your email change",
-      intro: `Approve changing your Mirage account email to ${newEmail}.`,
-      verificationUrl: approvalURL.toString(),
+    await notify({
+      data: {
+        actionLabel: "Approve email change",
+        email: currentEmail,
+        heading: "Approve your email change",
+        intro: `Approve changing your Mirage account email to ${newEmail}.`,
+        verificationUrl: approvalURL.toString(),
+      },
+      recipientId: userId,
+      type: "auth.email_verification",
     });
   } catch (error) {
     logEmailDeliveryFailure("email-change-approval", error);
@@ -476,11 +450,6 @@ export async function resolveEmailChangeApprovalRedirectURL({
       redirectURL: createAccountRedirectURL("invalid"),
     };
   }
-  await notifyEmailChangeRequested({
-    challengeId: pendingVerificationId,
-    newEmail: newEmailChange.newEmail,
-    userId: newEmailChange.userId,
-  });
 
   try {
     await sendPendingEmailChangeConfirmation(newEmailChange);
