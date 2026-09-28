@@ -30,6 +30,31 @@ export async function getBillingSubscriptionsByUserId(userId: string) {
     .orderBy(desc(subscription.periodEnd), desc(subscription.periodStart));
 }
 
+export async function getBillingSubscriptionByStripeCustomerId(
+  stripeCustomerId: string,
+) {
+  const [record] = await db
+    .select()
+    .from(subscription)
+    .where(eq(subscription.stripeCustomerId, stripeCustomerId))
+    .orderBy(desc(subscription.periodEnd), desc(subscription.periodStart))
+    .limit(1);
+
+  return record ?? null;
+}
+
+export async function getBillingSubscriptionByStripeSubscriptionId(
+  stripeSubscriptionId: string,
+) {
+  const [record] = await db
+    .select()
+    .from(subscription)
+    .where(eq(subscription.stripeSubscriptionId, stripeSubscriptionId))
+    .limit(1);
+
+  return record ?? null;
+}
+
 export async function updateBillingSubscription(
   id: string,
   values: BillingSubscriptionUpdate,

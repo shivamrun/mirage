@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { POST as AUTH_WEBHOOK_POST } from "@/app/(backend)/api/auth/[...all]/route";
 import db from "@/server/db";
-import { subscription, user } from "@/server/db/schema";
+import { notification, subscription, user } from "@/server/db/schema";
 import { getCreditBalance } from "@/server/db/services/credits/ledger";
 import { setCreditTopUpStripeClientForTests } from "@/server/db/services/credits/top-up";
 import { createTestActor } from "./infra/admin-actor";
@@ -16,6 +16,7 @@ const topUpSession = (userId: string) => ({
   metadata: {
     credits: "200",
     lookupKey: "one_time_credit",
+    purchaseType: "credit_top_up",
     userId,
   },
   mode: "payment",
@@ -74,10 +75,17 @@ function subscriptionObject({
 
 function setBetterAuthWebhookStripeClient({
   eventType,
+  invoiceMetadata,
+  invoiceSubscriptionId,
   throwOnConstruct = false,
   userId,
 }: {
-  eventType: "checkout.session.completed" | "customer.subscription.created";
+  eventType:
+    | "checkout.session.completed"
+    | "customer.subscription.created"
+    | "invoice.payment_failed";
+  invoiceMetadata?: Record<string, string>;
+  invoiceSubscriptionId?: string;
   throwOnConstruct?: boolean;
   userId: string;
 }) {
@@ -136,7 +144,24 @@ function setBetterAuthWebhookStripeClient({
             object:
               eventType === "checkout.session.completed"
                 ? topUpSession(userId)
-                : subscriptionObject(),
+                : eventType === "invoice.payment_failed"
+                  ? {
+                      customer: "cus_test",
+                      id: "in_test_failed",
+                      metadata: invoiceMetadata ?? {
+                        plan: "Mirage Pro",
+                        userId,
+                      },
+                      object: "invoice",
+                      parent: invoiceSubscriptionId
+                        ? {
+                            subscription_details: {
+                              subscription: invoiceSubscriptionId,
+                            },
+                          }
+                        : undefined,
+                    }
+                  : subscriptionObject(),
           },
           id: `evt_test_${eventType.replaceAll(".", "_")}`,
           object: "event",
@@ -215,6 +240,20 @@ describe("Stripe webhook route", () => {
         (entry) => entry.idempotencyKey === "stripe_checkout:cs_test_top_up",
       ),
     ).toHaveLength(1);
+
+    const notifications = await db
+      .select()
+      .from(notification)
+      .where(eq(notification.recipientId, actor.id));
+
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]).toMatchObject({
+      category: "billing",
+      idempotencyKey: "billing:credit_top_up:cs_test_top_up",
+      subjectId: "cs_test_top_up",
+      subjectType: "stripe_checkout_session",
+      type: "billing.credit_top_up_completed",
+    });
   });
 
   it("creates subscription records and grants credits through Better Auth lifecycle hooks", async () => {
@@ -248,6 +287,99 @@ describe("Stripe webhook route", () => {
     expect(balance.currentPeriod).toMatchObject({
       allowance: 50,
       plan: "pro",
+    });
+
+    const notifications = await db
+      .select()
+      .from(notification)
+      .where(eq(notification.recipientId, actor.id));
+
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]).toMatchObject({
+      category: "billing",
+      idempotencyKey: expect.stringMatching(
+        /^billing:subscription:.+:started$/,
+      ),
+      subjectId: "sub_test",
+      subjectType: "stripe_subscription",
+      type: "billing.subscription_started",
+    });
+    expect(notifications[0].data).toEqual({
+      interval: "monthly",
+      plan: "Mirage Pro",
+    });
+  });
+
+  it("notifies users when Stripe reports payment failure metadata", async () => {
+    const actor = await createTestActor();
+    setBetterAuthWebhookStripeClient({
+      eventType: "invoice.payment_failed",
+      userId: actor.id,
+    });
+
+    for (const attempt of [1, 2]) {
+      const response = await postBetterAuthStripeWebhook(
+        JSON.stringify({ attempt }),
+      );
+
+      expect(response.status, await response.clone().text()).toBe(200);
+    }
+
+    const notifications = await db
+      .select()
+      .from(notification)
+      .where(eq(notification.recipientId, actor.id));
+
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]).toMatchObject({
+      category: "billing",
+      idempotencyKey: "billing:payment_failed:in_test_failed",
+      subjectId: "in_test_failed",
+      subjectType: "stripe_invoice",
+      type: "billing.payment_failed",
+    });
+    expect(notifications[0].data).toEqual({
+      invoiceId: "in_test_failed",
+      plan: "Mirage Pro",
+    });
+  });
+
+  it("resolves payment failure notifications from stored subscription data", async () => {
+    const actor = await createTestActor();
+    await db.insert(subscription).values({
+      id: "sub_record_payment_failed",
+      billingInterval: "month",
+      plan: "mirage pro",
+      referenceId: actor.id,
+      status: "active",
+      stripeCustomerId: "cus_test",
+      stripeSubscriptionId: "sub_test",
+    });
+    setBetterAuthWebhookStripeClient({
+      eventType: "invoice.payment_failed",
+      invoiceMetadata: {},
+      invoiceSubscriptionId: "sub_test",
+      userId: actor.id,
+    });
+
+    const response = await postBetterAuthStripeWebhook();
+
+    expect(response.status, await response.clone().text()).toBe(200);
+
+    const notifications = await db
+      .select()
+      .from(notification)
+      .where(eq(notification.recipientId, actor.id));
+
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]).toMatchObject({
+      category: "billing",
+      idempotencyKey: "billing:payment_failed:in_test_failed",
+      type: "billing.payment_failed",
+    });
+    expect(notifications[0].data).toEqual({
+      invoiceId: "in_test_failed",
+      plan: "mirage pro",
     });
   });
 });

@@ -37,14 +37,14 @@ describe("notifications", () => {
     const recipientId = await createUser("Recipient");
     const actorId = await createUser("Actor");
 
-    expect(getNotificationDefinition("SYSTEM_ANNOUNCEMENT").category).toBe(
+    expect(getNotificationDefinition("system.announcement").category).toBe(
       "system",
     );
     await expect(
       notify({
         data: { message: "", title: "" },
         recipientId,
-        type: "SYSTEM_ANNOUNCEMENT",
+        type: "system.announcement",
       }),
     ).rejects.toThrow();
 
@@ -60,7 +60,7 @@ describe("notifications", () => {
         id: "phase-1",
         type: "release",
       },
-      type: "SYSTEM_ANNOUNCEMENT",
+      type: "system.announcement",
     });
 
     expect(created).toMatchObject({
@@ -69,7 +69,7 @@ describe("notifications", () => {
       recipientId,
       subjectId: "phase-1",
       subjectType: "release",
-      type: "SYSTEM_ANNOUNCEMENT",
+      type: "system.announcement",
     });
     expect(created.data).toEqual({
       message: "Phase 1 is live.",
@@ -86,13 +86,13 @@ describe("notifications", () => {
         data: { balance: 2, threshold: 5 },
         idempotencyKey,
         recipientId,
-        type: "CREDITS_LOW_BALANCE",
+        type: "credits.low_balance",
       }),
       notify({
         data: { balance: 2, threshold: 5 },
         idempotencyKey,
         recipientId,
-        type: "CREDITS_LOW_BALANCE",
+        type: "credits.low_balance",
       }),
     ]);
 
@@ -106,12 +106,12 @@ describe("notifications", () => {
     const owned = await notify({
       data: { action: "New sign-in detected" },
       recipientId: ownerId,
-      type: "ACCOUNT_SECURITY_ALERT",
+      type: "security.account_alert",
     });
     await notify({
       data: { action: "Other sign-in detected" },
       recipientId: otherId,
-      type: "ACCOUNT_SECURITY_ALERT",
+      type: "security.account_alert",
     });
 
     expect(await getUnreadNotificationCount({ recipientId: ownerId })).toBe(1);
@@ -155,14 +155,14 @@ describe("notifications", () => {
             title: `Notice ${index}`,
           },
           recipientId,
-          type: "SYSTEM_ANNOUNCEMENT",
+          type: "system.announcement",
         }),
       ),
     );
     await notify({
       data: { message: "Not yours", title: "Hidden" },
       recipientId: otherId,
-      type: "SYSTEM_ANNOUNCEMENT",
+      type: "system.announcement",
     });
     await db
       .update(notification)

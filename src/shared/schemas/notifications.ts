@@ -26,18 +26,17 @@ export const notificationSubjectSchema = z.object({
   type: z.string().trim().min(1),
 });
 
+const notificationDataSchemas = Object.values(notificationPayloadSchemas) as [
+  (typeof notificationPayloadSchemas)[keyof typeof notificationPayloadSchemas],
+  ...(typeof notificationPayloadSchemas)[keyof typeof notificationPayloadSchemas][],
+];
+
 export const notificationResponseSchema = z.object({
   actorId: z.string().nullable(),
   archivedAt: z.iso.datetime().nullable(),
   category: notificationCategorySchema,
   createdAt: z.iso.datetime(),
-  data: z.union([
-    notificationPayloadSchemas.ACCOUNT_EMAIL_CHANGED,
-    notificationPayloadSchemas.ACCOUNT_SECURITY_ALERT,
-    notificationPayloadSchemas.BILLING_PAYMENT_FAILED,
-    notificationPayloadSchemas.CREDITS_LOW_BALANCE,
-    notificationPayloadSchemas.SYSTEM_ANNOUNCEMENT,
-  ]),
+  data: z.union(notificationDataSchemas),
   id: z.string(),
   idempotencyKey: z.string().nullable(),
   readAt: z.iso.datetime().nullable(),

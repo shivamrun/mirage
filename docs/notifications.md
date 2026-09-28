@@ -19,11 +19,12 @@ analytics.
 
 ## Lifecycle
 
-Feature code calls the public service:
+Feature code calls the public service. Use `notify()` when notification creation
+is required for the operation to be considered successful:
 
 ```ts
 await notify({
-  type: "SYSTEM_ANNOUNCEMENT",
+  type: "system.announcement",
   recipientId,
   actorId,
   subject: {
@@ -42,6 +43,61 @@ await notify({
 payload with Zod, routes to the `in_app` channel, persists the row, and returns
 the stored notification.
 
+For user-facing or webhook flows where the primary business action has already
+succeeded, use `notifyBestEffort()`:
+
+```ts
+await notifyBestEffort(
+  {
+    type: "billing.credit_top_up_completed",
+    recipientId: userId,
+    subject: {
+      type: "stripe_checkout_session",
+      id: session.id,
+    },
+    data: {
+      amount: 200,
+    },
+    idempotencyKey: `billing:credit_top_up:${session.id}`,
+  },
+  "billing.credit_top_up_completed",
+);
+```
+
+`notifyBestEffort()` calls `notify()`, logs failures, and returns `null` instead
+of throwing. Use it after critical state changes such as email changes, credit
+grants, and Stripe webhook reconciliation so a notification write failure does
+not roll back the user-visible outcome or cause webhook retries.
+
+## Strict Vs Best-Effort
+
+Use `notify()` when:
+
+- The caller is explicitly creating a notification as the main action.
+- A test needs to assert validation, persistence, or idempotency behavior.
+- Internal tooling should fail loudly if the notification cannot be stored.
+- The notification must be returned to the caller immediately.
+
+Use `notifyBestEffort()` when:
+
+- The business operation already succeeded and should not be reported as failed.
+- The caller is inside a webhook where throwing may trigger provider retries.
+- The notification is a secondary UX signal, such as account, billing, or credit
+  activity.
+
+Examples:
+
+- Email change requested: use `notifyBestEffort()` after creating the pending
+  verification record. If the notification fails, the email challenge should
+  still be usable.
+- Email change completed: use `notifyBestEffort()` after the user email is
+  updated. If the notification fails, the user should still land on the success
+  redirect.
+- Credit top-up completed: use `notifyBestEffort()` after credits are granted.
+  A notification failure must not cause Stripe to retry a fulfilled checkout.
+- System announcement tooling: use `notify()` when the tool's explicit purpose
+  is to create notifications and report failures.
+
 ## Registry And Payloads
 
 `notificationRegistry` is the source of truth for notification type, category,
@@ -53,7 +109,8 @@ supported channels, and payload schema. Add a new type by:
 
 The `NotifyInput` type derives `data` from the payload map, so callers get
 compile-time checking for each notification type. Runtime validation still runs
-inside `notify()` before data is stored.
+inside `notify()` before data is stored. `notifyBestEffort()` uses the same
+validation path and only changes error handling.
 
 ## Idempotency
 
@@ -70,8 +127,8 @@ type, category, optional subject, JSON payload, idempotency key, `seenAt`,
 `readAt`, `archivedAt`, and timestamps.
 
 Feature code should not insert notification rows directly or call the channel.
-Use `notify()` so later phases can add dispatching, preferences, and additional
-channels without changing callers.
+Use `notify()` or `notifyBestEffort()` so later phases can add dispatching,
+preferences, and additional channels without changing callers.
 
 ## Pagination
 

@@ -11,6 +11,7 @@ import {
   setBillingStripeClientForTests,
 } from "@/server/db/services/billing/stripe-client";
 import { grantCreditTopUp } from "@/server/db/services/credits/ledger";
+import { notifyBestEffort } from "@/server/db/services/notifications/service";
 
 export const creditTopUpProduct = {
   amount: billingCatalog.creditTopUp.amount,
@@ -90,6 +91,20 @@ export async function grantCreditTopUpForCheckoutSession(
   });
 
   if (result.created) {
+    await notifyBestEffort(
+      {
+        data: { amount: creditTopUpProduct.credits },
+        idempotencyKey: `billing:credit_top_up:${session.id}`,
+        recipientId: userId,
+        subject: {
+          id: session.id,
+          type: "stripe_checkout_session",
+        },
+        type: "billing.credit_top_up_completed",
+      },
+      "billing.credit_top_up_completed",
+    );
+
     await analytics.trackAuthoritative(
       "credits_purchased",
       {

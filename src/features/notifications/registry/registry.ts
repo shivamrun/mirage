@@ -8,32 +8,81 @@ type NotificationDefinition = {
 };
 
 export const notificationRegistry = {
-  ACCOUNT_EMAIL_CHANGED: {
+  "account.email_changed": {
     category: "account",
     channels: ["in_app"],
-    payloadSchema: notificationPayloadSchemas.ACCOUNT_EMAIL_CHANGED,
+    payloadSchema: notificationPayloadSchemas["account.email_changed"],
   },
-  ACCOUNT_SECURITY_ALERT: {
-    category: "security",
+  "account.email_change_requested": {
+    category: "account",
     channels: ["in_app"],
-    payloadSchema: notificationPayloadSchemas.ACCOUNT_SECURITY_ALERT,
+    payloadSchema: notificationPayloadSchemas["account.email_change_requested"],
   },
-  BILLING_PAYMENT_FAILED: {
+  "billing.credit_top_up_completed": {
     category: "billing",
     channels: ["in_app"],
-    payloadSchema: notificationPayloadSchemas.BILLING_PAYMENT_FAILED,
+    payloadSchema:
+      notificationPayloadSchemas["billing.credit_top_up_completed"],
   },
-  CREDITS_LOW_BALANCE: {
+  "billing.payment_failed": {
+    category: "billing",
+    channels: ["in_app"],
+    payloadSchema: notificationPayloadSchemas["billing.payment_failed"],
+  },
+  "billing.subscription_canceled": {
+    category: "billing",
+    channels: ["in_app"],
+    payloadSchema: notificationPayloadSchemas["billing.subscription_canceled"],
+  },
+  "billing.subscription_started": {
+    category: "billing",
+    channels: ["in_app"],
+    payloadSchema: notificationPayloadSchemas["billing.subscription_started"],
+  },
+  "billing.subscription_updated": {
+    category: "billing",
+    channels: ["in_app"],
+    payloadSchema: notificationPayloadSchemas["billing.subscription_updated"],
+  },
+  "credits.low_balance": {
     category: "product",
     channels: ["in_app"],
-    payloadSchema: notificationPayloadSchemas.CREDITS_LOW_BALANCE,
+    payloadSchema: notificationPayloadSchemas["credits.low_balance"],
   },
-  SYSTEM_ANNOUNCEMENT: {
+  "security.account_alert": {
+    category: "security",
+    channels: ["in_app"],
+    payloadSchema: notificationPayloadSchemas["security.account_alert"],
+  },
+  "system.announcement": {
     category: "system",
     channels: ["in_app"],
-    payloadSchema: notificationPayloadSchemas.SYSTEM_ANNOUNCEMENT,
+    payloadSchema: notificationPayloadSchemas["system.announcement"],
   },
 } as const satisfies Record<string, NotificationDefinition>;
+
+const legacyNotificationTypeMap = {
+  ACCOUNT_EMAIL_CHANGED: "account.email_changed",
+  ACCOUNT_EMAIL_CHANGE_REQUESTED: "account.email_change_requested",
+  ACCOUNT_SECURITY_ALERT: "security.account_alert",
+  BILLING_CREDIT_TOP_UP_COMPLETED: "billing.credit_top_up_completed",
+  BILLING_PAYMENT_FAILED: "billing.payment_failed",
+  BILLING_SUBSCRIPTION_CANCELED: "billing.subscription_canceled",
+  BILLING_SUBSCRIPTION_STARTED: "billing.subscription_started",
+  BILLING_SUBSCRIPTION_UPDATED: "billing.subscription_updated",
+  CREDITS_LOW_BALANCE: "credits.low_balance",
+  SYSTEM_ANNOUNCEMENT: "system.announcement",
+} as const satisfies Record<string, keyof typeof notificationRegistry>;
+
+export function normalizeNotificationType(type: string) {
+  if (type in notificationRegistry) {
+    return type as keyof typeof notificationRegistry;
+  }
+
+  return legacyNotificationTypeMap[
+    type as keyof typeof legacyNotificationTypeMap
+  ];
+}
 
 export function getNotificationDefinition(
   type: keyof typeof notificationRegistry,

@@ -4,7 +4,12 @@ import { eq, like } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { describe, expect, it } from "vitest";
 import db from "@/server/db";
-import { applicationRateLimit, user, verification } from "@/server/db/schema";
+import {
+  applicationRateLimit,
+  notification,
+  user,
+  verification,
+} from "@/server/db/schema";
 import { accountRoutes } from "@/server/routes/account";
 import { createTestActor } from "./infra/admin-actor";
 import { setTestEmailDeliveryHook, testEmailOutbox } from "./infra/email-fake";
@@ -436,6 +441,49 @@ describe("email-change tokens", () => {
       results.map((result) => redirectStatus(result.redirectURL)).sort(),
     ).toEqual(["invalid", "success"]);
     expect((await storedUser(actor.id))?.email).toBe(newEmail);
+
+    const notifications = await db
+      .select()
+      .from(notification)
+      .where(eq(notification.recipientId, actor.id));
+    const emailChangeNotifications = notifications.filter(
+      (notification) =>
+        notification.type === "account.email_change_requested" ||
+        notification.type === "account.email_changed",
+    );
+
+    expect(emailChangeNotifications).toHaveLength(2);
+    expect(emailChangeNotifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: "account",
+          data: { email: newEmail },
+          recipientId: actor.id,
+          subjectId: actor.id,
+          subjectType: "account",
+          type: "account.email_change_requested",
+        }),
+        expect.objectContaining({
+          category: "account",
+          data: { email: newEmail },
+          recipientId: actor.id,
+          subjectId: actor.id,
+          subjectType: "account",
+          type: "account.email_changed",
+        }),
+      ]),
+    );
+    expect(
+      emailChangeNotifications.find(
+        (notification) => notification.type === "account.email_changed",
+      ),
+    ).toMatchObject({
+      category: "account",
+      recipientId: actor.id,
+      subjectId: actor.id,
+      subjectType: "account",
+      type: "account.email_changed",
+    });
   });
 
   it("allows only one simultaneous approval to issue a new token", async () => {

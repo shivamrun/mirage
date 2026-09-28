@@ -1,7 +1,10 @@
 import type { NotifyInput } from "@/features/notifications";
 import { inAppNotificationChannel } from "@/features/notifications/channels/in-app";
 import type { NotificationRecord } from "@/features/notifications/domain/types";
-import { getNotificationDefinition } from "@/features/notifications/registry/registry";
+import {
+  getNotificationDefinition,
+  normalizeNotificationType,
+} from "@/features/notifications/registry/registry";
 import {
   countUnreadNotificationsForRecipient,
   getNotificationForRecipient,
@@ -23,6 +26,7 @@ export function toNotificationResponse(notification: NotificationRecord) {
     createdAt: notification.createdAt.toISOString(),
     readAt: optionalDateToISOString(notification.readAt),
     seenAt: optionalDateToISOString(notification.seenAt),
+    type: normalizeNotificationType(notification.type) ?? notification.type,
     updatedAt: notification.updatedAt.toISOString(),
   };
 }
@@ -52,6 +56,18 @@ export async function notify<Type extends NotifyInput["type"]>(
   }
 
   return notification;
+}
+
+export async function notifyBestEffort<Type extends NotifyInput["type"]>(
+  input: NotifyInput<Type>,
+  context: string,
+) {
+  try {
+    return await notify(input);
+  } catch (error) {
+    console.warn(`Unable to create notification (${context}):`, error);
+    return null;
+  }
 }
 
 export async function listNotificationsView({

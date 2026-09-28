@@ -22,6 +22,7 @@ import {
   parsePendingEmailChange,
 } from "@/server/db/services/account/verification-schemas";
 import type { AuthSession } from "@/server/db/services/auth/current-user";
+import { notifyBestEffort } from "@/server/db/services/notifications/service";
 import { env } from "@/shared/env";
 import type { ChangeEmailValues } from "@/shared/schemas";
 
@@ -83,6 +84,30 @@ function getApprovalIdentifier(userId: string, token: string) {
   return `${getApprovalIdentifierPrefix(userId)}${token}`;
 }
 
+async function notifyEmailChangeRequested({
+  challengeId,
+  newEmail,
+  userId,
+}: {
+  challengeId: string;
+  newEmail: string;
+  userId: string;
+}) {
+  await notifyBestEffort(
+    {
+      data: { email: newEmail },
+      idempotencyKey: `account:email_change_requested:${challengeId}`,
+      recipientId: userId,
+      subject: {
+        id: userId,
+        type: "account",
+      },
+      type: "account.email_change_requested",
+    },
+    "account.email_change_requested",
+  );
+}
+
 async function getPendingEmailChange(userId: string) {
   await cleanupStaleEmailChanges(userId);
 
@@ -140,6 +165,7 @@ async function createPendingEmailChange({
 }) {
   const token = createToken();
   const expiresAt = new Date(Date.now() + EMAIL_CHANGE_EXPIRES_IN_MS);
+  const verificationId = randomUUID();
   const pendingChange: PendingEmailChange = {
     currentEmail,
     newEmail,
@@ -149,10 +175,15 @@ async function createPendingEmailChange({
 
   await clearPendingEmailChanges(userId);
   await createVerification({
-    id: randomUUID(),
+    id: verificationId,
     identifier: getPendingIdentifier(userId, token),
     value: JSON.stringify(pendingChange),
     expiresAt,
+  });
+  await notifyEmailChangeRequested({
+    challengeId: verificationId,
+    newEmail,
+    userId,
   });
 
   // A provider timeout can happen after acceptance. Keep this exact challenge
@@ -202,6 +233,7 @@ async function createPendingEmailChangeApproval({
 }) {
   const token = createToken();
   const expiresAt = new Date(Date.now() + EMAIL_CHANGE_EXPIRES_IN_MS);
+  const verificationId = randomUUID();
   const pendingChange: PendingEmailChange = {
     currentEmail,
     newEmail,
@@ -211,10 +243,15 @@ async function createPendingEmailChangeApproval({
 
   await clearPendingEmailChanges(userId);
   await createVerification({
-    id: randomUUID(),
+    id: verificationId,
     identifier: getApprovalIdentifier(userId, token),
     value: JSON.stringify(pendingChange),
     expiresAt,
+  });
+  await notifyEmailChangeRequested({
+    challengeId: verificationId,
+    newEmail,
+    userId,
   });
 
   const approvalURL = new URL(
@@ -418,10 +455,11 @@ export async function resolveEmailChangeApprovalRedirectURL({
     userId: pendingChange.userId,
     token: createToken(),
   };
+  const pendingVerificationId = randomUUID();
   const claimed = await replaceApprovalWithPending({
     approvalId: approvalRecord.id,
     pending: {
-      id: randomUUID(),
+      id: pendingVerificationId,
       identifier: getPendingIdentifier(
         newEmailChange.userId,
         newEmailChange.token,
@@ -438,6 +476,11 @@ export async function resolveEmailChangeApprovalRedirectURL({
       redirectURL: createAccountRedirectURL("invalid"),
     };
   }
+  await notifyEmailChangeRequested({
+    challengeId: pendingVerificationId,
+    newEmail: newEmailChange.newEmail,
+    userId: newEmailChange.userId,
+  });
 
   try {
     await sendPendingEmailChangeConfirmation(newEmailChange);
@@ -649,6 +692,20 @@ export async function resolveEmailChangeConfirmationRedirectURL({
       redirectURL: createAccountRedirectURL("invalid"),
     };
   }
+
+  await notifyBestEffort(
+    {
+      data: { email: pendingChange.newEmail },
+      idempotencyKey: `account:email_changed:${pendingChangeRecord.id}`,
+      recipientId: pendingChange.userId,
+      subject: {
+        id: pendingChange.userId,
+        type: "account",
+      },
+      type: "account.email_changed",
+    },
+    "account.email_changed",
+  );
 
   return {
     notificationEmail: pendingChange.newEmail,

@@ -2,6 +2,7 @@ import type {
   NotificationPayloadMap,
   NotificationRecord,
 } from "../domain/types";
+import { normalizeNotificationType } from "./registry";
 
 type NotificationPresentation = {
   description: string;
@@ -17,31 +18,68 @@ type NotificationPresenter<Type extends keyof NotificationPayloadMap> = (
 ) => NotificationPresentation;
 
 const notificationPresenters = {
-  ACCOUNT_EMAIL_CHANGED: (notification) => ({
+  "account.email_changed": (notification) => ({
     description: `Your account email was changed to ${notification.data.email}.`,
     href: "/account/profile",
     title: "Email changed",
   }),
-  ACCOUNT_SECURITY_ALERT: (notification) => ({
-    description: notification.data.ipAddress
-      ? `${notification.data.action} from ${notification.data.ipAddress}.`
-      : notification.data.action,
-    href: "/account/security",
-    title: "Security alert",
+  "account.email_change_requested": (notification) => ({
+    description: `Email change to ${notification.data.email} is pending.`,
+    href: "/account",
+    title: "Email change pending",
   }),
-  BILLING_PAYMENT_FAILED: (notification) => ({
+  "billing.credit_top_up_completed": (notification) => ({
+    description: `${notification.data.amount} credits were added to your account.`,
+    href: "/billing",
+    title: "Credit top-up complete",
+  }),
+  "billing.payment_failed": (notification) => ({
     description: notification.data.plan
       ? `Payment failed for ${notification.data.plan}.`
       : "A billing payment could not be completed.",
     href: "/billing",
     title: "Payment failed",
   }),
-  CREDITS_LOW_BALANCE: (notification) => ({
+  "billing.subscription_canceled": (notification) => ({
+    description: notification.data.cancelAtPeriodEnd
+      ? `${notification.data.plan} is scheduled to end after the current period.`
+      : `${notification.data.plan} has been canceled.`,
+    href: "/billing",
+    title: "Subscription canceled",
+  }),
+  "billing.subscription_started": (notification) => ({
+    description: notification.data.interval
+      ? `${notification.data.plan} is now active on ${notification.data.interval} billing.`
+      : `${notification.data.plan} is now active.`,
+    href: "/billing",
+    title: "Subscription started",
+  }),
+  "billing.subscription_updated": (notification) => ({
+    description: [
+      `${notification.data.plan} subscription updated.`,
+      notification.data.interval
+        ? `Billing interval: ${notification.data.interval}.`
+        : null,
+      notification.data.status ? `Status: ${notification.data.status}.` : null,
+    ]
+      .filter(Boolean)
+      .join(" "),
+    href: "/billing",
+    title: "Subscription updated",
+  }),
+  "credits.low_balance": (notification) => ({
     description: `${notification.data.balance} credits remaining. Threshold: ${notification.data.threshold}.`,
     href: "/credits",
     title: "Low credit balance",
   }),
-  SYSTEM_ANNOUNCEMENT: (notification) => ({
+  "security.account_alert": (notification) => ({
+    description: notification.data.ipAddress
+      ? `${notification.data.action} from ${notification.data.ipAddress}.`
+      : notification.data.action,
+    href: "/account/security",
+    title: "Security alert",
+  }),
+  "system.announcement": (notification) => ({
     description: notification.data.message,
     href: notification.data.url,
     title: notification.data.title,
@@ -51,7 +89,16 @@ const notificationPresenters = {
 };
 
 export function presentNotification(notification: NotificationRecord) {
-  const presenter = notificationPresenters[notification.type];
+  const type = normalizeNotificationType(notification.type);
+  const presenter = type ? notificationPresenters[type] : null;
 
-  return presenter(notification as never);
+  if (!presenter) {
+    return {
+      description: "Open your account to review this notification.",
+      href: "/account/notifications",
+      title: "Notification",
+    };
+  }
+
+  return presenter({ ...notification, type } as never);
 }
