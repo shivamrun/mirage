@@ -48,6 +48,56 @@ export const notificationResponseSchema = z.object({
   updatedAt: z.iso.datetime(),
 });
 
+export const notificationRealtimeEventNames = {
+  connected: "notifications.connected",
+  created: "notification.created",
+  ping: "ping",
+  resync: "notifications.resync",
+  unreadCountChanged: "notifications.unread_count_changed",
+} as const;
+
+export const notificationRealtimeRetryMs = 5_000;
+
+export const notificationRealtimeConnectedEventSchema = z.object({
+  unreadCount: z.number().int().min(0),
+});
+
+export const notificationRealtimeCreatedEventSchema = z.object({
+  notification: notificationResponseSchema,
+  unreadCount: z.number().int().min(0),
+});
+
+export const notificationRealtimeUnreadCountChangedEventSchema = z.object({
+  unreadCount: z.number().int().min(0),
+});
+
+export const notificationRealtimeResyncEventSchema = z.object({});
+
+export const notificationRealtimePingEventSchema = z.object({});
+
+export const notificationRealtimeEventSchema = z.discriminatedUnion("event", [
+  z.object({
+    data: notificationRealtimeConnectedEventSchema,
+    event: z.literal(notificationRealtimeEventNames.connected),
+  }),
+  z.object({
+    data: notificationRealtimeCreatedEventSchema,
+    event: z.literal(notificationRealtimeEventNames.created),
+  }),
+  z.object({
+    data: notificationRealtimeUnreadCountChangedEventSchema,
+    event: z.literal(notificationRealtimeEventNames.unreadCountChanged),
+  }),
+  z.object({
+    data: notificationRealtimeResyncEventSchema,
+    event: z.literal(notificationRealtimeEventNames.resync),
+  }),
+  z.object({
+    data: notificationRealtimePingEventSchema,
+    event: z.literal(notificationRealtimeEventNames.ping),
+  }),
+]);
+
 export const notificationsListResponseSchema = paginatedResponseSchema(
   notificationResponseSchema,
 );
@@ -67,3 +117,6 @@ export const notificationIdParamsSchema = z.object({
 export const notificationActionSchema = notificationIdParamsSchema;
 
 export type NotificationActionValues = z.infer<typeof notificationActionSchema>;
+export type NotificationRealtimeEvent = z.infer<
+  typeof notificationRealtimeEventSchema
+>;

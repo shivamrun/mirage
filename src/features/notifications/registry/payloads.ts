@@ -65,9 +65,4 @@ export const notificationPayloadSchemas = {
     action: z.string().trim().min(1),
     ipAddress: z.string().trim().optional(),
   }),
-  "system.announcement": z.object({
-    message: z.string().trim().min(1),
-    title: z.string().trim().min(1),
-    url: z.string().trim().optional(),
-  }),
 } as const;

@@ -28,18 +28,18 @@ is required for the operation to be considered successful:
 
 ```ts
 await notify({
-  type: "system.announcement",
+  type: "security.account_alert",
   recipientId,
   actorId,
   subject: {
-    type: "release",
-    id: releaseId,
+    type: "security_event",
+    id: eventId,
   },
   data: {
-    title: "Notifications ready",
-    message: "Phase 1 is live.",
+    action: "New sign-in detected",
+    ipAddress: requestIp,
   },
-  idempotencyKey: `system-announcement:${releaseId}:${recipientId}`,
+  idempotencyKey: `security:${eventId}:${recipientId}`,
 });
 ```
 
@@ -100,8 +100,8 @@ Examples:
   redirect.
 - Credit top-up completed: use `notifyBestEffort()` after credits are granted.
   A notification failure must not cause Stripe to retry a fulfilled checkout.
-- System announcement tooling: use `notify()` when the tool's explicit purpose
-  is to create notifications and report failures.
+- Internal notification tooling: use `notify()` when the tool's explicit
+  purpose is to create notifications and report failures.
 
 ## Registry And Payloads
 

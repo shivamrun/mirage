@@ -5,7 +5,15 @@ import { describe, expect, it } from "vitest";
 
 import db from "@/server/db";
 import { contactSubmission, emailList, verification } from "@/server/db/schema";
+import {
+  resetNotificationRealtimeBrokerForTests,
+  subscribe,
+} from "@/server/db/services/notifications/realtime-broker";
 import { app } from "@/server/routes";
+import {
+  notificationRealtimeEventNames,
+  notificationRealtimeRetryMs,
+} from "@/shared/schemas/notifications";
 import { createTestActor } from "./infra/admin-actor";
 import { testEmailOutbox } from "./infra/email-fake";
 import { httpRequest } from "./infra/http-request";
@@ -57,6 +65,11 @@ const mutationRoutes = [
   {
     method: "POST",
     path: "/api/account/notifications/read-all",
+    access: "user",
+  },
+  {
+    method: "POST",
+    path: "/api/account/notifications/test",
     access: "user",
   },
   {
@@ -197,6 +210,20 @@ function requestBody(path: string) {
   return "{}";
 }
 
+async function readFirstStreamChunk(response: Response) {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("Response did not include a readable body.");
+
+  const { value } = await reader.read();
+  await reader.cancel();
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  return new TextDecoder().decode(value);
+}
+
 describe("current Elysia HTTP contract", () => {
   it("keeps the composed method and path inventory", () => {
     const expected = [
@@ -205,6 +232,7 @@ describe("current Elysia HTTP contract", () => {
       "GET /api/account/",
       "GET /api/account/google-account",
       "GET /api/account/notifications",
+      "GET /api/account/notifications/events",
       "GET /api/account/notifications/unread-count",
       "GET /api/account/confirm-email-change",
       "GET /api/account/approve-email-change",
@@ -226,8 +254,8 @@ describe("current Elysia HTTP contract", () => {
     );
   });
 
-  it("guards all 29 mutations with the current origin response", async () => {
-    expect(mutationRoutes).toHaveLength(29);
+  it("guards all 30 mutations with the current origin response", async () => {
+    expect(mutationRoutes).toHaveLength(30);
     const user = await createTestActor();
     const admin = await createTestActor({ role: "admin", emailVerified: true });
     const sentBefore = testEmailOutbox.length;
@@ -415,6 +443,68 @@ describe("current Elysia HTTP contract", () => {
     expect(response.status).toBe(404);
     expect(response.headers.get("content-type")).toContain("application/json");
     expect(await response.json()).toEqual({ message: "Not Found" });
+  });
+
+  it("rejects unauthenticated notification SSE requests", async () => {
+    const response = await httpRequest(
+      app,
+      "/api/account/notifications/events",
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ message: "Unauthorized" });
+  });
+
+  it("starts authenticated notification SSE with the connected event", async () => {
+    const actor = await createTestActor();
+    const response = await httpRequest(
+      app,
+      "/api/account/notifications/events",
+      {
+        cookie: actor.cookie,
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+
+    const chunk = await readFirstStreamChunk(response);
+    expect(chunk).toContain(
+      `event: ${notificationRealtimeEventNames.connected}`,
+    );
+    expect(chunk).toContain(`retry: ${notificationRealtimeRetryMs}`);
+    expect(chunk).toContain('data: {"unreadCount":0}');
+  });
+
+  it("creates a realtime test notification for the authenticated owner", async () => {
+    resetNotificationRealtimeBrokerForTests();
+    const actor = await createTestActor();
+    const subscription = subscribe(actor.id);
+
+    const response = await httpRequest(app, "/api/account/notifications/test", {
+      cookie: actor.cookie,
+      headers: { origin: trustedOrigin },
+      method: "POST",
+    });
+
+    expect(response.status, await response.clone().text()).toBe(200);
+    expect(await response.json()).toMatchObject({
+      notification: {
+        recipientId: actor.id,
+        type: "security.account_alert",
+      },
+    });
+    expect(await subscription.next()).toMatchObject({
+      data: {
+        notification: {
+          recipientId: actor.id,
+          type: "security.account_alert",
+        },
+        unreadCount: 1,
+      },
+      event: notificationRealtimeEventNames.created,
+    });
+    subscription.close();
   });
 
   it.each([

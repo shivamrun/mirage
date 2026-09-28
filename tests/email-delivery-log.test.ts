@@ -30,15 +30,57 @@ describe("email delivery diagnostics", () => {
       );
 
       expect(log.mock.calls.map(([, details]) => details)).toEqual([
-        { flow: "email-change-confirmation", failureKind: "configuration" },
-        { flow: "email-change-approval", failureKind: "provider-rejected" },
         {
+          errorCodes: [],
+          errorNames: ["EmailConfigurationError"],
+          failureKind: "configuration",
+          flow: "email-change-confirmation",
+        },
+        {
+          errorCodes: [],
+          errorNames: ["EmailDeliveryError"],
+          failureKind: "provider-rejected",
+          flow: "email-change-approval",
+        },
+        {
+          errorCodes: [],
+          errorNames: ["EmailDeliveryError"],
           flow: "two-factor-code",
           failureKind: "provider-response-incomplete",
         },
-        { flow: "email-change-resend", failureKind: "timeout" },
+        {
+          errorCodes: [],
+          errorNames: ["TimeoutError"],
+          flow: "email-change-resend",
+          failureKind: "timeout",
+        },
       ]);
       expect(JSON.stringify(log.mock.calls)).not.toContain(secret);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it("surfaces nested timeout codes from fetch failures", () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const error = new TypeError("fetch failed", {
+      cause: new AggregateError([
+        Object.assign(new Error("connect timed out"), { code: "ETIMEDOUT" }),
+      ]),
+    });
+
+    try {
+      logEmailDeliveryFailure("auth-email-verification", error);
+
+      expect(log).toHaveBeenCalledWith(
+        "Email delivery could not be confirmed.",
+        {
+          errorCodes: ["ETIMEDOUT"],
+          errorNames: ["AggregateError", "Error", "TypeError"],
+          failureKind: "timeout",
+          flow: "auth-email-verification",
+        },
+      );
     } finally {
       log.mockRestore();
     }

@@ -11,7 +11,7 @@ export const defaultEmailLists = [
     status: "active",
   },
   {
-    description: "Product news and occasional announcements.",
+    description: "Product news and occasional updates.",
     emailVerificationRequired: true,
     key: "newsletter",
     name: "Newsletter",

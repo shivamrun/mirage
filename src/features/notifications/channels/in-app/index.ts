@@ -9,13 +9,14 @@ export const inAppNotificationChannel = {
       throw new Error("In-app notifications require a recipientId.");
     }
 
-    const notification = await createNotification({
+    const result = await createNotification({
       ...input,
       recipientId: input.recipientId,
     });
 
     return {
-      notificationId: notification.id,
+      notificationCreated: result.created,
+      notificationId: result.notification.id,
     };
   },
 } satisfies NotificationChannelHandler;

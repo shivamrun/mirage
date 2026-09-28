@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import { NotificationList } from "@/features/notifications/components/notification-list";
+import { NotificationRealtimeTestButton } from "@/features/notifications/components/notification-realtime-test-button";
 import {
   NOTIFICATIONS_PAGE_SIZE,
   type NotificationsPageSearchParams,
@@ -70,11 +71,20 @@ export default async function NotificationsPage({
           </p>
         </div>
 
-        <form action={markAllNotificationsReadAction}>
-          <Button disabled={unreadCount === 0} type="submit" variant="outline">
-            Mark all read
-          </Button>
-        </form>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {process.env.NODE_ENV !== "production" ? (
+            <NotificationRealtimeTestButton />
+          ) : null}
+          <form action={markAllNotificationsReadAction}>
+            <Button
+              disabled={unreadCount === 0}
+              type="submit"
+              variant="outline"
+            >
+              Mark all read
+            </Button>
+          </form>
+        </div>
       </header>
 
       <NotificationList

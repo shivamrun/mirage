@@ -103,11 +103,6 @@ const notificationPresenters = {
     href: "/account/security",
     title: "Security alert",
   }),
-  "system.announcement": (notification) => ({
-    description: notification.data.message,
-    href: notification.data.url,
-    title: notification.data.title,
-  }),
 } satisfies {
   [Type in keyof NotificationPayloadMap]: NotificationPresenter<Type>;
 };

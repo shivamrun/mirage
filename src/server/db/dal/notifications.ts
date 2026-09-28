@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import type { NotificationRecord } from "@/features/notifications";
 import type { NotificationDeliveryInput } from "@/features/notifications/channels/types";
 import db from "@/server/db";
@@ -56,7 +56,10 @@ export async function createNotification(
     .returning();
 
   if (created) {
-    return asNotificationRecord(created);
+    return {
+      created: true,
+      notification: asNotificationRecord(created),
+    };
   }
 
   if (!input.idempotencyKey) {
@@ -75,7 +78,10 @@ export async function createNotification(
     throw new Error("Notification idempotency conflict could not be resolved.");
   }
 
-  return asNotificationRecord(existing);
+  return {
+    created: false,
+    notification: asNotificationRecord(existing),
+  };
 }
 
 export async function getNotificationForRecipient({
@@ -149,7 +155,11 @@ export async function markNotificationRead({
     .update(notification)
     .set({ readAt: new Date() })
     .where(
-      and(eq(notification.id, id), eq(notification.recipientId, recipientId)),
+      and(
+        eq(notification.id, id),
+        eq(notification.recipientId, recipientId),
+        isNull(notification.readAt),
+      ),
     )
     .returning(notificationSelection);
 
@@ -164,7 +174,11 @@ export async function markNotificationUnread({
     .update(notification)
     .set({ readAt: null })
     .where(
-      and(eq(notification.id, id), eq(notification.recipientId, recipientId)),
+      and(
+        eq(notification.id, id),
+        eq(notification.recipientId, recipientId),
+        isNotNull(notification.readAt),
+      ),
     )
     .returning(notificationSelection);
 
@@ -176,7 +190,7 @@ export async function markAllNotificationsRead({
 }: {
   recipientId: string;
 }) {
-  await db
+  const rows = await db
     .update(notification)
     .set({ readAt: new Date() })
     .where(
@@ -184,5 +198,8 @@ export async function markAllNotificationsRead({
         eq(notification.recipientId, recipientId),
         isNull(notification.readAt),
       ),
-    );
+    )
+    .returning({ id: notification.id });
+
+  return rows.length;
 }

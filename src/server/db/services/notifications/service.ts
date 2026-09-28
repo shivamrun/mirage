@@ -15,7 +15,9 @@ import {
   markNotificationRead,
   markNotificationUnread,
 } from "@/server/db/dal/notifications";
+import { publish } from "@/server/db/services/notifications/realtime-broker";
 import { resolvePaginatedView } from "@/server/db/services/pagination";
+import { notificationRealtimeEventNames } from "@/shared/schemas/notifications";
 
 function optionalDateToISOString(value: Date | null) {
   return value ? value.toISOString() : null;
@@ -37,6 +39,7 @@ type NotifyResult = {
   deliveries: {
     email?: NotificationDeliveryResult["email"];
   };
+  created: boolean;
   notification: NotificationRecord | null;
 };
 
@@ -55,6 +58,7 @@ export async function notify<Type extends NotifyInput["type"]>(
     type: input.type,
   };
   const deliveries: NotifyResult["deliveries"] = {};
+  let notificationCreated = false;
   let notificationId: string | undefined;
 
   for (const channel of definition.channels) {
@@ -68,12 +72,14 @@ export async function notify<Type extends NotifyInput["type"]>(
     }
 
     if (result.notificationId) {
+      notificationCreated = Boolean(result.notificationCreated);
       notificationId = result.notificationId;
     }
   }
 
   if (!notificationId) {
     return {
+      created: false,
       deliveries,
       notification: null,
     };
@@ -92,7 +98,22 @@ export async function notify<Type extends NotifyInput["type"]>(
     throw new Error("Created notification could not be loaded.");
   }
 
+  if (notificationCreated) {
+    const unreadCount = await getUnreadNotificationCount({
+      recipientId: input.recipientId,
+    });
+
+    publish(input.recipientId, {
+      data: {
+        notification: toNotificationResponse(notification),
+        unreadCount,
+      },
+      event: notificationRealtimeEventNames.created,
+    });
+  }
+
   return {
+    created: notificationCreated,
     deliveries,
     notification,
   };
@@ -157,7 +178,12 @@ export async function markUserNotificationRead({
   id: string;
   recipientId: string;
 }) {
-  return markNotificationRead({ id, recipientId });
+  const notification = await markNotificationRead({ id, recipientId });
+  if (notification) {
+    await publishUnreadCountChanged(recipientId);
+  }
+
+  return notification;
 }
 
 export async function markUserNotificationUnread({
@@ -167,7 +193,12 @@ export async function markUserNotificationUnread({
   id: string;
   recipientId: string;
 }) {
-  return markNotificationUnread({ id, recipientId });
+  const notification = await markNotificationUnread({ id, recipientId });
+  if (notification) {
+    await publishUnreadCountChanged(recipientId);
+  }
+
+  return notification;
 }
 
 export async function markUserNotificationsRead({
@@ -175,5 +206,17 @@ export async function markUserNotificationsRead({
 }: {
   recipientId: string;
 }) {
-  await markAllNotificationsRead({ recipientId });
+  const changedCount = await markAllNotificationsRead({ recipientId });
+  if (changedCount > 0) {
+    await publishUnreadCountChanged(recipientId);
+  }
+}
+
+async function publishUnreadCountChanged(recipientId: string) {
+  publish(recipientId, {
+    data: {
+      unreadCount: await getUnreadNotificationCount({ recipientId }),
+    },
+    event: notificationRealtimeEventNames.unreadCountChanged,
+  });
 }

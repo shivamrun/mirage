@@ -79,11 +79,6 @@ export const notificationRegistry = {
     channels: ["in_app"],
     payloadSchema: notificationPayloadSchemas["security.account_alert"],
   },
-  "system.announcement": {
-    category: "system",
-    channels: ["in_app"],
-    payloadSchema: notificationPayloadSchemas["system.announcement"],
-  },
 } as const satisfies Record<string, NotificationDefinition>;
 
 const legacyNotificationTypeMap = {
@@ -96,7 +91,6 @@ const legacyNotificationTypeMap = {
   BILLING_SUBSCRIPTION_STARTED: "billing.subscription_started",
   BILLING_SUBSCRIPTION_UPDATED: "billing.subscription_updated",
   CREDITS_LOW_BALANCE: "credits.low_balance",
-  SYSTEM_ANNOUNCEMENT: "system.announcement",
 } as const satisfies Record<string, keyof typeof notificationRegistry>;
 
 export function normalizeNotificationType(type: string) {

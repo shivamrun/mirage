@@ -1,4 +1,4 @@
-import { Elysia } from "elysia";
+import { Elysia, sse } from "elysia";
 import {
   cancelPendingEmailChange,
   changeAccountEmail,
@@ -16,12 +16,14 @@ import {
   verifyAccountTwoFactorSetup,
 } from "@/server/db/services/account/two-factor";
 import { completeAdminTotpStepUp } from "@/server/db/services/auth/admin-step-up";
+import { subscribe } from "@/server/db/services/notifications/realtime-broker";
 import {
   getUnreadNotificationCount,
   listNotificationsView,
   markUserNotificationRead,
   markUserNotificationsRead,
   markUserNotificationUnread,
+  notify,
   toNotificationResponse,
 } from "@/server/db/services/notifications/service";
 import { elysiaAuth } from "@/server/http/auth";
@@ -50,7 +52,13 @@ import {
   twoFactorStartSetupResponseSchema,
   unreadNotificationCountResponseSchema,
 } from "@/shared/schemas";
+import {
+  notificationRealtimeEventNames,
+  notificationRealtimeRetryMs,
+} from "@/shared/schemas/notifications";
 import { paginationQuerySchema } from "@/shared/schemas/pagination";
+
+const notificationHeartbeatMs = 25_000;
 
 function emailChangePageURL({
   action,
@@ -74,6 +82,48 @@ function invalidEmailChangePageURL() {
 export const accountRoutes = new Elysia({ prefix: "/account" })
   .use(elysiaAuth)
   .use(requestPolicy)
+  .get(
+    "/notifications/events",
+    async function* ({ set, user }) {
+      const subscription = subscribe(user.id);
+
+      set.headers["cache-control"] = "no-cache, no-transform";
+      set.headers["x-accel-buffering"] = "no";
+
+      try {
+        const unreadCount = await getUnreadNotificationCount({
+          recipientId: user.id,
+        });
+
+        yield sse({
+          data: { unreadCount },
+          event: notificationRealtimeEventNames.connected,
+          retry: notificationRealtimeRetryMs,
+        });
+
+        while (true) {
+          const event = await waitForNotificationEventOrHeartbeat(subscription);
+
+          if (event) {
+            yield sse(event);
+          } else {
+            yield sse({
+              data: {},
+              event: notificationRealtimeEventNames.ping,
+            });
+          }
+        }
+      } finally {
+        subscription.close();
+      }
+    },
+    {
+      auth: true,
+      response: {
+        401: messageResponseSchema,
+      },
+    },
+  )
   .get(
     "/notifications",
     async ({ query, user }) => {
@@ -125,6 +175,50 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       response: {
         200: unreadNotificationCountResponseSchema,
         401: messageResponseSchema,
+      },
+    },
+  )
+  .post(
+    "/notifications/test",
+    async ({ status, user }) => {
+      if (env.NODE_ENV === "production") {
+        return status(404, { message: "Not Found" });
+      }
+
+      const now = new Date();
+      const result = await notify({
+        data: {
+          action: `Realtime notification test sent at ${now.toLocaleTimeString(
+            "en-US",
+            {
+              hour: "numeric",
+              minute: "2-digit",
+              second: "2-digit",
+            },
+          )}.`,
+        },
+        recipientId: user.id,
+        subject: {
+          id: now.toISOString(),
+          type: "notification-realtime-test",
+        },
+        type: "security.account_alert",
+      });
+
+      return {
+        notification: result.notification
+          ? toNotificationResponse(result.notification)
+          : null,
+      };
+    },
+    {
+      auth: true,
+      sameOrigin: true,
+      response: {
+        200: notificationMutationResponseSchema,
+        401: messageResponseSchema,
+        403: messageResponseSchema,
+        404: messageResponseSchema,
       },
     },
   )
@@ -619,3 +713,24 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       },
     },
   );
+
+async function waitForNotificationEventOrHeartbeat(
+  subscription: ReturnType<typeof subscribe>,
+) {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const eventPromise = subscription.next();
+  const heartbeatPromise = new Promise<null>((resolve) => {
+    timeoutId = setTimeout(() => resolve(null), notificationHeartbeatMs);
+  });
+
+  const result = await Promise.race([eventPromise, heartbeatPromise]);
+
+  if (result) {
+    if (timeoutId) clearTimeout(timeoutId);
+    return result;
+  }
+
+  subscription.cancelNext();
+  await eventPromise;
+  return null;
+}

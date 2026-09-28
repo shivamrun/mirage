@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { admin, captcha, twoFactor } from "better-auth/plugins";
 import { analytics } from "@/adapters/analytics/server";
+import { logEmailDeliveryFailure } from "@/adapters/email";
 import { authHooks } from "@/features/auth/better-auth/hooks";
 import { authStripePlugin } from "@/features/auth/better-auth/plugins/stripe";
 import { authAccessControl, authRolePermissions } from "@/features/auth/roles";
@@ -88,29 +89,39 @@ export const auth = betterAuth({
     enabled: true,
     revokeSessionsOnPasswordReset: true,
     async sendResetPassword({ url, user }) {
-      await notify({
-        data: {
-          email: user.email,
-          name: user.name,
-          resetUrl: url,
-        },
-        recipientId: user.id,
-        type: "auth.password_reset",
-      });
+      try {
+        await notify({
+          data: {
+            email: user.email,
+            name: user.name,
+            resetUrl: url,
+          },
+          recipientId: user.id,
+          type: "auth.password_reset",
+        });
+      } catch (error) {
+        logEmailDeliveryFailure("auth-password-reset", error);
+        throw error;
+      }
     },
   },
   emailVerification: {
     sendOnSignUp: true,
     async sendVerificationEmail({ url, user }) {
-      await notify({
-        data: {
-          email: user.email,
-          name: user.name,
-          verificationUrl: url,
-        },
-        recipientId: user.id,
-        type: "auth.email_verification",
-      });
+      try {
+        await notify({
+          data: {
+            email: user.email,
+            name: user.name,
+            verificationUrl: url,
+          },
+          recipientId: user.id,
+          type: "auth.email_verification",
+        });
+      } catch (error) {
+        logEmailDeliveryFailure("auth-email-verification", error);
+        throw error;
+      }
     },
   },
   hooks: authHooks,
