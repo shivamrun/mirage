@@ -1,12 +1,12 @@
 import {
   EmailLayout,
   EmailText,
-} from "@/adapters/email/components/email-layout";
+} from "@/adapters/email/components";
 import { sendEmail } from "@/adapters/email/send-email";
-import { EmailListVerificationTemplate } from "@/adapters/email/templates/email-list-verification";
-import { ResetPasswordTemplate } from "@/adapters/email/templates/reset-password";
-import { VerifyEmailTemplate } from "@/adapters/email/templates/verify-email";
-import { WelcomeEmailTemplate } from "@/adapters/email/templates/welcome-email";
+import EmailListVerificationTemplate from "@/adapters/email/templates/email-list-verification";
+import ResetPasswordTemplate from "@/adapters/email/templates/reset-password";
+import VerifyEmailTemplate from "@/adapters/email/templates/verify-email";
+import WelcomeEmailTemplate from "@/adapters/email/templates/welcome-email";
 import { env } from "@/shared/env";
 
 import type { NotificationPayloadMap } from "../../domain/types";

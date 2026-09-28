@@ -1,128 +1,81 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
+
+import {
+  Body,
+  Container,
+  Head,
+  Html,
+  Link,
+  Preview,
+  Section,
+  Tailwind,
+  Text,
+} from "react-email";
+
+import { EmailFooter } from "./email-footer";
+import { emailTailwindConfig } from "./theme";
 
 type EmailLayoutProps = {
   children: ReactNode;
   previewText: string;
   title: string;
-};
-
-type EmailButtonProps = {
-  children: ReactNode;
-  href: string;
-};
-
-type EmailTextProps = {
-  children: ReactNode;
-};
-
-const pageStyle: CSSProperties = {
-  margin: 0,
-  backgroundColor: "#14120f",
-  color: "#f7f4ef",
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  padding: "32px 16px",
-};
-
-const containerStyle: CSSProperties = {
-  margin: "0 auto",
-  maxWidth: "560px",
-};
-
-const brandStyle: CSSProperties = {
-  color: "#56d9bf",
-  fontSize: "18px",
-  fontWeight: 700,
-  letterSpacing: 0,
-  marginBottom: "18px",
-};
-
-const panelStyle: CSSProperties = {
-  backgroundColor: "#1d1a16",
-  border: "1px solid #34302a",
-  borderRadius: "8px",
-  padding: "32px",
-};
-
-const titleStyle: CSSProperties = {
-  color: "#f7f4ef",
-  fontSize: "24px",
-  fontWeight: 700,
-  letterSpacing: 0,
-  lineHeight: "32px",
-  margin: "0 0 16px",
-};
-
-const textStyle: CSSProperties = {
-  color: "#c8c0b6",
-  fontSize: "15px",
-  lineHeight: "24px",
-  margin: "0 0 16px",
-};
-
-const buttonStyle: CSSProperties = {
-  backgroundColor: "#56d9bf",
-  borderRadius: "6px",
-  color: "#101815",
-  display: "inline-block",
-  fontSize: "15px",
-  fontWeight: 700,
-  lineHeight: "20px",
-  margin: "8px 0 20px",
-  padding: "12px 18px",
-  textDecoration: "none",
-};
-
-const footerStyle: CSSProperties = {
-  color: "#8f877c",
-  fontSize: "12px",
-  lineHeight: "18px",
-  margin: "18px 0 0",
-};
-
-const hiddenPreviewStyle: CSSProperties = {
-  color: "transparent",
-  display: "none",
-  height: 0,
-  maxHeight: 0,
-  maxWidth: 0,
-  opacity: 0,
-  overflow: "hidden",
-  width: 0,
+  description?: ReactNode;
+  appUrl?: string;
 };
 
 export function EmailLayout({
   children,
   previewText,
   title,
+  description,
+  appUrl,
 }: EmailLayoutProps) {
   return (
-    <html lang="en">
-      <body style={pageStyle}>
-        <div style={hiddenPreviewStyle}>{previewText}</div>
-        <main style={containerStyle}>
-          <div style={brandStyle}>Mirage</div>
-          <section style={panelStyle}>
-            <h1 style={titleStyle}>{title}</h1>
-            {children}
-          </section>
-          <p style={footerStyle}>
-            This message was sent by Mirage. If you did not request it, you can
-            safely ignore it.
-          </p>
-        </main>
-      </body>
-    </html>
-  );
-}
+    <Tailwind config={emailTailwindConfig}>
+      <Html>
+        <Head />
 
-export function EmailText({ children }: EmailTextProps) {
-  return <p style={textStyle}>{children}</p>;
-}
+        <Body className="m-0 bg-page p-0 font-sans">
+          <Preview>{previewText}</Preview>
 
-export function EmailButton({ children, href }: EmailButtonProps) {
-  return (
-    <a href={href} style={buttonStyle}>
-      {children}
-    </a>
+          <Container className="mx-auto my-0 max-w-[600px] bg-white">
+            <Section className="bg-ink px-10 pb-11 pt-8">
+              {appUrl ? (
+                <Link
+                  href={appUrl}
+                  className="text-[16px] font-semibold leading-[24px] text-white no-underline"
+                >
+                  Mirage
+                </Link>
+              ) : (
+                <Text className="m-0 text-[16px] font-semibold leading-[24px] text-white">
+                  Mirage
+                </Text>
+              )}
+
+              <Section align="left" className="mt-6 max-w-[470px]">
+                <Text className="m-0 text-[24px] font-semibold leading-[42px] tracking-[-1.3px] text-white">
+                  {title}
+                </Text>
+
+                {description ? (
+                  <Text className="m-0 mt-1 max-w-[450px] text-[14px] leading-[24px] text-hero-muted">
+                    {description}
+                  </Text>
+                ) : null}
+              </Section>
+            </Section>
+
+            <Section className="bg-white px-10 py-10">
+              <Section align="left" className="max-w-[470px]">
+                {children}
+              </Section>
+            </Section>
+
+            <EmailFooter />
+          </Container>
+        </Body>
+      </Html>
+    </Tailwind>
   );
 }

@@ -2,7 +2,8 @@ import {
   EmailButton,
   EmailLayout,
   EmailText,
-} from "@/adapters/email/components/email-layout";
+} from "@/adapters/email/components";
+import { EmailRawLink } from "../components/email-raw-link";
 
 type VerifyEmailTemplateProps = {
   actionLabel?: string;
@@ -12,7 +13,7 @@ type VerifyEmailTemplateProps = {
   verificationUrl: string;
 };
 
-export function VerifyEmailTemplate({
+function VerifyEmailTemplate({
   actionLabel = "Verify email",
   heading = "Verify your email",
   intro = "Confirm this email address so we can keep your Mirage account secure.",
@@ -23,15 +24,32 @@ export function VerifyEmailTemplate({
     <EmailLayout
       previewText="Confirm your Mirage email address."
       title={heading}
+      description={intro}
     >
-      <EmailText>Hi {name || "there"},</EmailText>
-      <EmailText>{intro}</EmailText>
+      <EmailText className="mb-0">
+        Hi {name || "there"}, use the button below to verify your email address.
+      </EmailText>
+
       <EmailButton href={verificationUrl}>{actionLabel}</EmailButton>
-      <EmailText>
-        If the button does not work, paste this link into your browser:
+
+      <EmailText className="mb-0">
+        If the button doesn&apos;t work, copy and paste this link into your
+        browser:
         <br />
-        <a href={verificationUrl}>{verificationUrl}</a>
+        <EmailRawLink href={verificationUrl} />
       </EmailText>
     </EmailLayout>
   );
 }
+
+VerifyEmailTemplate.PreviewProps = {
+  actionLabel: "Verify email",
+  heading: "Verify your email",
+  intro:
+    "Confirm this email address so we can keep your Mirage account secure.",
+  name: "Shivam",
+  verificationUrl:
+    "https://example.com/verify-email?token=example-verification-token",
+} satisfies VerifyEmailTemplateProps;
+
+export default VerifyEmailTemplate;
