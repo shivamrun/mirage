@@ -847,6 +847,60 @@ export async function grantCreditTopUp({
   return entry;
 }
 
+export async function grantCreditTopUps(
+  topUps: {
+    amount: number;
+    idempotencyKey: string;
+    metadata?: LedgerMetadata;
+    source?: string;
+    sourceId?: null | string;
+    userId: string;
+  }[],
+) {
+  if (topUps.length === 0) {
+    return [];
+  }
+
+  for (const topUp of topUps) {
+    assertPositiveInteger(topUp.amount, "Credit top-up amount");
+  }
+
+  const entries = await db.transaction(async (tx) => {
+    const ledgerEntries = [];
+
+    for (const topUp of topUps) {
+      const result = await reconcilePeriodGrantForUser(topUp.userId, tx);
+      const topUpResult = await appendLedgerEntryWithResult(tx, {
+        amount: topUp.amount,
+        carryForwardDelta: topUp.amount,
+        idempotencyKey: topUp.idempotencyKey,
+        metadata: topUp.metadata,
+        periodEnd: result.period.periodEnd,
+        periodStart: result.period.periodStart,
+        source: topUp.source ?? "stripe_credit_top_up",
+        sourceId: topUp.sourceId,
+        type: "top_up",
+        userId: topUp.userId,
+      });
+
+      ledgerEntries.push({
+        ...topUpResult.entry,
+        created: topUpResult.created,
+      });
+    }
+
+    return ledgerEntries;
+  });
+
+  await Promise.all(
+    [...new Set(topUps.map((topUp) => topUp.userId))].map((userId) =>
+      invalidateCreditBalanceCache(userId),
+    ),
+  );
+
+  return entries;
+}
+
 export async function adjustCredits({
   amount,
   idempotencyKey,

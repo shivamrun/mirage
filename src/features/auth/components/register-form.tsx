@@ -127,6 +127,12 @@ function RegisterForm({
           {error ? (
             <AuthStatusMessage tone="error">{error}</AuthStatusMessage>
           ) : null}
+          {referralCode ? (
+            <AuthStatusMessage tone="success">
+              Referral code applied: {referralCode}. You and your referrer each
+              get 50 credits after email verification.
+            </AuthStatusMessage>
+          ) : null}
           <EmailField
             id="email"
             description="We'll use this for sign-in and account updates."
