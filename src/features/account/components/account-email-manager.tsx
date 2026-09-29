@@ -18,7 +18,6 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group";
-import { AuthStatusMessage } from "@/features/auth/components";
 import { getUnexpectedAuthErrorMessage } from "@/features/auth/components/auth-errors";
 import { api } from "@/shared/api/client";
 import {
@@ -26,15 +25,15 @@ import {
   type ChangeEmailValues,
   changeEmailSchema,
 } from "@/shared/schemas";
+import {
+  showCriticalEmailToast,
+  showEmailInfoToast,
+  showEmailSuccessToast,
+} from "@/shared/ui/email-flow-toast";
 
 type EmailManagerUser = {
   email: string;
   emailVerified: boolean;
-};
-
-type StatusMessage = {
-  text: string;
-  tone: "success" | "error" | "info";
 };
 
 type AccountEmailResponse = {
@@ -53,6 +52,19 @@ function readAccountError(error: { value?: unknown } | null) {
   return body?.message || "Something went wrong. Please try again.";
 }
 
+const DEFAULT_EMAIL_RESEND_COOLDOWN_SECONDS = 60;
+
+function formatCooldown(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+}
+
+function isRetryGuidance(message: string) {
+  return message.toLowerCase().includes("wait before");
+}
+
 function AccountEmailManager({
   emailChangeStatus,
   onSessionRefresh,
@@ -62,7 +74,6 @@ function AccountEmailManager({
   onSessionRefresh: () => Promise<void>;
   user: EmailManagerUser;
 }) {
-  const [status, setStatus] = React.useState<StatusMessage>();
   const [emailState, setEmailState] = React.useState<AccountEmailResponse>({
     email: user.email,
     emailVerified: user.emailVerified,
@@ -70,8 +81,12 @@ function AccountEmailManager({
     pendingEmailStep: null,
     pendingEmailExpiresAt: null,
   });
+  const [resendCooldownSeconds, setResendCooldownSeconds] = React.useState(0);
   const [isSendingVerification, setIsSendingVerification] =
     React.useState(false);
+  const handledEmailChangeStatusRef = React.useRef<string | undefined>(
+    undefined,
+  );
   const form = useForm<ChangeEmailInput, undefined, ChangeEmailValues>({
     resolver: zodResolver(changeEmailSchema),
     defaultValues: {
@@ -80,38 +95,53 @@ function AccountEmailManager({
   });
 
   React.useEffect(() => {
+    if (
+      !emailChangeStatus ||
+      handledEmailChangeStatusRef.current === emailChangeStatus
+    ) {
+      return;
+    }
+
+    handledEmailChangeStatusRef.current = emailChangeStatus;
+
     if (emailChangeStatus === "success") {
       onSessionRefresh().catch(() => undefined);
-      setStatus({
-        text: "Email address updated.",
-        tone: "success",
-      });
+      showEmailSuccessToast("Email address updated.");
       return;
     }
 
     if (emailChangeStatus === "pending") {
-      setStatus({
-        text: "Current email approved. Check the new email to finish the change.",
-        tone: "success",
-      });
+      showEmailSuccessToast(
+        "Current email approved. Check the new email to finish the change.",
+      );
       return;
     }
 
     if (emailChangeStatus === "expired") {
-      setStatus({
-        text: "That email change link expired. Start a new change below.",
-        tone: "error",
-      });
+      showCriticalEmailToast(
+        "That email change link expired. Start a new change below.",
+      );
       return;
     }
 
     if (emailChangeStatus === "invalid") {
-      setStatus({
-        text: "That email change link is invalid. Start a new change below.",
-        tone: "error",
-      });
+      showCriticalEmailToast(
+        "That email change link is invalid. Start a new change below.",
+      );
     }
   }, [emailChangeStatus, onSessionRefresh]);
+
+  React.useEffect(() => {
+    if (resendCooldownSeconds <= 0) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setResendCooldownSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [resendCooldownSeconds]);
 
   React.useEffect(() => {
     setEmailState((current) => ({
@@ -162,7 +192,6 @@ function AccountEmailManager({
       return;
     }
 
-    setStatus(undefined);
     setIsSendingVerification(true);
 
     try {
@@ -171,37 +200,35 @@ function AccountEmailManager({
         : await api.api.account["resend-verification"].post();
 
       if (error) {
-        setStatus({
-          text: readAccountError(error),
-          tone: "error",
-        });
+        const message = readAccountError(error);
+        if (isRetryGuidance(message)) {
+          setResendCooldownSeconds(DEFAULT_EMAIL_RESEND_COOLDOWN_SECONDS);
+          showEmailInfoToast(message);
+        } else {
+          showCriticalEmailToast(message);
+        }
         const state = await api.api.account.get().catch(() => null);
         if (state?.data) setEmailState(state.data as AccountEmailResponse);
         return;
       }
 
       setEmailState(data as AccountEmailResponse);
-      setStatus({
-        text: `Verification link has been sent to ${
+      setResendCooldownSeconds(DEFAULT_EMAIL_RESEND_COOLDOWN_SECONDS);
+      showEmailSuccessToast(
+        `Verification link has been sent to ${
           isPendingNewEmailVerification
             ? emailState.pendingEmail
             : emailState.email
         }.`,
-        tone: "success",
-      });
+      );
     } catch (reason) {
-      setStatus({
-        text: getUnexpectedAuthErrorMessage(reason),
-        tone: "error",
-      });
+      showCriticalEmailToast(getUnexpectedAuthErrorMessage(reason));
     } finally {
       setIsSendingVerification(false);
     }
   }
 
   async function onSubmit(values: ChangeEmailValues) {
-    setStatus(undefined);
-
     if (values.newEmail === emailState.email) {
       form.setError("newEmail", {
         message: "New email must be different from your current email.",
@@ -215,10 +242,7 @@ function AccountEmailManager({
       });
 
       if (error) {
-        setStatus({
-          text: readAccountError(error),
-          tone: "error",
-        });
+        showCriticalEmailToast(readAccountError(error));
         const state = await api.api.account.get().catch(() => null);
         if (state?.data) setEmailState(state.data as AccountEmailResponse);
         return;
@@ -233,18 +257,14 @@ function AccountEmailManager({
               (data as AccountEmailResponse).email)
             : (data as AccountEmailResponse).email,
       });
-      setStatus({
-        text:
-          (data as AccountEmailResponse).pendingEmailStep === "approve-current"
-            ? "Approve the request sent to your current email to change email."
-            : `Verification link has been sent to ${values.newEmail}.`,
-        tone: "success",
-      });
+      setResendCooldownSeconds(DEFAULT_EMAIL_RESEND_COOLDOWN_SECONDS);
+      showEmailSuccessToast(
+        (data as AccountEmailResponse).pendingEmailStep === "approve-current"
+          ? "Approve the request sent to your current email to change email."
+          : `Verification link has been sent to ${values.newEmail}.`,
+      );
     } catch (reason) {
-      setStatus({
-        text: getUnexpectedAuthErrorMessage(reason),
-        tone: "error",
-      });
+      showCriticalEmailToast(getUnexpectedAuthErrorMessage(reason));
     }
   }
 
@@ -268,9 +288,7 @@ function AccountEmailManager({
     ? emailState.pendingEmailStep === "approve-current"
       ? `Email change to ${emailState.pendingEmail} is pending approval from your current email.`
       : `Email change to ${emailState.pendingEmail} is pending verification. You can resend if the message does not arrive.`
-    : status && status.tone !== "error"
-      ? status.text
-      : null;
+    : null;
   const noteClassName =
     emailTone === "verified"
       ? "text-emerald-700 dark:text-emerald-300"
@@ -282,10 +300,6 @@ function AccountEmailManager({
 
   return (
     <FieldSet className="gap-3">
-      {status?.tone === "error" ? (
-        <AuthStatusMessage tone={status.tone}>{status.text}</AuthStatusMessage>
-      ) : null}
-
       <form
         className="flex flex-col gap-2"
         onSubmit={form.handleSubmit(onSubmit)}
@@ -315,13 +329,17 @@ function AccountEmailManager({
               ) : (
                 <InputGroupButton
                   className="text-amber-700 hover:bg-amber-100 hover:text-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/50 dark:hover:text-amber-200"
-                  disabled={isSendingVerification}
+                  disabled={isSendingVerification || resendCooldownSeconds > 0}
                   onClick={sendVerificationEmail}
                   type="button"
                   variant="ghost"
                 >
                   <RefreshCw data-icon="inline-start" />
-                  {isSendingVerification ? "Sending..." : "Verify email"}
+                  {isSendingVerification
+                    ? "Sending..."
+                    : resendCooldownSeconds > 0
+                      ? `Resend in ${formatCooldown(resendCooldownSeconds)}`
+                      : "Verify email"}
                 </InputGroupButton>
               )}
             </InputGroupAddon>

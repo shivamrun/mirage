@@ -5,7 +5,6 @@ import { ArrowRight } from "lucide-react";
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
-import { AuthStatusMessage } from "@/features/auth/components";
 import { EmailField } from "@/features/auth/components/auth-fields";
 import {
   captureBrowserAttribution,
@@ -17,6 +16,10 @@ import {
   type EmailSubscriptionValues,
   emailSubscriptionSchema,
 } from "@/shared/schemas";
+import {
+  showCriticalEmailToast,
+  showEmailSuccessToast,
+} from "@/shared/ui/email-flow-toast";
 
 type EmailSignupFormProps = {
   inputId?: string;
@@ -74,10 +77,6 @@ function EmailSignupForm({
 }: EmailSignupFormProps) {
   const generatedId = React.useId();
   const emailInputId = inputId ?? `${generatedId}-email`;
-  const [statusMessage, setStatusMessage] = React.useState<{
-    tone: "error" | "success";
-    message: string;
-  }>();
   const form = useForm<
     EmailSubscriptionInput,
     undefined,
@@ -93,8 +92,6 @@ function EmailSignupForm({
   });
 
   async function onSubmit(values: EmailSubscriptionValues) {
-    setStatusMessage(undefined);
-
     try {
       const result = await api.api["email-list"].post({
         ...values,
@@ -102,10 +99,7 @@ function EmailSignupForm({
       });
 
       if (result.error) {
-        setStatusMessage({
-          tone: "error",
-          message: getErrorMessage(result.error),
-        });
+        showCriticalEmailToast(getErrorMessage(result.error));
         return;
       }
 
@@ -115,17 +109,13 @@ function EmailSignupForm({
         source,
         website: "",
       });
-      setStatusMessage({
-        tone: "success",
-        message: isVerificationRequiredResponse(result.data)
+      showEmailSuccessToast(
+        isVerificationRequiredResponse(result.data)
           ? "Check your email to confirm your signup."
           : "You are on the list. We will be in touch soon.",
-      });
+      );
     } catch {
-      setStatusMessage({
-        tone: "error",
-        message: "We could not save your email. Please try again.",
-      });
+      showCriticalEmailToast("We could not save your email. Please try again.");
     }
   }
 
@@ -134,11 +124,6 @@ function EmailSignupForm({
       className="flex flex-col gap-3"
       onSubmit={form.handleSubmit(onSubmit)}
     >
-      {statusMessage ? (
-        <AuthStatusMessage tone={statusMessage.tone}>
-          {statusMessage.message}
-        </AuthStatusMessage>
-      ) : null}
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
         <EmailField
           error={form.formState.errors.email?.message}

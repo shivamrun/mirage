@@ -359,6 +359,7 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
         return status(503, {
           message: result.message,
           recovery: result.recovery,
+          retryAfterSeconds: result.retryAfterSeconds,
         });
       }
       if (result.kind === "error") {

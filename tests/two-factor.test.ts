@@ -90,6 +90,7 @@ describe("two-factor authentication", () => {
     expect(await failed.json()).toMatchObject({
       message: expect.stringContaining("previous code is no longer valid"),
       recovery: "try-delivered-code",
+      retryAfterSeconds: 60,
     });
     const replacement = await codeRecord(actor.id, "enable");
     expect(replacement).toBeDefined();

@@ -6,6 +6,12 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@marinedotsh/better-auth-referral": fileURLToPath(
+        new URL(
+          "./packages/better-auth-referral/src/index.ts",
+          import.meta.url,
+        ),
+      ),
       "server-only": fileURLToPath(
         new URL("./tests/infra/server-only.ts", import.meta.url),
       ),

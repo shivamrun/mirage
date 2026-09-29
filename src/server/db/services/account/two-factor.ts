@@ -35,6 +35,7 @@ import { siteConfig } from "@/shared/metadata";
 const EMAIL_CODE_PREFIX = "account-two-factor-email-code";
 const EMAIL_CODE_EXPIRES_IN_MS = 1000 * 60 * 10;
 const EMAIL_CODE_MAX_FAILED_ATTEMPTS = 5;
+const EMAIL_CODE_RESEND_COOLDOWN_SECONDS = 60;
 
 type TwoFactorAction = "enable" | "disable";
 
@@ -172,6 +173,7 @@ export async function sendAccountTwoFactorEmailCode({
       message:
         "We could not confirm code delivery. Your previous code is no longer valid; wait a minute and request a new code if this one does not arrive.",
       recovery: "try-delivered-code",
+      retryAfterSeconds: EMAIL_CODE_RESEND_COOLDOWN_SECONDS,
     };
   }
 

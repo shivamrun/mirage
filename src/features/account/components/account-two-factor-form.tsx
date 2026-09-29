@@ -1,6 +1,6 @@
 "use client";
 
-import { ShieldCheck, ShieldOff } from "lucide-react";
+import { RefreshCw, ShieldCheck, ShieldOff } from "lucide-react";
 import * as React from "react";
 import QRCode from "react-qr-code";
 import { HeadingBlock } from "@/components/heading-block";
@@ -16,9 +16,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
-import { AuthOtpField, AuthStatusMessage } from "@/features/auth/components";
+import { AuthOtpField } from "@/features/auth/components";
 import { getUnexpectedAuthErrorMessage } from "@/features/auth/components/auth-errors";
 import { api } from "@/shared/api/client";
+import {
+  showCriticalEmailToast,
+  showEmailInfoToast,
+  showEmailSuccessToast,
+} from "@/shared/ui/email-flow-toast";
 import { cn } from "@/shared/utils";
 
 type TwoFactorUser = {
@@ -26,12 +31,9 @@ type TwoFactorUser = {
   twoFactorEnabled?: boolean | null;
 };
 
-type StatusMessage = {
-  text: string;
-  tone: "error";
-};
-
 type TwoFactorAction = "enable" | "disable";
+
+const DEFAULT_RESEND_COOLDOWN_SECONDS = 60;
 
 type AccountTwoFactorFormProps = {
   onSessionRefresh: () => Promise<void>;
@@ -46,6 +48,31 @@ function readAccountError(error: { value?: unknown } | null) {
   return body?.message || "Something went wrong. Please try again.";
 }
 
+function readDeliveryRecovery(error: { value?: unknown } | null) {
+  return error?.value as {
+    message?: string;
+    recovery?: string;
+    retryAfterSeconds?: number;
+  } | null;
+}
+
+function formatCooldown(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+}
+
+function getRetrySeconds(value?: number) {
+  return value && value > 0
+    ? Math.ceil(value)
+    : DEFAULT_RESEND_COOLDOWN_SECONDS;
+}
+
+function isRetryGuidance(message: string) {
+  return message.toLowerCase().includes("wait before");
+}
+
 function AccountTwoFactorForm({
   onSessionRefresh,
   user,
@@ -56,7 +83,9 @@ function AccountTwoFactorForm({
   const [pendingAction, setPendingAction] = React.useState<TwoFactorAction>();
   const [codeDeliveryUnconfirmed, setCodeDeliveryUnconfirmed] =
     React.useState(false);
-  const [status, setStatus] = React.useState<StatusMessage>();
+  const [emailCodeError, setEmailCodeError] = React.useState<string>();
+  const [resendCooldownSeconds, setResendCooldownSeconds] = React.useState(0);
+  const [totpCodeError, setTotpCodeError] = React.useState<string>();
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [isSendingCode, setIsSendingCode] = React.useState(false);
   const [isContinuing, setIsContinuing] = React.useState(false);
@@ -69,13 +98,27 @@ function AccountTwoFactorForm({
     setIsEnabled(Boolean(user.twoFactorEnabled));
   }, [user.twoFactorEnabled]);
 
+  React.useEffect(() => {
+    if (resendCooldownSeconds <= 0) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setResendCooldownSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [resendCooldownSeconds]);
+
   const hasEmailCode = emailCode.replace(/\D/g, "").length === 6;
   const hasTotpCode = totpCode.replace(/\D/g, "").length === 6;
+  const isResendCoolingDown = resendCooldownSeconds > 0;
   const destructiveButtonClassName =
     "border-destructive bg-destructive text-white hover:bg-destructive/90 focus-visible:border-destructive focus-visible:ring-destructive/30 dark:text-white";
 
   async function sendEmailCode(action: TwoFactorAction) {
-    setStatus(undefined);
+    setEmailCodeError(undefined);
+    setTotpCodeError(undefined);
     setIsSendingCode(true);
 
     try {
@@ -84,24 +127,32 @@ function AccountTwoFactorForm({
       });
 
       if (error) {
-        const body = error.value as { recovery?: string } | null;
+        const body = readDeliveryRecovery(error);
+        const message = readAccountError(error);
         if (body?.recovery === "try-delivered-code") {
           setEmailCode("");
           setPendingAction(action);
           setCodeDeliveryUnconfirmed(true);
+          setResendCooldownSeconds(getRetrySeconds(body.retryAfterSeconds));
+          showCriticalEmailToast(message);
+          return;
         }
-        setStatus({ text: readAccountError(error), tone: "error" });
+        if (isRetryGuidance(message)) {
+          setResendCooldownSeconds(getRetrySeconds(body?.retryAfterSeconds));
+          showEmailInfoToast(message);
+          return;
+        }
+        showCriticalEmailToast(message);
         return;
       }
 
       setEmailCode("");
       setPendingAction(action);
       setCodeDeliveryUnconfirmed(false);
+      setResendCooldownSeconds(DEFAULT_RESEND_COOLDOWN_SECONDS);
+      showEmailSuccessToast(`Code sent to ${user.email}.`);
     } catch (reason) {
-      setStatus({
-        text: getUnexpectedAuthErrorMessage(reason),
-        tone: "error",
-      });
+      showCriticalEmailToast(getUnexpectedAuthErrorMessage(reason));
     } finally {
       setIsSendingCode(false);
     }
@@ -120,7 +171,7 @@ function AccountTwoFactorForm({
       return;
     }
 
-    setStatus(undefined);
+    setEmailCodeError(undefined);
     setIsContinuing(true);
 
     try {
@@ -130,7 +181,7 @@ function AccountTwoFactorForm({
         ].post({ code: emailCode });
 
         if (error) {
-          setStatus({ text: readAccountError(error), tone: "error" });
+          setEmailCodeError(readAccountError(error));
           return;
         }
 
@@ -144,7 +195,7 @@ function AccountTwoFactorForm({
       });
 
       if (error) {
-        setStatus({ text: readAccountError(error), tone: "error" });
+        setEmailCodeError(readAccountError(error));
         return;
       }
 
@@ -155,12 +206,9 @@ function AccountTwoFactorForm({
         Boolean((data as { twoFactorEnabled: boolean }).twoFactorEnabled),
       );
       await onSessionRefresh();
-      setStatus(undefined);
+      setEmailCodeError(undefined);
     } catch (reason) {
-      setStatus({
-        text: getUnexpectedAuthErrorMessage(reason),
-        tone: "error",
-      });
+      showCriticalEmailToast(getUnexpectedAuthErrorMessage(reason));
     } finally {
       setIsContinuing(false);
     }
@@ -173,7 +221,7 @@ function AccountTwoFactorForm({
       return;
     }
 
-    setStatus(undefined);
+    setTotpCodeError(undefined);
     setIsVerifying(true);
 
     try {
@@ -182,7 +230,7 @@ function AccountTwoFactorForm({
       ].post({ code: totpCode });
 
       if (error) {
-        setStatus({ text: readAccountError(error), tone: "error" });
+        setTotpCodeError(readAccountError(error));
         return;
       }
 
@@ -194,12 +242,9 @@ function AccountTwoFactorForm({
         Boolean((data as { twoFactorEnabled: boolean }).twoFactorEnabled),
       );
       await onSessionRefresh();
-      setStatus(undefined);
+      setTotpCodeError(undefined);
     } catch (reason) {
-      setStatus({
-        text: getUnexpectedAuthErrorMessage(reason),
-        tone: "error",
-      });
+      showCriticalEmailToast(getUnexpectedAuthErrorMessage(reason));
     } finally {
       setIsVerifying(false);
     }
@@ -230,7 +275,8 @@ function AccountTwoFactorForm({
           setDialogOpen(open);
 
           if (open) {
-            setStatus(undefined);
+            setEmailCodeError(undefined);
+            setTotpCodeError(undefined);
           }
 
           if (!open && !isSendingCode && !isContinuing && !isVerifying) {
@@ -239,7 +285,9 @@ function AccountTwoFactorForm({
             setEmailCode("");
             setTotpCode("");
             setTotpURI(undefined);
-            setStatus(undefined);
+            setEmailCodeError(undefined);
+            setResendCooldownSeconds(0);
+            setTotpCodeError(undefined);
           }
         }}
       >
@@ -290,12 +338,6 @@ function AccountTwoFactorForm({
             <AlertDialogDescription>{dialogDescription}</AlertDialogDescription>
           </AlertDialogHeader>
 
-          {status?.tone === "error" ? (
-            <AuthStatusMessage className="text-left" tone={status.tone}>
-              {status.text}
-            </AuthStatusMessage>
-          ) : null}
-
           {totpURI ? (
             <form className="flex flex-col gap-5" onSubmit={verifySetup}>
               <div className="grid place-items-center">
@@ -307,8 +349,12 @@ function AccountTwoFactorForm({
               <FieldGroup>
                 <AuthOtpField
                   id="setup-totp-code"
+                  error={totpCodeError}
                   label="Authenticator code"
-                  onChange={setTotpCode}
+                  onChange={(value) => {
+                    setTotpCode(value);
+                    setTotpCodeError(undefined);
+                  }}
                   required
                   value={totpCode}
                 />
@@ -332,27 +378,44 @@ function AccountTwoFactorForm({
               <FieldGroup>
                 <AuthOtpField
                   id="two-factor-email-code"
+                  error={emailCodeError}
                   label="Email code"
-                  onChange={setEmailCode}
+                  onChange={(value) => {
+                    setEmailCode(value);
+                    setEmailCodeError(undefined);
+                  }}
                   required
                   value={emailCode}
                 />
               </FieldGroup>
-              <AlertDialogFooter>
-                <AlertDialogCancel
-                  className="w-full sm:w-1/2"
-                  disabled={isContinuing}
-                >
+              <AlertDialogFooter className="sm:grid sm:grid-cols-3">
+                <AlertDialogCancel className="w-full" disabled={isContinuing}>
                   Cancel
                 </AlertDialogCancel>
                 <Button
+                  className="w-full"
+                  disabled={
+                    isContinuing || isSendingCode || isResendCoolingDown
+                  }
+                  onClick={() => sendEmailCode(pendingAction)}
+                  type="button"
+                  variant="outline"
+                >
+                  <RefreshCw data-icon="inline-start" />
+                  {isSendingCode
+                    ? "Sending..."
+                    : isResendCoolingDown
+                      ? `Resend in ${formatCooldown(resendCooldownSeconds)}`
+                      : "Resend code"}
+                </Button>
+                <Button
                   className={cn(
-                    "w-full sm:w-1/2",
+                    "w-full",
                     pendingAction === "disable"
                       ? destructiveButtonClassName
                       : undefined,
                   )}
-                  disabled={isContinuing || !hasEmailCode}
+                  disabled={isContinuing || isSendingCode || !hasEmailCode}
                   type="submit"
                   variant={
                     pendingAction === "disable" ? "destructive" : "default"

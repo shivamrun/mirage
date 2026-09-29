@@ -63,6 +63,7 @@ export const emailChangeApprovalRecoveryResponseSchema = z.object({
 
 export const twoFactorDeliveryRecoveryResponseSchema = z.object({
   message: z.string(),
+  retryAfterSeconds: z.number().optional(),
   recovery: z.string(),
 });
 
