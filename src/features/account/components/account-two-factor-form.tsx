@@ -3,6 +3,7 @@
 import { RefreshCw, ShieldCheck, ShieldOff } from "lucide-react";
 import * as React from "react";
 import QRCode from "react-qr-code";
+import { toast } from "sonner";
 import { HeadingBlock } from "@/components/heading-block";
 import {
   AlertDialog,
@@ -19,11 +20,7 @@ import { FieldGroup } from "@/components/ui/field";
 import { AuthOtpField } from "@/features/auth/components";
 import { getUnexpectedAuthErrorMessage } from "@/features/auth/components/auth-errors";
 import { api } from "@/shared/api/client";
-import {
-  showCriticalEmailToast,
-  showEmailInfoToast,
-  showEmailSuccessToast,
-} from "@/shared/ui/email-flow-toast";
+import { showEmailSuccessToast } from "@/shared/ui/email-flow-toast";
 import { cn } from "@/shared/utils";
 
 type TwoFactorUser = {
@@ -134,15 +131,15 @@ function AccountTwoFactorForm({
           setPendingAction(action);
           setCodeDeliveryUnconfirmed(true);
           setResendCooldownSeconds(getRetrySeconds(body.retryAfterSeconds));
-          showCriticalEmailToast(message);
+          toast(message);
           return;
         }
         if (isRetryGuidance(message)) {
           setResendCooldownSeconds(getRetrySeconds(body?.retryAfterSeconds));
-          showEmailInfoToast(message);
+          toast(message);
           return;
         }
-        showCriticalEmailToast(message);
+        toast(message);
         return;
       }
 
@@ -152,7 +149,7 @@ function AccountTwoFactorForm({
       setResendCooldownSeconds(DEFAULT_RESEND_COOLDOWN_SECONDS);
       showEmailSuccessToast(`Code sent to ${user.email}.`);
     } catch (reason) {
-      showCriticalEmailToast(getUnexpectedAuthErrorMessage(reason));
+      toast(getUnexpectedAuthErrorMessage(reason));
     } finally {
       setIsSendingCode(false);
     }
@@ -208,7 +205,7 @@ function AccountTwoFactorForm({
       await onSessionRefresh();
       setEmailCodeError(undefined);
     } catch (reason) {
-      showCriticalEmailToast(getUnexpectedAuthErrorMessage(reason));
+      setEmailCodeError(getUnexpectedAuthErrorMessage(reason));
     } finally {
       setIsContinuing(false);
     }
@@ -244,7 +241,7 @@ function AccountTwoFactorForm({
       await onSessionRefresh();
       setTotpCodeError(undefined);
     } catch (reason) {
-      showCriticalEmailToast(getUnexpectedAuthErrorMessage(reason));
+      setTotpCodeError(getUnexpectedAuthErrorMessage(reason));
     } finally {
       setIsVerifying(false);
     }
@@ -388,50 +385,55 @@ function AccountTwoFactorForm({
                   value={emailCode}
                 />
               </FieldGroup>
-              <AlertDialogFooter className="sm:grid sm:grid-cols-3">
-                <AlertDialogCancel className="w-full" disabled={isContinuing}>
-                  Cancel
-                </AlertDialogCancel>
-                <Button
-                  className="w-full"
-                  disabled={
-                    isContinuing || isSendingCode || isResendCoolingDown
-                  }
-                  onClick={() => sendEmailCode(pendingAction)}
-                  type="button"
-                  variant="outline"
-                >
-                  <RefreshCw data-icon="inline-start" />
-                  {isSendingCode
-                    ? "Sending..."
-                    : isResendCoolingDown
-                      ? `Resend in ${formatCooldown(resendCooldownSeconds)}`
-                      : "Resend code"}
-                </Button>
-                <Button
-                  className={cn(
-                    "w-full",
-                    pendingAction === "disable"
-                      ? destructiveButtonClassName
-                      : undefined,
-                  )}
-                  disabled={isContinuing || isSendingCode || !hasEmailCode}
-                  type="submit"
-                  variant={
-                    pendingAction === "disable" ? "destructive" : "default"
-                  }
-                >
-                  {pendingAction === "disable" ? (
-                    <ShieldOff data-icon="inline-start" />
-                  ) : (
-                    <ShieldCheck data-icon="inline-start" />
-                  )}
-                  {isContinuing
-                    ? "Checking..."
-                    : pendingAction === "disable"
-                      ? "Disable authenticator"
-                      : "Continue setup"}
-                </Button>
+              <AlertDialogFooter className="flex-col gap-3 sm:flex-col sm:items-stretch sm:justify-start">
+                <p className="text-muted-foreground text-sm">
+                  {isResendCoolingDown
+                    ? `You can request another code in ${formatCooldown(
+                        resendCooldownSeconds,
+                      )}.`
+                    : "You can request another code now."}
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <AlertDialogCancel className="w-full" disabled={isContinuing}>
+                    Cancel
+                  </AlertDialogCancel>
+                  <Button
+                    className="w-full"
+                    disabled={
+                      isContinuing || isSendingCode || isResendCoolingDown
+                    }
+                    onClick={() => sendEmailCode(pendingAction)}
+                    type="button"
+                    variant="outline"
+                  >
+                    <RefreshCw data-icon="inline-start" />
+                    {isSendingCode ? "Sending..." : "Resend code"}
+                  </Button>
+                  <Button
+                    className={cn(
+                      "w-full sm:col-span-2",
+                      pendingAction === "disable"
+                        ? destructiveButtonClassName
+                        : undefined,
+                    )}
+                    disabled={isContinuing || isSendingCode || !hasEmailCode}
+                    type="submit"
+                    variant={
+                      pendingAction === "disable" ? "destructive" : "default"
+                    }
+                  >
+                    {pendingAction === "disable" ? (
+                      <ShieldOff data-icon="inline-start" />
+                    ) : (
+                      <ShieldCheck data-icon="inline-start" />
+                    )}
+                    {isContinuing
+                      ? "Checking..."
+                      : pendingAction === "disable"
+                        ? "Disable authenticator"
+                        : "Continue setup"}
+                  </Button>
+                </div>
               </AlertDialogFooter>
             </form>
           ) : (
