@@ -3,5 +3,6 @@ export * from "./auth-schema";
 export * from "./contact-submission";
 export * from "./credits";
 export * from "./email-list";
+export * from "./invitations";
 export * from "./notifications";
 export * from "./rate-limit";

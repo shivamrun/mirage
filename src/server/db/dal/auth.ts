@@ -1,7 +1,7 @@
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { eq } from "drizzle-orm";
 
-import db from "@/server/db";
+import db, { type DBClient } from "@/server/db";
 import * as schema from "@/server/db/schema";
 import { user as userTable } from "@/server/db/schema";
 
@@ -14,11 +14,24 @@ export function createAuthDatabaseAdapter() {
   });
 }
 
-export async function getAuthUserById(id: string) {
-  const [user] = await db
+export async function getAuthUserById(id: string, executor: DBClient = db) {
+  const [user] = await executor
     .select()
     .from(userTable)
     .where(eq(userTable.id, id))
+    .limit(1);
+
+  return user ?? null;
+}
+
+export async function getAuthUserByEmail(
+  email: string,
+  executor: DBClient = db,
+) {
+  const [user] = await executor
+    .select()
+    .from(userTable)
+    .where(eq(userTable.email, email))
     .limit(1);
 
   return user ?? null;

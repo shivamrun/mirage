@@ -183,6 +183,13 @@
       "when": 1790659856792,
       "tag": "0025_little_sprite",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790703536850,
+      "tag": "0026_tough_penance",
+      "breakpoints": true
     }
   ]
 }
