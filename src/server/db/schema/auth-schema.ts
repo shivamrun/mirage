@@ -1,5 +1,12 @@
 import { relations } from "drizzle-orm";
-import { boolean, index, integer, pgTable, text } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+} from "drizzle-orm/pg-core";
 
 import {
   auditTimestamps,
@@ -161,12 +168,101 @@ export const subscription = pgTable(
   ],
 );
 
+export const referralCode = pgTable(
+  "referralCode",
+  {
+    id: text("id").primaryKey(),
+
+    userId: text("user_id")
+      .notNull()
+      .unique()
+      .references(() => user.id, {
+        onDelete: "cascade",
+      }),
+
+    code: text("code").notNull().unique(),
+
+    createdAt: requiredTimestamp("created_at").defaultNow(),
+  },
+  (table) => [
+    index("referralCode_userId_idx").on(table.userId),
+    index("referralCode_code_idx").on(table.code),
+  ],
+);
+
+export const referrals = pgTable(
+  "referrals",
+  {
+    id: text("id").primaryKey(),
+
+    referrerUserId: text("referrer_user_id")
+      .notNull()
+      .references(() => user.id, {
+        onDelete: "cascade",
+      }),
+
+    referredUserId: text("referred_user_id")
+      .notNull()
+      .unique()
+      .references(() => user.id, {
+        onDelete: "cascade",
+      }),
+
+    referralCodeId: text("referral_code_id")
+      .notNull()
+      .references(() => referralCode.id, {
+        onDelete: "cascade",
+      }),
+
+    status: text("status", { enum: ["pending", "completed"] })
+      .default("completed")
+      .notNull(),
+
+    completedAt: eventTimestamp("completed_at"),
+
+    createdAt: requiredTimestamp("created_at").defaultNow(),
+  },
+  (table) => [
+    index("referrals_referrerUserId_idx").on(table.referrerUserId),
+    index("referrals_referredUserId_idx").on(table.referredUserId),
+    index("referrals_referralCodeId_idx").on(table.referralCodeId),
+    index("referrals_status_idx").on(table.status),
+    index("referrals_createdAt_idx").on(table.createdAt),
+  ],
+);
+
+export const referralStepCompletion = pgTable(
+  "referralStepCompletion",
+  {
+    id: text("id").primaryKey(),
+
+    referralId: text("referral_id")
+      .notNull()
+      .references(() => referrals.id, {
+        onDelete: "cascade",
+      }),
+
+    step: text("step").notNull(),
+    completionKey: text("completion_key").notNull().unique(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+
+    completedAt: requiredTimestamp("completed_at").defaultNow(),
+  },
+  (table) => [
+    index("referralStepCompletion_referralId_idx").on(table.referralId),
+    index("referralStepCompletion_completionKey_idx").on(table.completionKey),
+  ],
+);
+
 // RELATIONS
 
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
   twoFactors: many(twoFactor),
+  referralCodes: many(referralCode),
+  referralsMade: many(referrals, { relationName: "referrerUser" }),
+  referralsReceived: many(referrals, { relationName: "referredUser" }),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -189,3 +285,42 @@ export const twoFactorRelations = relations(twoFactor, ({ one }) => ({
     references: [user.id],
   }),
 }));
+
+export const referralCodeRelations = relations(
+  referralCode,
+  ({ many, one }) => ({
+    referrals: many(referrals),
+    user: one(user, {
+      fields: [referralCode.userId],
+      references: [user.id],
+    }),
+  }),
+);
+
+export const referralsRelations = relations(referrals, ({ many, one }) => ({
+  referralCode: one(referralCode, {
+    fields: [referrals.referralCodeId],
+    references: [referralCode.id],
+  }),
+  referredUser: one(user, {
+    fields: [referrals.referredUserId],
+    references: [user.id],
+    relationName: "referredUser",
+  }),
+  referrerUser: one(user, {
+    fields: [referrals.referrerUserId],
+    references: [user.id],
+    relationName: "referrerUser",
+  }),
+  stepCompletions: many(referralStepCompletion),
+}));
+
+export const referralStepCompletionRelations = relations(
+  referralStepCompletion,
+  ({ one }) => ({
+    referral: one(referrals, {
+      fields: [referralStepCompletion.referralId],
+      references: [referrals.id],
+    }),
+  }),
+);

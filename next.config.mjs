@@ -2,7 +2,10 @@ import { createMDX } from "fumadocs-mdx/next";
 
 /** @type {import("next").NextConfig} */
 const nextConfig = {
-  transpilePackages: ["@marinedotsh/upload-sdk"],
+  transpilePackages: [
+    "@marinedotsh/upload-sdk",
+    "@marinedotsh/better-auth-referral",
+  ],
 };
 
 const withMDX = createMDX({

@@ -30,6 +30,7 @@
     "@elysia/eden": "^1.4.10",
     "@hookform/resolvers": "^5.6.0",
     "@marinedotsh/upload-sdk": "workspace:*",
+    "@marinedotsh/better-auth-referral": "workspace:*",
     "@marsidev/react-turnstile": "^1.6.1",
     "@react-email/render": "^2.1.0",
     "@shadcn/react": "^0.3.1",

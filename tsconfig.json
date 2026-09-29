@@ -20,6 +20,9 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
+      "@marinedotsh/better-auth-referral": [
+        "./packages/better-auth-referral/src/index.ts"
+      ],
       "collections/*": ["./.source/*"]
     }
   },

@@ -176,6 +176,13 @@
       "when": 1790503048692,
       "tag": "0024_magical_tomorrow_man",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790659856792,
+      "tag": "0025_little_sprite",
+      "breakpoints": true
     }
   ]
 }

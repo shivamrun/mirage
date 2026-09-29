@@ -1,3 +1,4 @@
+import { betterAuthReferral } from "@marinedotsh/better-auth-referral";
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { admin, captcha, twoFactor } from "better-auth/plugins";
@@ -134,6 +135,9 @@ export const auth = betterAuth({
     }),
     twoFactor({
       issuer: siteConfig.name,
+    }),
+    betterAuthReferral({
+      maskReferredUserEmail: true,
     }),
     ...authCaptchaPlugins,
     nextCookies(),
