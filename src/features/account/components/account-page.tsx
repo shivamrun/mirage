@@ -199,4 +199,4 @@ function AccountSecurityPage({
   );
 }
 
-export { AccountProfilePage, AccountSecurityPage };
+export { AccountPageShell, AccountProfilePage, AccountSecurityPage };

@@ -37,9 +37,11 @@ import {
 function RegisterForm({
   redirectTo = "/account",
   googleAuthEnabled = false,
+  referralCode,
 }: {
   redirectTo?: string;
   googleAuthEnabled?: boolean;
+  referralCode?: string;
 }) {
   const router = useRouter();
   const [error, setError] = React.useState<string>();
@@ -71,6 +73,7 @@ function RegisterForm({
         fetchOptions: {
           headers: {
             "x-captcha-response": turnstileToken,
+            ...(referralCode ? { "x-referral-code": referralCode } : {}),
           },
         },
       });
@@ -213,6 +216,7 @@ function RegisterForm({
             <GoogleAuthButton
               redirectTo={redirectTo}
               onBeforeSignIn={validateSocialAuthConsent}
+              referralCode={referralCode}
             />
           </>
         ) : null}

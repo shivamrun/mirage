@@ -124,6 +124,18 @@ export const auth = betterAuth({
         throw error;
       }
     },
+    async afterEmailVerification(user) {
+      try {
+        await auth.api.markReferralStepComplete({
+          body: {
+            referredUserId: user.id,
+            step: "email_verified",
+          },
+        });
+      } catch {
+        // Not every verified user was referred.
+      }
+    },
   },
   hooks: authHooks,
   database: createAuthDatabaseAdapter(),
@@ -137,7 +149,24 @@ export const auth = betterAuth({
       issuer: siteConfig.name,
     }),
     betterAuthReferral({
+      steps: ["email_verified"],
       maskReferredUserEmail: true,
+      async afterSuccessfulSignUp(_referrerUser, referredUser) {
+        if (!referredUser.emailVerified) {
+          return;
+        }
+
+        try {
+          await auth.api.markReferralStepComplete({
+            body: {
+              referredUserId: referredUser.id,
+              step: "email_verified",
+            },
+          });
+        } catch {
+          // Best-effort completion for trusted OAuth signups.
+        }
+      },
     }),
     ...authCaptchaPlugins,
     nextCookies(),

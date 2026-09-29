@@ -12,6 +12,7 @@ export const metadata = getPageMetadata("Create Account", {
 type RegisterPageProps = {
   searchParams: Promise<{
     callbackURL?: string;
+    ref?: string;
   }>;
 };
 
@@ -36,7 +37,7 @@ const features = [
 export default async function RegisterPage({
   searchParams,
 }: RegisterPageProps) {
-  const { callbackURL } = await searchParams;
+  const { callbackURL, ref } = await searchParams;
 
   return (
     <main className="relative grid min-h-screen lg:grid-cols-2">
@@ -57,6 +58,7 @@ export default async function RegisterPage({
         <RegisterForm
           redirectTo={getSafeAuthRedirect(callbackURL)}
           googleAuthEnabled={isGoogleAuthConfigured}
+          referralCode={ref}
         />
       </section>
 

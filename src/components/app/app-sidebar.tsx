@@ -79,6 +79,10 @@ const userData = {
           title: "Security",
           url: "/account/security",
         },
+        {
+          title: "Referrals",
+          url: "/account/referrals",
+        },
       ],
     },
   ],

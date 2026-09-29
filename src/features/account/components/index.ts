@@ -8,5 +8,6 @@ export { AccountImpersonationNotice } from "./account-impersonation-notice";
 export { AccountProfilePage, AccountSecurityPage } from "./account-page";
 export { AccountPasswordForm } from "./account-password-form";
 export { AccountProfileForm } from "./account-profile-form";
+export { AccountReferralsPage } from "./account-referrals-page";
 export { AccountSection, AccountSectionStack } from "./account-section";
 export { AccountTwoFactorForm } from "./account-two-factor-form";
