@@ -14,6 +14,7 @@ type AdminUserDetailHeaderProps = {
   activeSection: AdminUserDetailSection;
   hasActiveBan: boolean;
   isBanned: boolean;
+  referralsLength: number;
   sessionsLength: number;
   user: AdminUserDetailUser;
 };
@@ -23,6 +24,7 @@ export function AdminUserDetailHeader({
   activeSection,
   hasActiveBan,
   isBanned,
+  referralsLength,
   sessionsLength,
   user,
 }: AdminUserDetailHeaderProps) {
@@ -137,6 +139,15 @@ export function AdminUserDetailHeader({
                     href={`${detailPath}/ledger`}
                   >
                     [ ledger ]
+                  </Link>
+                  <Link
+                    aria-current={
+                      activeSection === "referrals" ? "page" : undefined
+                    }
+                    className={navLinkClass("referrals")}
+                    href={`${detailPath}/referrals`}
+                  >
+                    [ referrals: {referralsLength} ]
                   </Link>
                 </nav>
               </div>

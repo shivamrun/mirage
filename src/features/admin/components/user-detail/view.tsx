@@ -1,5 +1,6 @@
 import type {
   AdminUserDetailCreditLedgerEntry,
+  AdminUserDetailReferralsView,
   AdminUserDetailViewModel,
 } from "@/server/db/services/admin/user-detail";
 import type { PaginationMeta } from "@/shared/pagination";
@@ -7,6 +8,7 @@ import { isFutureDate } from "../shared/formatters";
 import {
   AdminUserAccountsTab,
   AdminUserCreditLedgerTab,
+  AdminUserReferralsTab,
   AdminUserSessionsTab,
 } from "./activity-tabs";
 import { AdminUserDetailHeader } from "./header";
@@ -16,12 +18,14 @@ export type AdminUserDetailSection =
   | "accounts"
   | "ledger"
   | "overview"
+  | "referrals"
   | "sessions";
 
 export function AdminUserDetailView({
   currentUserId,
   detail,
   ledger,
+  referrals,
   section = "overview",
 }: {
   currentUserId: string;
@@ -30,9 +34,10 @@ export function AdminUserDetailView({
     entries: AdminUserDetailCreditLedgerEntry[];
     pagination: PaginationMeta;
   };
+  referrals?: AdminUserDetailReferralsView;
   section?: AdminUserDetailSection;
 }) {
-  const { accounts, creditBalance, sessions, user } = detail;
+  const { accounts, creditBalance, referralSummary, sessions, user } = detail;
   const now = new Date();
   const isBanned = Boolean(user.banned);
   const hasActiveBan = Boolean(
@@ -46,6 +51,7 @@ export function AdminUserDetailView({
         activeSection={section}
         hasActiveBan={hasActiveBan}
         isBanned={isBanned}
+        referralsLength={referralSummary.totalReferred}
         sessionsLength={sessions.length}
         user={user}
       />
@@ -79,6 +85,10 @@ export function AdminUserDetailView({
             pagination={ledger.pagination}
             userId={user.id}
           />
+        ) : null}
+
+        {section === "referrals" && referrals ? (
+          <AdminUserReferralsTab referrals={referrals} userId={user.id} />
         ) : null}
       </div>
     </div>
