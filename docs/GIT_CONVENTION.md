@@ -1,75 +1,82 @@
-    # Git Convention
+# Git Convention
 
-    Use only when creating commits, suggesting commit messages, reviewing commit readiness, or preparing PR notes.
+Use only for commits, commit-message suggestions, commit readiness, or PR notes.
 
-    ## Format
+## Commit Format
 
-    `<type>(<scope>): <summary>` — scope is required.
+`<type>(<scope>): <summary>`
 
-    ```txt
-    feat(sdk): add client factory
-    fix(auth): handle expired sessions
-    docs(repo): document git convention
-    ```
+Scope is required.
 
-    ## Types
+Examples:
 
-    Smallest accurate type: `feat` new feature/API · `fix` bug fix · `docs` docs-only · `test` tests-only · `refactor` no behavior change · `chore` maintenance/config/tooling · `build` build system/bundling · `ci` CI/CD.
+```txt
+feat(sdk): add client factory
+fix(auth): handle expired sessions
+docs(repo): document git convention
+```
 
-    ## Scope
+### Types
 
-    Smallest clear package/app/feature/area affected. No fixed scope list unless the repo defines one. For repo-wide changes, use a broad but clear scope (e.g. `repo`, `config`).
-    Avoid vague scopes like `stuff`, `things`.
+- `feat` — new feature/API
+- `fix` — bug fix
+- `docs` — documentation only
+- `test` — tests only
+- `refactor` — no behavior change
+- `chore` — maintenance/config/tooling
+- `build` — build/bundling
+- `ci` — CI/CD
 
-    ## Summary
+Use the smallest accurate type.
 
-    Short, imperative, present tense, no trailing period, describes the actual change, one logical change only.
-    Bad: `update stuff`, `fix bug`, `changes`, `final`, `feat(sdk): added a lot of things.`
+### Scope
 
-    ## Commit Size
+Use the smallest clear package, app, feature, or area affected.
 
-    One logical change per commit. Don't mix: feature + refactor, formatting + behavior change, docs + unrelated code, dependency changes + unrelated feature work. Multiple files are fine if they belong to the same logical change.
+For repo-wide changes, use a clear broad scope such as `repo` or `config`.
 
-    ## Breaking Changes
+### Summary
 
-    Add `!` after the scope:
+- imperative, present tense
+- concise and specific
+- no trailing period
+- describe one logical change
 
-    ```txt
-    feat(sdk)!: rename client factory
-    ```
+Avoid vague messages such as `update stuff`, `fix bug`, `changes`, or `final`.
 
-    Add a body with migration impact:
+## Commit Rules
 
-    ```txt
-    BREAKING CHANGE: `createClient` was renamed to `createBelaClient`.
-    ```
+- One logical change per commit.
+- Multiple files are fine when part of the same change.
+- Inspect the diff before choosing the message.
+- Do not include unrelated changes.
+- Do not commit generated files unless explicitly requested.
+- Never claim a commit was created unless the git command actually ran.
 
-    ## Body
+## Breaking Changes
 
-    Optional — use when the subject alone isn't enough: public API changes, migration impact, non-obvious reasons, important tradeoffs.
+Add `!` after the scope:
 
-    ## AI Agent Rules
+```txt
+feat(sdk)!: rename client factory
+```
 
-    1. Inspect the diff first.
-    2. Pick the smallest accurate type and scope.
-    3. Suggest one clean commit message.
-    4. Don't include unrelated changes.
-    5. Don't commit generated files unless explicitly requested.
-    6. Never claim a commit was created unless the git command actually ran.
+Use a commit body when migration impact or important context is not obvious:
 
-    ## PR Notes
+```txt
+BREAKING CHANGE: `createClient` was renamed to `createBelaClient`.
+```
 
-    ```md
-    ## Summary
+## PR Notes
 
-    - What changed
-    - Why it changed
+```md
+## Summary
+- What changed
+- Why it changed
 
-    ## Verification
+## Verification
+- Commands run
 
-    - Commands run
-
-    ## Notes
-
-    - API changes, risks, or follow-ups
-    ```
+## Notes
+- API changes, risks, or follow-ups
+```

@@ -1,65 +1,77 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
+## Work Efficiently
 
-This is a Next.js app using the App Router. Application routes and global styles live in `src/app`, with backend route handlers grouped under `src/app/(backend)/api`. Product UI domains live in `src/features`, shared API schemas live in `src/shared/schemas`, and cross-feature utilities live in `src/shared`. Elysia routes live in `src/server/routes`; database schema, DAL, and server services live in `src/server/db`; HTTP helpers live in `src/server/http`; technical adapters such as email, operations, and rate limiting live under `src/adapters`. Static assets are kept in `public`.
+- Inspect only files relevant to the current task.
+- Prefer targeted search over broad repository exploration.
+- Follow imports/dependencies only when required.
+- Prefer patterns from the nearest equivalent feature.
+- Do not re-read unchanged files unnecessarily.
+- Make the smallest correct change.
+- Do not perform unrelated refactors or cleanup.
+- Run focused tests/checks instead of broad suites.
+- Keep final summaries concise.
 
-Tests live in the top-level `tests` directory. Keep integration helpers there, and colocate narrowly focused unit tests near the code they cover when that makes ownership clearer.
+## Architecture
 
-## Build, Test, and Development Commands
+Next.js App Router + Elysia + Drizzle + pnpm workspace.
 
-- `pnpm dev`: start the local Next.js development server.
-- `pnpm build`: create a production build and run Next.js type validation.
-- `pnpm start`: run the built production app.
-- `pnpm lint`: run Biome checks for formatting, lint rules, and import organization.
-- `pnpm format`: apply Biome formatting.
-- `pnpm db:up`: start local Postgres and Redis via Docker Compose.
-- `pnpm db:down`: stop local infrastructure and remove local volumes.
-- `pnpm db:generate`: generate Drizzle migrations from schema changes.
-- `pnpm db:migrate`: apply Drizzle migrations.
-- `pnpm db:studio`: open Drizzle Studio.
+- `src/app` — pages, layouts, Next.js route entrypoints
+- `src/components` — shared UI
+- `src/features` — feature-specific UI/domain code
+- `src/shared` — shared utilities and schemas
+- `src/server/routes` — Elysia routes
+- `src/server/db/dal` — database access
+- `src/server/db/services` — business logic
+- `src/server/db/schema` — Drizzle schemas
+- `src/adapters` — infrastructure/integrations
+- `packages` — workspace packages
+- `tests` — integration/cross-cutting tests
 
-## Editing Guardrails
+Prefer:
 
-Never modify ignored or generated output directly. This includes `node_modules`,
-`dist`, `.next`, and any file or directory covered by `.gitignore`.
+`UI → route → service → DAL → database`
 
-Never edit migration files directly. For database changes, update the Drizzle
-schema first, then generate a new migration with `pnpm db:generate`.
+Do not bypass existing service/DAL layers.
 
-For billing architecture, Stripe webhook routing, subscription checkout, or
-Better Auth Stripe optimizations, consult the Better Auth Stripe plugin docs
-first: https://better-auth.com/docs/plugins/stripe.md. Prefer the documented
-Better Auth plugin flow over inventing parallel webhook endpoints or custom
-subscription plumbing.
+## Editing Rules
 
-## Coding Style & Naming Conventions
+- Never edit generated or ignored files.
+- Never manually edit generated Drizzle migrations.
+- For DB changes, update the schema then use `pnpm db:generate`.
+- Do not modify lockfiles unless dependencies change.
+- Prefer `@/...` imports over deep relative imports.
+- Use nearby code as the primary style reference.
+- UI text links should use `.link-text` from `src/app/globals.css`.
 
-Use TypeScript with strict mode. Biome is the source of truth for formatting: 2-space indentation, semicolons, organized imports, and recommended React/Next rules. Prefer path aliases like `@/shared/env` over deep relative imports when practical.
+## Validation
 
-Use PascalCase for React components, camelCase for functions and variables, and lowercase route filenames following Next conventions. Keep feature-specific UI code under `src/features`, API routes under `src/server/routes`, and server-side DAL/services under `src/server/db`.
-
-Text links in the UI should use the shared `.link-text` class from `src/app/globals.css`. Add only local utility modifiers when a link needs a different size or emphasis.
-
-## Testing Guidelines
-
-Vitest is configured for tests. For most changes, validate with:
+Run the narrowest relevant validation.
 
 ```bash
 pnpm lint
-pnpm build
 ```
 
-DO NOT RUN `pnpm build` temporarily ask the user to run it in the terminal, cuzz of some issues.
+Run focused Vitest tests when behavior changes.
 
-For future tests, prefer Vitest for unit tests and Playwright for browser flows. Name tests after the behavior under review, for example `auth-session.test.ts` or `api-health.spec.ts`.
+**Do not run `pnpm build`.** Ask the user to run it when build validation is required.
 
-## Commit & Pull Request Guidelines
+## Documentation
 
-Follow the repository commit rules in [docs/GIT_CONVENTION.md](docs/GIT_CONVENTION.md) for all commit messages. Check that guide before creating commits, especially for type/scope format and examples.
+Read docs only when relevant to the task.
 
-Pull requests should include a short summary, validation commands run, linked issue when available, and screenshots for UI changes.
+- architecture → `docs/ARCHITECTURE.md`
+- pagination → `docs/PAGINATION.md`
+- notifications → `docs/notifications.md`
+- adapters → `docs/adapters/*`
+- commits → `docs/GIT_CONVENTION.md`
 
-## Security & Configuration Tips
+For Stripe/Better Auth billing changes, consult:
 
-Keep `.env` files local. Required runtime values include `DATABASE_URL`, `NEXT_PUBLIC_BASE_URL`, `BETTER_AUTH_URL`, and a strong `BETTER_AUTH_SECRET` of at least 32 characters. Do not hardcode production URLs or secrets in source files.
+`https://better-auth.com/docs/plugins/stripe.md`
+
+## Security
+
+- Never expose or commit secrets.
+- Keep `.env` files local.
+- Never hardcode production credentials or URLs.
