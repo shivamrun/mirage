@@ -41,6 +41,13 @@ const routePolicies: Record<RateLimitPolicyName, RoutePolicyDefinition> = {
     trustedClientLimit: 80,
     windowMs: ROUTE_WINDOW_MS,
   },
+  "admin-invitation-mutation": {
+    limit: 40,
+    message: "Too many admin invitation requests. Please try again later.",
+    scope: "route:admin:invitation-mutation",
+    trustedClientLimit: 80,
+    windowMs: ROUTE_WINDOW_MS,
+  },
   "admin-security-mutation": {
     limit: 40,
     message: "Too many admin security requests. Please try again later.",

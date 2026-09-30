@@ -4,7 +4,12 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import db from "@/server/db";
-import { contactSubmission, emailList, verification } from "@/server/db/schema";
+import {
+  contactSubmission,
+  emailList,
+  invitation,
+  verification,
+} from "@/server/db/schema";
 import {
   resetNotificationRealtimeBrokerForTests,
   subscribe,
@@ -102,6 +107,7 @@ const mutationRoutes = [
     path: "/api/admin/users/:userId/credits/adjust",
     access: "admin",
   },
+  { method: "POST", path: "/api/admin/invitations", access: "admin" },
   { method: "POST", path: "/api/admin/email-list", access: "admin" },
   { method: "PATCH", path: "/api/admin/email-list/:key", access: "admin" },
   {
@@ -207,6 +213,12 @@ function requestBody(path: string) {
   if (path === "/api/admin/users/:userId/credits/adjust") {
     return JSON.stringify({ amount: 1, reason: "Phase zero adjustment" });
   }
+  if (path === "/api/admin/invitations") {
+    return JSON.stringify({
+      email: `phase-zero-invite-${randomUUID()}@example.com`,
+      role: "user",
+    });
+  }
   return "{}";
 }
 
@@ -239,6 +251,7 @@ describe("current Elysia HTTP contract", () => {
       "GET /api/credits/balance",
       "GET /api/email-list/verify",
       "GET /api/admin/",
+      "GET /api/admin/invitations",
       ...mutationRoutes.map(({ method, path }) => `${method} ${path}`),
     ].sort();
     expect(
@@ -254,8 +267,8 @@ describe("current Elysia HTTP contract", () => {
     );
   });
 
-  it("guards all 30 mutations with the current origin response", async () => {
-    expect(mutationRoutes).toHaveLength(30);
+  it("guards all 31 mutations with the current origin response", async () => {
+    expect(mutationRoutes).toHaveLength(31);
     const user = await createTestActor();
     const admin = await createTestActor({ role: "admin", emailVerified: true });
     const sentBefore = testEmailOutbox.length;
@@ -281,6 +294,7 @@ describe("current Elysia HTTP contract", () => {
 
     expect(await db.select().from(contactSubmission)).toHaveLength(0);
     expect(await db.select().from(emailList)).toHaveLength(0);
+    expect(await db.select().from(invitation)).toHaveLength(0);
     expect(await db.select().from(verification)).toHaveLength(0);
     expect(testEmailOutbox).toHaveLength(sentBefore);
   });
@@ -416,6 +430,7 @@ describe("current Elysia HTTP contract", () => {
       });
     }
     expect(await db.select().from(emailList)).toHaveLength(0);
+    expect(await db.select().from(invitation)).toHaveLength(0);
     expect(testEmailOutbox).toHaveLength(sentBefore);
   });
 
