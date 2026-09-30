@@ -2,6 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import db from "@/server/db";
 import { getAdminUserDetail } from "@/server/db/dal/admin-user-detail";
+import { findAcceptedInvitationForUser } from "@/server/db/dal/invitations";
 import { paginateList, totalCount } from "@/server/db/helpers/paginate";
 import {
   creditLedgerEntries,
@@ -23,13 +24,16 @@ export async function getAdminUserDetailView(userId: string) {
     return null;
   }
 
-  const [creditBalance, referralSummary] = await Promise.all([
-    getCreditBalance(userId),
-    getAdminUserReferralSummaryView(userId),
-  ]);
+  const [creditBalance, referralSummary, acceptedInvitation] =
+    await Promise.all([
+      getCreditBalance(userId),
+      getAdminUserReferralSummaryView(userId),
+      findAcceptedInvitationForUser(userId),
+    ]);
 
   return {
     accounts: detail.accounts,
+    acceptedInvitation,
     creditBalance,
     referralSummary,
     sessions: detail.sessions,
@@ -180,6 +184,8 @@ export type AdminUserDetailViewModel = NonNullable<
   Awaited<ReturnType<typeof getAdminUserDetailView>>
 >;
 export type AdminUserDetailUser = AdminUserDetailViewModel["user"];
+export type AdminUserDetailAcceptedInvitation =
+  AdminUserDetailViewModel["acceptedInvitation"];
 export type AdminUserDetailCreditBalance =
   AdminUserDetailViewModel["creditBalance"];
 export type AdminUserDetailCreditLedgerEntry = Awaited<

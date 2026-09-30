@@ -14,11 +14,14 @@ import {
   claimPendingInvitationForUser,
   createInvitationRecord,
   findActivePendingInvitationByEmail,
+  findInvitationById,
   findInvitationByTokenHash,
   findInvitationByTokenHashForUpdate,
   type InvitationRecord,
   markInvitationRevoked,
+  revokeActivePendingInvitation,
   revokeSessionsForUser,
+  rotateActivePendingInvitationToken,
   setUserRole,
 } from "@/server/db/dal/invitations";
 import { notify } from "@/server/db/services/notifications/service";
@@ -53,6 +56,30 @@ type CreateAndSendInvitationResult =
   | {
       invitation: InvitationRecord;
       status: "email-delivery-failed";
+    };
+
+export type InvitationMutationResult =
+  | {
+      invitation: InvitationRecord;
+      status: "success";
+    }
+  | {
+      status: "not-found" | "not-pending";
+    };
+
+export type InvitationResendResult =
+  | {
+      invitation: InvitationRecord;
+      status: "success";
+      token: string;
+    }
+  | {
+      invitation: InvitationRecord;
+      status: "email-delivery-failed";
+      token: string;
+    }
+  | {
+      status: "not-found" | "not-pending";
     };
 
 type InvitationSignupResult =
@@ -229,6 +256,122 @@ export async function createInvitationAndSendEmail({
       status: "email-delivery-failed",
     };
   }
+}
+
+function isEffectivelyPending(invitation: InvitationRecord, now = new Date()) {
+  return getEffectiveInvitationStatus(invitation, now) === "pending";
+}
+
+async function sendInvitationEmail({
+  invitation,
+  token,
+  variant,
+}: {
+  invitation: InvitationRecord;
+  token: string;
+  variant: "created" | "resent";
+}) {
+  await notify({
+    data: {
+      acceptUrl: buildInvitationAcceptUrl(token),
+      email: invitation.email,
+      expiresAt: invitation.expiresAt.toISOString(),
+    },
+    idempotencyKey: `invitation:${invitation.id}:${variant}:${invitation.tokenHash}`,
+    subject: {
+      id: invitation.id,
+      type: "invitation",
+    },
+    type: "auth.invitation",
+  });
+}
+
+export async function resendInvitationEmail({
+  id,
+}: {
+  id: string;
+}): Promise<InvitationResendResult> {
+  const current = await findInvitationById(id);
+
+  if (!current) {
+    return { status: "not-found" };
+  }
+
+  const now = new Date();
+
+  if (!isEffectivelyPending(current, now)) {
+    return { status: "not-pending" };
+  }
+
+  const token = createInvitationToken();
+  const tokenHash = hashInvitationToken(token);
+  const expiresAt = new Date(now.getTime() + INVITATION_EXPIRES_IN_MS);
+  const rotated = await rotateActivePendingInvitationToken({
+    expectedTokenHash: current.tokenHash,
+    expiresAt,
+    id,
+    now,
+    tokenHash,
+  });
+
+  if (!rotated) {
+    return { status: "not-pending" };
+  }
+
+  try {
+    await sendInvitationEmail({
+      invitation: rotated,
+      token,
+      variant: "resent",
+    });
+
+    return {
+      invitation: rotated,
+      status: "success",
+      token,
+    };
+  } catch (error) {
+    logEmailDeliveryFailure("auth-invitation-resend", error);
+
+    return {
+      invitation: rotated,
+      status: "email-delivery-failed",
+      token,
+    };
+  }
+}
+
+export async function revokeInvitation({
+  id,
+}: {
+  id: string;
+}): Promise<InvitationMutationResult> {
+  const current = await findInvitationById(id);
+
+  if (!current) {
+    return { status: "not-found" };
+  }
+
+  const now = new Date();
+
+  if (!isEffectivelyPending(current, now)) {
+    return { status: "not-pending" };
+  }
+
+  const revoked = await revokeActivePendingInvitation({
+    expectedTokenHash: current.tokenHash,
+    id,
+    now,
+  });
+
+  if (!revoked) {
+    return { status: "not-pending" };
+  }
+
+  return {
+    invitation: revoked,
+    status: "success",
+  };
 }
 
 export async function validateInvitationToken(token: string): Promise<{

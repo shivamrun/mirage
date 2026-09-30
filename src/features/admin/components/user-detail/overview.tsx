@@ -10,6 +10,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { normalizeRoles } from "@/features/auth/roles";
 import type {
+  AdminUserDetailAcceptedInvitation,
   AdminUserDetailCreditBalance,
   AdminUserDetailUser,
 } from "@/server/db/services/admin/user-detail";
@@ -36,6 +37,7 @@ import {
 } from "./primitives";
 
 type AdminUserDetailOverviewProps = {
+  acceptedInvitation: AdminUserDetailAcceptedInvitation;
   currentUserId: string;
   creditBalance: AdminUserDetailCreditBalance;
   hasActiveBan: boolean;
@@ -106,6 +108,7 @@ function AdminUserCreditsSection({
 }
 
 export function AdminUserDetailOverview({
+  acceptedInvitation,
   currentUserId,
   creditBalance,
   hasActiveBan,
@@ -271,6 +274,43 @@ export function AdminUserDetailOverview({
           </DetailRow>
         </DetailSection>
       </DetailPanel>
+
+      {acceptedInvitation ? (
+        <DetailPanel
+          description="How this account was invited."
+          title="Invitation"
+        >
+          <DetailRow label="Invited by">
+            {acceptedInvitation.invitedBy ? (
+              <Link
+                className="link-text"
+                href={`/admin/users/${acceptedInvitation.invitedBy.id}`}
+              >
+                {acceptedInvitation.invitedBy.name} (
+                {acceptedInvitation.invitedBy.email})
+              </Link>
+            ) : (
+              "Unavailable"
+            )}
+          </DetailRow>
+          <DetailRow label="Invited email">
+            <span className="break-all">{acceptedInvitation.email}</span>
+          </DetailRow>
+          <DetailRow label="Invited role">{acceptedInvitation.role}</DetailRow>
+          <DetailRow label="Invited at">
+            {formatDate(acceptedInvitation.createdAt)}
+          </DetailRow>
+          <DetailRow label="Accepted at">
+            {formatDate(acceptedInvitation.acceptedAt)}
+          </DetailRow>
+          <DetailRow label="Expires at">
+            {formatDate(acceptedInvitation.expiresAt)}
+          </DetailRow>
+          <DetailRow label="Invitation ID" mono>
+            {acceptedInvitation.id}
+          </DetailRow>
+        </DetailPanel>
+      ) : null}
 
       <AdminUserCreditsSection creditBalance={creditBalance} userId={user.id} />
     </div>

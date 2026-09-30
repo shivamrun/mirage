@@ -10,6 +10,7 @@ import {
 import { resolvePaginatedView } from "@/server/db/services/pagination";
 import type {
   AdminInvitationResponse,
+  InvitationEffectiveStatus,
   InvitationRole,
 } from "@/shared/schemas/invitations";
 
@@ -55,9 +56,11 @@ export function toAdminCreateInvitationResponse(
 }
 
 export async function listAdminInvitationsView({
+  effectiveStatus,
   limit,
   page,
 }: {
+  effectiveStatus?: InvitationEffectiveStatus;
   limit: number;
   page: number;
 }) {
@@ -65,7 +68,11 @@ export async function listAdminInvitationsView({
     limit,
     page,
     loadPage: async ({ limit, offset }) => {
-      const result = await listAdminInvitations({ limit, offset });
+      const result = await listAdminInvitations({
+        effectiveStatus,
+        limit,
+        offset,
+      });
 
       return {
         items: result.items.map(toAdminInvitationResponse),

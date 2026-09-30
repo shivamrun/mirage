@@ -37,7 +37,14 @@ export function AdminUserDetailView({
   referrals?: AdminUserDetailReferralsView;
   section?: AdminUserDetailSection;
 }) {
-  const { accounts, creditBalance, referralSummary, sessions, user } = detail;
+  const {
+    acceptedInvitation,
+    accounts,
+    creditBalance,
+    referralSummary,
+    sessions,
+    user,
+  } = detail;
   const now = new Date();
   const isBanned = Boolean(user.banned);
   const hasActiveBan = Boolean(
@@ -59,6 +66,7 @@ export function AdminUserDetailView({
       <div className="min-h-0 min-w-0 flex-1 pt-4 mb-6">
         {section === "overview" ? (
           <AdminUserDetailOverview
+            acceptedInvitation={acceptedInvitation}
             creditBalance={creditBalance}
             currentUserId={currentUserId}
             hasActiveBan={hasActiveBan}

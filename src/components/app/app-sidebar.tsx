@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   type LucideIcon,
   Mail,
+  MailPlus,
   Settings2,
   ShieldAlert,
   UserRound,
@@ -127,6 +128,11 @@ const adminData = {
           url: "/admin/users/new",
         },
       ],
+    },
+    {
+      title: "Invitations",
+      url: "/admin/invitations",
+      icon: MailPlus,
     },
     {
       title: "Contact Submission",
