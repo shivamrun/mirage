@@ -90,4 +90,29 @@ describe("architecture boundaries", () => {
 
     expect(offenders).toEqual([]);
   });
+
+  it("keeps invitation table mutations inside the invitation DAL", () => {
+    const allowedPath = "server/db/dal/invitations.ts";
+    const offenders = listSourceFiles(sourceRoot)
+      .filter((path) => toPosixPath(relative(sourceRoot, path)) !== allowedPath)
+      .filter((path) => {
+        const source = readFileSync(path, "utf8");
+        return /\.(?:insert|update|delete)\(invitation\)/.test(source);
+      })
+      .map((path) => toPosixPath(relative(process.cwd(), path)));
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps invitation routes behind the service layer", () => {
+    for (const relativePath of [
+      "server/routes/invitations.ts",
+      "server/routes/admin/invitations.ts",
+    ]) {
+      const source = readFileSync(join(sourceRoot, relativePath), "utf8");
+      expect(source).toContain("@/server/db/services/");
+      expect(source).not.toContain("@/server/db/dal/");
+      expect(source).not.toContain("@/server/db/schema");
+    }
+  });
 });

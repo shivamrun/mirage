@@ -9,10 +9,11 @@ import {
   findActivePendingInvitationByEmail,
   findInvitationById,
   findInvitationByTokenHash,
-  markInvitationRevoked,
+  revokeActivePendingInvitation,
 } from "@/server/db/dal/invitations";
 import { invitation, user } from "@/server/db/schema";
 import {
+  buildInvitationAcceptUrl,
   createInvitation,
   createInvitationToken,
   getEffectiveInvitationStatus,
@@ -54,6 +55,14 @@ async function createInvitationFixture({
 }
 
 describe("invitation tokens", () => {
+  it("puts invitation tokens in the URL fragment", () => {
+    const token = "a".repeat(64);
+    const url = new URL(buildInvitationAcceptUrl(token));
+
+    expect(url.search).toBe("");
+    expect(url.hash).toBe(`#token=${token}`);
+  });
+
   it("generates 64-character hex tokens", () => {
     expect(createInvitationToken()).toMatch(/^[a-f0-9]{64}$/);
   });
@@ -111,6 +120,13 @@ describe("invitation effective status", () => {
         },
         new Date("2026-01-01T00:00:00.000Z"),
       ),
+    ).toBe("expired");
+  });
+
+  it("treats the exact expiry boundary as expired", () => {
+    const now = new Date("2026-01-01T00:00:00.000Z");
+    expect(
+      getEffectiveInvitationStatus({ expiresAt: now, status: "pending" }, now),
     ).toBe("expired");
   });
 
@@ -209,7 +225,10 @@ describe("invitation creation", () => {
     expect(created.status).toBe("success");
     if (created.status !== "success") return;
 
-    await markInvitationRevoked({ id: created.invitation.id });
+    await revokeActivePendingInvitation({
+      expectedTokenHash: created.invitation.tokenHash,
+      id: created.invitation.id,
+    });
 
     const next = await createInvitation({ email, invitedByUserId: inviter.id });
     expect(next.status).toBe("success");

@@ -91,6 +91,12 @@ const mutationRoutes = [
   { method: "POST", path: "/api/billing/checkout", access: "user" },
   { method: "POST", path: "/api/credits/sample-create", access: "user" },
   { method: "POST", path: "/api/email-list/", access: "public" },
+  { method: "POST", path: "/api/invitations/validate", access: "public" },
+  {
+    method: "POST",
+    path: "/api/invitations/accept-signup",
+    access: "public",
+  },
   { method: "POST", path: "/api/uploads/", access: "user" },
   {
     method: "DELETE",
@@ -108,6 +114,16 @@ const mutationRoutes = [
     access: "admin",
   },
   { method: "POST", path: "/api/admin/invitations", access: "admin" },
+  {
+    method: "POST",
+    path: "/api/admin/invitations/:id/resend",
+    access: "admin",
+  },
+  {
+    method: "POST",
+    path: "/api/admin/invitations/:id/revoke",
+    access: "admin",
+  },
   { method: "POST", path: "/api/admin/email-list", access: "admin" },
   { method: "PATCH", path: "/api/admin/email-list/:key", access: "admin" },
   {
@@ -219,6 +235,17 @@ function requestBody(path: string) {
       role: "user",
     });
   }
+  if (path === "/api/invitations/validate") {
+    return JSON.stringify({ token: "a".repeat(64) });
+  }
+  if (path === "/api/invitations/accept-signup") {
+    return JSON.stringify({
+      agreeToTerms: true,
+      email: "phase-zero-invite-accept@example.com",
+      password: "TestPassword123!",
+      token: "a".repeat(64),
+    });
+  }
   return "{}";
 }
 
@@ -267,8 +294,8 @@ describe("current Elysia HTTP contract", () => {
     );
   });
 
-  it("guards all 31 mutations with the current origin response", async () => {
-    expect(mutationRoutes).toHaveLength(31);
+  it("guards all 35 mutations with the current origin response", async () => {
+    expect(mutationRoutes).toHaveLength(35);
     const user = await createTestActor();
     const admin = await createTestActor({ role: "admin", emailVerified: true });
     const sentBefore = testEmailOutbox.length;

@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { AuthStatusMessage } from "@/features/auth/components";
 import { api } from "@/shared/api/client";
+import type { InvitationRole } from "@/shared/schemas";
 import { invitationsPageHref } from "./query";
 
 type StatusMessage = {
@@ -35,7 +36,7 @@ type StatusMessage = {
 export function InvitationCreateDialog() {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
-  const [role, setRole] = React.useState("user");
+  const [role, setRole] = React.useState<InvitationRole>("user");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [status, setStatus] = React.useState<StatusMessage>();
 
@@ -118,7 +119,10 @@ export function InvitationCreateDialog() {
 
           <div className="space-y-2">
             <Label htmlFor="invitation-role">Role</Label>
-            <Select value={role} onValueChange={setRole}>
+            <Select
+              value={role}
+              onValueChange={(value) => setRole(value as InvitationRole)}
+            >
               <SelectTrigger className="w-full" id="invitation-role">
                 <SelectValue />
               </SelectTrigger>

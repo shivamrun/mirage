@@ -24,18 +24,6 @@ function getAdminRouteUser(context: unknown) {
   return (context as { authUser: CurrentUser }).authUser;
 }
 
-function stringBodyValue(value: unknown) {
-  return typeof value === "string" ? value : "";
-}
-
-function invitationRoleBodyValue(value: unknown) {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  return typeof value === "string" ? value : "__invalid__";
-}
-
 export const adminInvitationRoutes = new Elysia()
   .use(requestPolicy)
   .get(
@@ -60,9 +48,9 @@ export const adminInvitationRoutes = new Elysia()
     async (context) => {
       const { body, status } = context;
       const result = await createInvitationAndSendEmail({
-        email: stringBodyValue(body.email),
+        email: body.email,
         invitedByUserId: getAdminRouteUser(context).id,
-        role: invitationRoleBodyValue(body.role),
+        role: body.role,
       });
 
       switch (result.status) {
@@ -117,6 +105,10 @@ export const adminInvitationRoutes = new Elysia()
           });
         case "not-found":
           return status(404, { message: "Invitation not found." });
+        case "existing-user":
+          return status(409, {
+            message: "A user with this email already exists.",
+          });
         case "not-pending":
           return status(409, {
             message: "Invitation is no longer pending.",

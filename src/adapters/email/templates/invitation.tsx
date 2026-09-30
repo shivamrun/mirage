@@ -53,7 +53,7 @@ function InvitationTemplate({
 }
 
 InvitationTemplate.PreviewProps = {
-  acceptUrl: "https://example.com/invite/accept?token=example-invite-token",
+  acceptUrl: "https://example.com/invite/accept#token=example-invite-token",
   email: "teammate@example.com",
   expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
 } satisfies InvitationTemplateProps;

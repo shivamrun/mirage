@@ -16,10 +16,12 @@ export const invitationEffectiveStatusSchema = z.enum([
 ]);
 export const invitationRoleSchema = z.enum(authRoles);
 
-export const adminCreateInvitationSchema = z.object({
-  email: z.unknown(),
-  role: z.unknown().optional(),
-});
+export const adminCreateInvitationSchema = z
+  .object({
+    email: emailSchema,
+    role: invitationRoleSchema.default("user"),
+  })
+  .strict();
 
 export const adminInvitationsListQuerySchema = paginationQuerySchema.extend({
   effectiveStatus: invitationEffectiveStatusSchema.optional(),
@@ -57,9 +59,11 @@ export const publicInvitationValidationStatusSchema = z.enum([
   "accepted",
 ]);
 
-export const publicInvitationValidateQuerySchema = z.object({
-  token: z.string().trim().min(1),
-});
+export const publicInvitationValidateSchema = z
+  .object({
+    token: z.string().trim().min(1),
+  })
+  .strict();
 
 export const publicInvitationValidateResponseSchema = z.object({
   email: emailSchema.optional(),

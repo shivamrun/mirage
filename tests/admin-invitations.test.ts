@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { desc, eq } from "drizzle-orm";
 import { Elysia } from "elysia";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { rateLimitStore } from "@/adapters/rate-limit/store";
 import db from "@/server/db";
@@ -10,14 +10,18 @@ import {
   claimPendingInvitationForUser,
   createInvitationRecord,
   findAcceptedInvitationForUser,
+  findInvitationById,
   revokeActivePendingInvitation,
   rotateActivePendingInvitationToken,
 } from "@/server/db/dal/invitations";
 import { invitation, user } from "@/server/db/schema";
+import { setBillingStripeClientForTests } from "@/server/db/services/billing/stripe-client";
 import {
   createInvitationToken,
   hashInvitationToken,
+  validateInvitationToken,
 } from "@/server/db/services/invitations/service";
+import { apiErrors } from "@/server/http/errors";
 import { adminRoutes } from "@/server/routes/admin";
 import { createTestActor } from "./infra/admin-actor";
 import { setTestEmailDeliveryHook, testEmailOutbox } from "./infra/email-fake";
@@ -25,7 +29,37 @@ import { httpRequest } from "./infra/http-request";
 
 const origin = "http://localhost:3000";
 const jsonHeaders = { "content-type": "application/json", origin };
-const app = new Elysia({ prefix: "/api" }).use(adminRoutes);
+const app = new Elysia({ prefix: "/api" }).use(apiErrors).use(adminRoutes);
+
+beforeEach(() => {
+  setBillingStripeClientForTests({
+    customers: {
+      create: async () => ({
+        id: `cus_${randomUUID().replaceAll("-", "")}`,
+        object: "customer",
+      }),
+      list: async () => ({
+        data: [],
+        has_more: false,
+        object: "list",
+        url: "/v1/customers",
+      }),
+      retrieve: async (id: string) => ({
+        deleted: false,
+        email: null,
+        id,
+        object: "customer",
+      }),
+      search: async () => ({
+        data: [],
+        has_more: false,
+        object: "search_result",
+        url: "/v1/customers/search",
+      }),
+      update: async (id: string) => ({ id, object: "customer" }),
+    },
+  } as never);
+});
 
 function invitationBody(email = `invite-${randomUUID()}@example.com`) {
   return JSON.stringify({ email, role: "admin" });
@@ -99,6 +133,10 @@ describe("admin invitation routes", () => {
               emailVerified: actor !== "user" && actor !== "unverified admin",
               twoFactorEnabled: actor !== "admin lacking required assurance",
             });
+      const managed =
+        actor === "verified admin" && current
+          ? await createInvitationFixture({ invitedByUserId: current.id })
+          : { id: randomUUID() };
 
       const list = await httpRequest(app, "/api/admin/invitations", {
         cookie: current?.cookie,
@@ -112,6 +150,19 @@ describe("admin invitation routes", () => {
         method: "POST",
       });
       expect(create.status).toBe(expected);
+
+      for (const action of ["resend", "revoke"] as const) {
+        const response = await httpRequest(
+          app,
+          `/api/admin/invitations/${managed.id}/${action}`,
+          {
+            cookie: current?.cookie,
+            headers: { origin },
+            method: "POST",
+          },
+        );
+        expect(response.status).toBe(expected);
+      }
     },
   );
 
@@ -162,7 +213,7 @@ describe("admin invitation routes", () => {
       subject: "Accept your Mirage invitation",
       to: email,
     });
-    expect(sentInvitationEmails[0]?.text).toContain("/invite/accept?token=");
+    expect(sentInvitationEmails[0]?.text).toContain("/invite/accept#token=");
   });
 
   it("returns 503 and revokes the invite when invitation email delivery fails", async () => {
@@ -402,9 +453,54 @@ describe("admin invitation routes", () => {
       .where(eq(invitation.id, created.id));
     expect(stored?.tokenHash).not.toBe(hashInvitationToken(originalToken));
     expect(invitationEmails()).toHaveLength(1);
+    await expect(validateInvitationToken(originalToken)).resolves.toEqual({
+      status: "invalid",
+      valid: false,
+    });
   });
 
-  it("keeps the rotated resend token and expiry when resend email delivery fails", async () => {
+  it("sends exactly one email for concurrent resend requests", async () => {
+    const admin = await createTestActor({ role: "admin", emailVerified: true });
+    const created = await createInvitationFixture({
+      invitedByUserId: admin.id,
+    });
+
+    const responses = await Promise.all(
+      Array.from({ length: 2 }, () =>
+        httpRequest(app, `/api/admin/invitations/${created.id}/resend`, {
+          cookie: admin.cookie,
+          headers: { origin },
+          method: "POST",
+        }),
+      ),
+    );
+
+    expect(responses.map(({ status }) => status).sort()).toEqual([200, 409]);
+    expect(invitationEmails()).toHaveLength(1);
+  });
+
+  it("revokes instead of resending after the email registers independently", async () => {
+    const admin = await createTestActor({ role: "admin", emailVerified: true });
+    const existing = await createUserFixture();
+    const created = await createInvitationFixture({
+      email: existing.email,
+      invitedByUserId: admin.id,
+    });
+
+    const response = await httpRequest(
+      app,
+      `/api/admin/invitations/${created.id}/resend`,
+      { cookie: admin.cookie, headers: { origin }, method: "POST" },
+    );
+
+    expect(response.status).toBe(409);
+    expect(invitationEmails()).toHaveLength(0);
+    await expect(findInvitationById(created.id)).resolves.toMatchObject({
+      status: "revoked",
+    });
+  });
+
+  it("restores the previous token and expiry when resend delivery fails", async () => {
     const admin = await createTestActor({ role: "admin", emailVerified: true });
     const originalToken = createInvitationToken();
     const created = await createInvitationFixture({
@@ -440,10 +536,8 @@ describe("admin invitation routes", () => {
       status: "pending",
       revokedAt: null,
     });
-    expect(stored?.tokenHash).not.toBe(hashInvitationToken(originalToken));
-    expect(stored?.expiresAt.getTime()).toBeGreaterThan(
-      created.expiresAt.getTime(),
-    );
+    expect(stored?.tokenHash).toBe(hashInvitationToken(originalToken));
+    expect(stored?.expiresAt).toEqual(created.expiresAt);
 
     setTestEmailDeliveryHook(null);
     const retry = await httpRequest(
@@ -638,8 +732,11 @@ describe("admin invitation routes", () => {
     });
   });
 
-  it("rejects missing or invalid same-origin headers on create only", async () => {
+  it("rejects missing or invalid same-origin headers on every mutation", async () => {
     const admin = await createTestActor({ role: "admin", emailVerified: true });
+    const created = await createInvitationFixture({
+      invitedByUserId: admin.id,
+    });
 
     const headerCases: Record<string, string>[] = [
       { "content-type": "application/json" },
@@ -654,6 +751,15 @@ describe("admin invitation routes", () => {
         method: "POST",
       });
       expect(response.status).toBe(403);
+
+      for (const action of ["resend", "revoke"] as const) {
+        const mutation = await httpRequest(
+          app,
+          `/api/admin/invitations/${created.id}/${action}`,
+          { cookie: admin.cookie, headers, method: "POST" },
+        );
+        expect(mutation.status).toBe(403);
+      }
     }
 
     const list = await httpRequest(app, "/api/admin/invitations", {

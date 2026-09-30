@@ -25,6 +25,7 @@ import type {
 } from "@/shared/schemas";
 import { cn } from "@/shared/utils";
 import { InvitationCreateDialog } from "./invitation-create-dialog";
+import { InvitationRowActions } from "./invitation-row-actions";
 import { invitationsPageHref } from "./query";
 
 type AdminInvitationsPanelProps = {
@@ -125,6 +126,7 @@ export function AdminInvitationsPanel({
               <TableHead className="h-12 px-4">Invited</TableHead>
               <TableHead className="h-12 px-4">Expires</TableHead>
               <TableHead className="h-12 px-4">Accepted</TableHead>
+              <TableHead className="h-12 px-4 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
 
@@ -178,11 +180,20 @@ export function AdminInvitationsPanel({
                   <TableCell className="whitespace-nowrap px-4 py-4 text-muted-foreground text-sm">
                     {formatDate(invitation.acceptedAt, "-")}
                   </TableCell>
+
+                  <TableCell className="px-4 py-4 text-right">
+                    {invitation.effectiveStatus === "pending" ? (
+                      <InvitationRowActions
+                        email={invitation.email}
+                        id={invitation.id}
+                      />
+                    ) : null}
+                  </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={6} className="h-72 px-6 text-center">
+                <TableCell colSpan={7} className="h-72 px-6 text-center">
                   <p className="font-medium">No invitations found</p>
                   <p className="mt-2 text-muted-foreground text-sm">
                     Send an invite or adjust the current status filter.

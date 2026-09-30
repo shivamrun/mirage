@@ -8,8 +8,8 @@ import {
   acceptInvitationSignupResponseSchema,
   acceptInvitationSignupSchema,
   messageResponseSchema,
-  publicInvitationValidateQuerySchema,
   publicInvitationValidateResponseSchema,
+  publicInvitationValidateSchema,
 } from "@/shared/schemas";
 
 function appendSetCookieHeaders(
@@ -40,13 +40,18 @@ function appendSetCookieHeaders(
 
 export const invitationRoutes = new Elysia()
   .use(requestPolicy)
-  .get(
+  .post(
     "/invitations/validate",
-    async ({ query }) => validateInvitationToken(query.token),
+    async ({ body }) => validateInvitationToken(body.token),
     {
-      query: publicInvitationValidateQuerySchema,
+      sameOrigin: true,
+      routeLimit: "invitation-validate",
+      body: publicInvitationValidateSchema,
       response: {
         200: publicInvitationValidateResponseSchema,
+        400: messageResponseSchema,
+        403: messageResponseSchema,
+        429: messageResponseSchema,
         500: messageResponseSchema,
       },
     },

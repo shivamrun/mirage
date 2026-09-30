@@ -29,12 +29,13 @@ function nullableDateToIso(value: Date | null) {
 
 export function toAdminInvitationResponse(
   invitation: AdminInvitationListItem | InvitationRecord,
+  now = new Date(),
 ): AdminInvitationResponse {
   return {
     acceptedAt: nullableDateToIso(invitation.acceptedAt),
     acceptedByUserId: invitation.acceptedByUserId,
     createdAt: invitation.createdAt.toISOString(),
-    effectiveStatus: getEffectiveInvitationStatus(invitation),
+    effectiveStatus: getEffectiveInvitationStatus(invitation, now),
     email: invitation.email,
     expiresAt: invitation.expiresAt.toISOString(),
     id: invitation.id,
@@ -64,6 +65,7 @@ export async function listAdminInvitationsView({
   limit: number;
   page: number;
 }) {
+  const now = new Date();
   const result = await resolvePaginatedView({
     limit,
     page,
@@ -71,11 +73,14 @@ export async function listAdminInvitationsView({
       const result = await listAdminInvitations({
         effectiveStatus,
         limit,
+        now,
         offset,
       });
 
       return {
-        items: result.items.map(toAdminInvitationResponse),
+        items: result.items.map((invitation) =>
+          toAdminInvitationResponse(invitation, now),
+        ),
         total: result.total,
       };
     },

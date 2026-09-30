@@ -59,6 +59,20 @@ export async function findInvitationById(id: string) {
   return record ?? null;
 }
 
+export async function findInvitationByIdForUpdate(
+  id: string,
+  executor: DBClient,
+) {
+  const [record] = await executor
+    .select()
+    .from(invitation)
+    .where(eq(invitation.id, id))
+    .for("update")
+    .limit(1);
+
+  return record ?? null;
+}
+
 export async function findAcceptedInvitationForUser(userId: string) {
   const [record] = await db
     .select({
@@ -137,32 +151,14 @@ export async function findActivePendingInvitationByEmail({
   return record ?? null;
 }
 
-export async function markInvitationRevoked({
-  id,
-  now = new Date(),
-}: {
-  id: string;
-  now?: Date;
-}) {
-  const [record] = await db
-    .update(invitation)
-    .set({
-      revokedAt: now,
-      status: "revoked",
-      updatedAt: now,
-    })
-    .where(eq(invitation.id, id))
-    .returning();
-
-  return record ?? null;
-}
-
 export async function revokeActivePendingInvitation({
+  executor = db,
   expectedTokenHash,
   id,
   now = new Date(),
 }: {
   expectedTokenHash?: string;
+  executor?: DBClient;
   id: string;
   now?: Date;
 }) {
@@ -176,7 +172,7 @@ export async function revokeActivePendingInvitation({
     conditions.push(eq(invitation.tokenHash, expectedTokenHash));
   }
 
-  const [record] = await db
+  const [record] = await executor
     .update(invitation)
     .set({
       revokedAt: now,
@@ -189,9 +185,9 @@ export async function revokeActivePendingInvitation({
   return record ?? null;
 }
 
-export async function rotateActivePendingInvitationToken({
-  expiresAt,
+export async function restorePendingInvitationToken({
   expectedTokenHash,
+  expiresAt,
   id,
   now = new Date(),
   tokenHash,
@@ -203,6 +199,36 @@ export async function rotateActivePendingInvitationToken({
   tokenHash: string;
 }) {
   const [record] = await db
+    .update(invitation)
+    .set({ expiresAt, tokenHash, updatedAt: now })
+    .where(
+      and(
+        eq(invitation.id, id),
+        eq(invitation.status, "pending"),
+        eq(invitation.tokenHash, expectedTokenHash),
+      ),
+    )
+    .returning();
+
+  return record ?? null;
+}
+
+export async function rotateActivePendingInvitationToken({
+  executor = db,
+  expiresAt,
+  expectedTokenHash,
+  id,
+  now = new Date(),
+  tokenHash,
+}: {
+  expectedTokenHash: string;
+  executor?: DBClient;
+  expiresAt: Date;
+  id: string;
+  now?: Date;
+  tokenHash: string;
+}) {
+  const [record] = await executor
     .update(invitation)
     .set({
       expiresAt,
@@ -279,6 +305,28 @@ export async function revokeSessionsForUser(
   executor: DBClient = db,
 ) {
   return executor.delete(session).where(eq(session.userId, userId)).returning();
+}
+
+export async function deletePartialInvitationUser({
+  email,
+  userId,
+}: {
+  email: string;
+  userId: string;
+}) {
+  const [record] = await db
+    .delete(user)
+    .where(
+      and(
+        eq(user.id, userId),
+        eq(user.email, email),
+        eq(user.emailVerified, false),
+        eq(user.role, "user"),
+      ),
+    )
+    .returning();
+
+  return record ?? null;
 }
 
 export async function listAdminInvitations({

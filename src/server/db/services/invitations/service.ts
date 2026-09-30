@@ -9,21 +9,23 @@ import {
   type RoleValue,
 } from "@/features/auth/roles";
 import db from "@/server/db";
-import { getAuthUserByEmail } from "@/server/db/dal/auth";
+import { getAuthUserByEmail, getAuthUserById } from "@/server/db/dal/auth";
 import {
   claimPendingInvitationForUser,
   createInvitationRecord,
+  deletePartialInvitationUser,
   findActivePendingInvitationByEmail,
   findInvitationById,
+  findInvitationByIdForUpdate,
   findInvitationByTokenHash,
   findInvitationByTokenHashForUpdate,
   type InvitationRecord,
-  markInvitationRevoked,
   revokeActivePendingInvitation,
   revokeSessionsForUser,
   rotateActivePendingInvitationToken,
   setUserRole,
 } from "@/server/db/dal/invitations";
+import { getBillingStripeClient } from "@/server/db/services/billing/stripe-client";
 import { notify } from "@/server/db/services/notifications/service";
 import { env } from "@/shared/env";
 import { emailSchema } from "@/shared/schemas/helpers/email";
@@ -79,7 +81,7 @@ export type InvitationResendResult =
       token: string;
     }
   | {
-      status: "not-found" | "not-pending";
+      status: "existing-user" | "not-found" | "not-pending";
     };
 
 type InvitationSignupResult =
@@ -100,6 +102,8 @@ type InvitationSignupResult =
     };
 
 const authRoleSet = new Set<string>(authRoles);
+
+class InvitationAcceptanceConflictError extends Error {}
 
 export function createInvitationToken() {
   return randomBytes(32).toString("hex");
@@ -127,7 +131,7 @@ export function getEffectiveInvitationStatus(
 
 export function buildInvitationAcceptUrl(token: string) {
   const url = new URL("/invite/accept", env.NEXT_PUBLIC_BASE_URL);
-  url.searchParams.set("token", token);
+  url.hash = new URLSearchParams({ token }).toString();
 
   return url.toString();
 }
@@ -243,7 +247,10 @@ export async function createInvitationAndSendEmail({
     logEmailDeliveryFailure("auth-invitation", error);
 
     try {
-      await markInvitationRevoked({ id: result.invitation.id });
+      await revokeActivePendingInvitation({
+        expectedTokenHash: result.invitation.tokenHash,
+        id: result.invitation.id,
+      });
     } catch (revokeError) {
       console.error(
         "Invitation email delivery failed and invitation revoke also failed.",
@@ -291,50 +298,76 @@ export async function resendInvitationEmail({
 }: {
   id: string;
 }): Promise<InvitationResendResult> {
-  const current = await findInvitationById(id);
-
-  if (!current) {
+  const initial = await findInvitationById(id);
+  if (!initial) {
     return { status: "not-found" };
   }
 
-  const now = new Date();
-
-  if (!isEffectivelyPending(current, now)) {
-    return { status: "not-pending" };
-  }
-
+  const initialUpdatedAt = initial.updatedAt.getTime();
   const token = createInvitationToken();
   const tokenHash = hashInvitationToken(token);
-  const expiresAt = new Date(now.getTime() + INVITATION_EXPIRES_IN_MS);
-  const rotated = await rotateActivePendingInvitationToken({
-    expectedTokenHash: current.tokenHash,
-    expiresAt,
-    id,
-    now,
-    tokenHash,
-  });
-
-  if (!rotated) {
-    return { status: "not-pending" };
-  }
-
   try {
-    await sendInvitationEmail({
-      invitation: rotated,
-      token,
-      variant: "resent",
-    });
+    return await db.transaction(async (tx) => {
+      const current = await findInvitationByIdForUpdate(id, tx);
 
-    return {
-      invitation: rotated,
-      status: "success",
-      token,
-    };
+      if (!current) {
+        return { status: "not-found" };
+      }
+
+      const now = new Date();
+      if (!isEffectivelyPending(current, now)) {
+        return { status: "not-pending" };
+      }
+
+      if (current.updatedAt.getTime() !== initialUpdatedAt) {
+        return { status: "not-pending" };
+      }
+
+      if (await getAuthUserByEmail(current.email)) {
+        await revokeActivePendingInvitation({
+          executor: tx,
+          expectedTokenHash: current.tokenHash,
+          id,
+          now,
+        });
+        return { status: "existing-user" };
+      }
+
+      const rotated = await rotateActivePendingInvitationToken({
+        executor: tx,
+        expectedTokenHash: current.tokenHash,
+        expiresAt: new Date(now.getTime() + INVITATION_EXPIRES_IN_MS),
+        id,
+        now,
+        tokenHash,
+      });
+
+      if (!rotated) {
+        return { status: "not-pending" };
+      }
+
+      await sendInvitationEmail({
+        invitation: rotated,
+        token,
+        variant: "resent",
+      });
+
+      return {
+        invitation: rotated,
+        status: "success",
+        token,
+      };
+    });
   } catch (error) {
     logEmailDeliveryFailure("auth-invitation-resend", error);
 
+    const current = await findInvitationById(id);
+    if (!current) {
+      return { status: "not-found" };
+    }
+
     return {
-      invitation: rotated,
+      invitation: current,
       status: "email-delivery-failed",
       token,
     };
@@ -374,7 +407,10 @@ export async function revokeInvitation({
   };
 }
 
-export async function validateInvitationToken(token: string): Promise<{
+export async function validateInvitationToken(
+  token: string,
+  { revokeForExistingUser = true } = {},
+): Promise<{
   email?: string;
   status: PublicInvitationValidationStatus;
   valid: boolean;
@@ -402,6 +438,12 @@ export async function validateInvitationToken(token: string): Promise<{
   const existingUser = await getAuthUserByEmail(record.email);
 
   if (existingUser) {
+    if (revokeForExistingUser) {
+      await revokeActivePendingInvitation({
+        expectedTokenHash: record.tokenHash,
+        id: record.id,
+      });
+    }
     return { status: "invalid", valid: false };
   }
 
@@ -440,7 +482,7 @@ async function signUpInvitedUser({
   });
 }
 
-async function recoverFailedInvitationSignup(userId: string) {
+async function lockDownFailedInvitationSignup(userId: string) {
   try {
     await db.transaction(async (tx) => {
       await setUserRole({ executor: tx, role: "user", userId });
@@ -449,6 +491,45 @@ async function recoverFailedInvitationSignup(userId: string) {
   } catch (error) {
     console.error("Invitation signup recovery failed.", { error, userId });
   }
+}
+
+async function cleanupFailedInvitationSignup({
+  email,
+  userId,
+}: {
+  email: string;
+  userId: string;
+}) {
+  const createdUser = await getAuthUserById(userId);
+
+  if (
+    !createdUser ||
+    createdUser.email !== email ||
+    createdUser.emailVerified ||
+    createdUser.role !== "user"
+  ) {
+    await lockDownFailedInvitationSignup(userId);
+    return false;
+  }
+
+  try {
+    if (createdUser.stripeCustomerId) {
+      await getBillingStripeClient().customers.del(
+        createdUser.stripeCustomerId,
+      );
+    }
+
+    const deleted = await deletePartialInvitationUser({ email, userId });
+
+    if (deleted) {
+      return true;
+    }
+  } catch (error) {
+    console.error("Invitation signup cleanup failed.", { error, userId });
+  }
+
+  await lockDownFailedInvitationSignup(userId);
+  return false;
 }
 
 export async function acceptInvitationSignup({
@@ -476,9 +557,28 @@ export async function acceptInvitationSignup({
 
   const normalizedEmail = parsedEmail.data;
   const tokenHash = hashInvitationToken(token);
-  const preflight = await validateInvitationToken(token);
+  const preflight = await validateInvitationToken(token, {
+    revokeForExistingUser: false,
+  });
 
   if (!preflight.valid || !preflight.email) {
+    const record = await findInvitationByTokenHash(tokenHash);
+    if (
+      record &&
+      isEffectivelyPending(record) &&
+      (await getAuthUserByEmail(record.email))
+    ) {
+      await revokeActivePendingInvitation({
+        expectedTokenHash: record.tokenHash,
+        id: record.id,
+      });
+      return {
+        message: "A user with this email already exists.",
+        status: "existing-user",
+        statusCode: 409,
+      };
+    }
+
     return {
       message: "This invitation is no longer available.",
       status: "invalid",
@@ -540,11 +640,15 @@ export async function acceptInvitationSignup({
         );
 
         if (!invitation) {
-          throw new Error("Invitation disappeared during acceptance.");
+          throw new InvitationAcceptanceConflictError(
+            "Invitation disappeared during acceptance.",
+          );
         }
 
         if (invitation.email !== normalizedEmail) {
-          throw new Error("Invitation email mismatch during acceptance.");
+          throw new InvitationAcceptanceConflictError(
+            "Invitation email mismatch during acceptance.",
+          );
         }
 
         const existingUserAfterSignup = await getAuthUserByEmail(
@@ -553,7 +657,14 @@ export async function acceptInvitationSignup({
         );
 
         if (!existingUserAfterSignup || existingUserAfterSignup.id !== userId) {
-          throw new Error("Invitation signup user mismatch during acceptance.");
+          throw new InvitationAcceptanceConflictError(
+            "Invitation signup user mismatch during acceptance.",
+          );
+        }
+
+        const canonicalRole = normalizeInvitationRole(invitation.role);
+        if (!canonicalRole || canonicalRole !== invitation.role) {
+          throw new Error("Invitation role is not canonical.");
         }
 
         const claimed = await claimPendingInvitationForUser({
@@ -564,23 +675,40 @@ export async function acceptInvitationSignup({
         });
 
         if (!claimed) {
-          throw new Error("Invitation was not claimable during acceptance.");
+          throw new InvitationAcceptanceConflictError(
+            "Invitation was not claimable during acceptance.",
+          );
         }
 
-        await setUserRole({ executor: tx, role: claimed.role, userId });
+        const updatedUser = await setUserRole({
+          executor: tx,
+          role: canonicalRole,
+          userId,
+        });
+        if (!updatedUser) {
+          throw new InvitationAcceptanceConflictError(
+            "Invitation signup user disappeared during acceptance.",
+          );
+        }
       });
     } catch (error) {
       console.error("Invitation acceptance failed after user signup.", {
         error,
         userId,
       });
-      await recoverFailedInvitationSignup(userId);
+      const cleanedUp = await cleanupFailedInvitationSignup({
+        email: normalizedEmail,
+        userId,
+      });
+      const isConflict = error instanceof InvitationAcceptanceConflictError;
 
       return {
         message:
-          "Your account was created, but the invitation could not be accepted. Contact support before signing in.",
+          cleanedUp && isConflict
+            ? "The invitation changed while signup was completing. Please use the latest invitation link."
+            : "Your account was created, but the invitation could not be accepted. Contact support before signing in.",
         status: "acceptance-failed",
-        statusCode: 500,
+        statusCode: cleanedUp && isConflict ? 409 : 500,
       };
     }
 
@@ -590,6 +718,15 @@ export async function acceptInvitationSignup({
       status: "success",
     };
   } catch {
+    const existingUser = await getAuthUserByEmail(normalizedEmail);
+    if (existingUser) {
+      return {
+        message: "A user with this email already exists.",
+        status: "existing-user",
+        statusCode: 409,
+      };
+    }
+
     return {
       message: "Invitation signup failed.",
       status: "signup-failed",

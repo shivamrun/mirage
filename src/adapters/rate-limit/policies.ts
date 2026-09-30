@@ -89,6 +89,13 @@ const routePolicies: Record<RateLimitPolicyName, RoutePolicyDefinition> = {
     scope: "route:invitation:accept",
     windowMs: ROUTE_WINDOW_MS,
   },
+  "invitation-validate": {
+    fallbackLimit: 500,
+    limit: 60,
+    message: "Too many invitation requests. Please try again later.",
+    scope: "route:invitation:validate",
+    windowMs: ROUTE_WINDOW_MS,
+  },
   "uploads-prepare": {
     limit: 100,
     message: "Too many upload requests. Please try again later.",

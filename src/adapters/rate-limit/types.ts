@@ -24,6 +24,7 @@ export type RateLimitPolicyName =
   | "credits-sample-create"
   | "email-list-signup"
   | "invitation-accept"
+  | "invitation-validate"
   | "uploads-prepare";
 
 export type UploadPrepareRateLimitPolicyName = "avatar";

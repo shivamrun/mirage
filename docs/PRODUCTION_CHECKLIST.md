@@ -72,7 +72,7 @@ changes, security reviews, or reliability hardening passes.
 - Confirm `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are configured in the
   production environment.
 - Create the Better Auth Stripe webhook endpoint:
-  `https://<production-domain>/api/auth/stripe/webhook`.
+  `https://<production-domain>/api/auth/stripe/webhdocs(repo): streamline repository guidelinesook`.
 - Select at least these events for the Better Auth endpoint:
   `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
   `customer.subscription.created`, `customer.subscription.updated`, and

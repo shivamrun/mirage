@@ -1,9 +1,6 @@
 import { BadgeCheck, KeyRound } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
-import { RegisterForm } from "@/features/auth/components";
-import { getSafeAuthRedirect } from "@/features/auth/redirect";
-import { validateInvitationToken } from "@/server/db/services/invitations/service";
+import { InvitationAcceptContent } from "@/features/auth/components";
 import { getPageMetadata, siteConfig } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Accept Invitation", {
@@ -17,35 +14,10 @@ type InviteAcceptPageProps = {
   }>;
 };
 
-function InvalidInvitation({ status }: { status: string }) {
-  const message =
-    status === "expired"
-      ? "This invitation has expired."
-      : status === "accepted"
-        ? "This invitation has already been accepted."
-        : status === "revoked"
-          ? "This invitation has been revoked."
-          : "This invitation is not available.";
-
-  return (
-    <section className="w-full max-w-md text-center">
-      <div className="mb-6 space-y-2 pt-4 pb-2">
-        <h1 className="text-4xl">Invitation unavailable</h1>
-        <p className="mt-3 text-muted-foreground text-base">{message}</p>
-      </div>
-
-      <Link className="link-text" href="/login">
-        Return to sign in
-      </Link>
-    </section>
-  );
-}
-
 export default async function InviteAcceptPage({
   searchParams,
 }: InviteAcceptPageProps) {
   const { callbackURL, token = "" } = await searchParams;
-  const validation = await validateInvitationToken(token);
 
   return (
     <main className="relative grid min-h-screen lg:grid-cols-2">
@@ -63,15 +35,10 @@ export default async function InviteAcceptPage({
       </div>
 
       <section className="flex min-h-screen items-center justify-center px-6 py-24 lg:px-12">
-        {validation.valid && validation.email ? (
-          <RegisterForm
-            redirectTo={getSafeAuthRedirect(callbackURL || "/account")}
-            invitedEmail={validation.email}
-            invitationToken={token}
-          />
-        ) : (
-          <InvalidInvitation status={validation.status} />
-        )}
+        <InvitationAcceptContent
+          callbackURL={callbackURL}
+          legacyToken={token}
+        />
       </section>
 
       <section className="hidden min-h-screen bg-secondary/35 p-6 lg:block">
