@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"],
+      "@marinedotsh/better-auth-referral": [
+        "./packages/better-auth-referral/src/index.ts"
+      ],
+      "server-only": ["./scripts/server-only.ts"]
+    }
+  }
+}

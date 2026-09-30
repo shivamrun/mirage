@@ -22,6 +22,7 @@ export type NotificationDeliveryInput<
 
 export type NotificationDeliveryResult = {
   email?: SendEmailResult;
+  emailDeliveryId?: string;
   notificationCreated?: boolean;
   notificationId?: string;
 };

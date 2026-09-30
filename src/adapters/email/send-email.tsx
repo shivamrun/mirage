@@ -6,6 +6,7 @@ import { getEmailConfig } from "./config";
 import { EmailConfigurationError, EmailDeliveryError } from "./errors";
 
 type SendEmailOptions = {
+  idempotencyKey?: string;
   react: ReactElement;
   subject: string;
   text: string;
@@ -35,6 +36,7 @@ function getProviderErrorMessage(error: unknown) {
 }
 
 export async function sendEmail({
+  idempotencyKey,
   react,
   replyTo,
   subject,
@@ -62,15 +64,18 @@ export async function sendEmail({
     throw new EmailConfigurationError("Missing EMAIL_FROM.");
   }
 
-  const response = await getResendClient().emails.send({
-    from: config.from,
-    react,
-    replyTo: replyTo ?? config.replyTo,
-    subject,
-    tags,
-    text,
-    to,
-  });
+  const response = await getResendClient().emails.send(
+    {
+      from: config.from,
+      react,
+      replyTo: replyTo ?? config.replyTo,
+      subject,
+      tags,
+      text,
+      to,
+    },
+    idempotencyKey ? { idempotencyKey } : undefined,
+  );
 
   if (response.error) {
     throw new EmailDeliveryError(

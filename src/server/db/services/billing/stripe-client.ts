@@ -15,6 +15,7 @@ export type BillingStripeClient = Pick<
 
 let stripeClient: BillingStripeClient = new Stripe(env.STRIPE_SECRET_KEY, {
   apiVersion: "2026-08-26.dahlia",
+  timeout: 30_000,
 });
 
 export const billingStripeClientProxy = new Proxy({} as Stripe, {

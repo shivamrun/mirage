@@ -11,6 +11,7 @@ const { url } = getSafeTestDatabaseUrl();
 process.env.DATABASE_URL = url;
 process.env.RESEND_API_KEY = "";
 process.env.EMAIL_FROM = "";
+process.env.JOBS_REDIS_URL ??= "redis://127.0.0.1:6380";
 delete process.env.TRUSTED_CLIENT_IP_HEADER;
 process.env.BETTER_AUTH_SECRET ??= "test-only-secret-at-least-32-characters";
 process.env.BETTER_AUTH_URL ??= "http://localhost:3000";
@@ -23,6 +24,14 @@ process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ??= "test-turnstile-site-key";
 vi.mock("@/adapters/email/send-email", () => ({ sendEmail: sendTestEmail }));
 
 beforeEach(async () => {
+  const [{ setJobEnqueueHandlerForTests }, { processJob }] = await Promise.all([
+    import("@/server/jobs/enqueue"),
+    import("@/server/jobs/processor"),
+  ]);
+  setJobEnqueueHandlerForTests(async (name, payload, options) => {
+    await processJob(name, payload);
+    return { id: options.jobId };
+  });
   testEmailOutbox.length = 0;
   setTestEmailDeliveryHook(null);
   const client = await openTestDatabase();

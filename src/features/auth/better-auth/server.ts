@@ -80,6 +80,7 @@ export const auth = betterAuth({
                 email: user.email,
                 name: user.name,
               },
+              idempotencyKey: `auth:welcome:${user.id}`,
               recipientId: user.id,
               type: "auth.welcome",
             },

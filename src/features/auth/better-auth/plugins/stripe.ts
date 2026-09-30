@@ -13,8 +13,8 @@ import type {
 } from "@/server/db/services/billing/catalog";
 import { billingCatalog } from "@/server/db/services/billing/catalog";
 import { billingStripeClientProxy } from "@/server/db/services/billing/stripe-client";
+import { enqueueStripeWebhookJob } from "@/server/db/services/billing/stripe-webhook-jobs";
 import { reconcileCreditGrantForSubscription } from "@/server/db/services/credits/ledger";
-import { grantCreditTopUpForCheckoutSession } from "@/server/db/services/credits/top-up";
 import { notifyBestEffort } from "@/server/db/services/notifications/service";
 import { env } from "@/shared/env";
 
@@ -283,9 +283,14 @@ export const authStripePlugin = stripe({
   createCustomerOnSignUp: true,
   async onEvent(event) {
     if (isCreditTopUpCheckoutSession(event)) {
-      await grantCreditTopUpForCheckoutSession(
-        event.data.object as Stripe.Checkout.Session,
-      );
+      const session = event.data.object as Stripe.Checkout.Session;
+      await enqueueStripeWebhookJob({
+        eventId: event.id,
+        eventType: event.type as
+          | "checkout.session.async_payment_succeeded"
+          | "checkout.session.completed",
+        objectId: session.id,
+      });
     }
 
     if (isPaymentFailedEvent(event)) {

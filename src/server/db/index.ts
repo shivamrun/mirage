@@ -60,6 +60,13 @@ export const db = new Proxy({} as DBExecutor, {
   },
 });
 
+export async function closeDbConnection() {
+  const client = globalThis.pgClient;
+  globalThis.pgClient = undefined;
+  globalThis.drizzleDb = undefined;
+  await client?.end();
+}
+
 export default db;
 export type DBTransaction = Parameters<DBExecutor["transaction"]>[0] extends (
   tx: infer T,

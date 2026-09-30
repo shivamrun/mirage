@@ -90,21 +90,21 @@ export async function grantCreditTopUpForCheckoutSession(
     userId,
   });
 
-  if (result.created) {
-    await notifyBestEffort(
-      {
-        data: { amount: creditTopUpProduct.credits },
-        idempotencyKey: `billing:credit_top_up:${session.id}`,
-        recipientId: userId,
-        subject: {
-          id: session.id,
-          type: "stripe_checkout_session",
-        },
-        type: "billing.credit_top_up_completed",
+  await notifyBestEffort(
+    {
+      data: { amount: creditTopUpProduct.credits },
+      idempotencyKey: `billing:credit_top_up:${session.id}`,
+      recipientId: userId,
+      subject: {
+        id: session.id,
+        type: "stripe_checkout_session",
       },
-      "billing.credit_top_up_completed",
-    );
+      type: "billing.credit_top_up_completed",
+    },
+    "billing.credit_top_up_completed",
+  );
 
+  if (result.created) {
     await analytics.trackAuthoritative(
       "credits_purchased",
       {

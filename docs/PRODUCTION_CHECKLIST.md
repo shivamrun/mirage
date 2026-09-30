@@ -101,6 +101,11 @@ changes, security reviews, or reliability hardening passes.
   errors, and rate-limit spikes.
 - Verify Redis availability before running multiple app instances, because
   notification SSE fanout across instances depends on `REDIS_URL`.
+- Run `pnpm jobs:worker` as a separately supervised process and alert when it is
+  absent, restart-looping, or accumulating failed/stalled jobs.
+- Configure `JOBS_REDIS_URL` with AOF persistence and
+  `maxmemory-policy noeviction`; use a dedicated queue Redis instance in
+  production rather than the cache/Pub/Sub instance.
 - Document incident response ownership and escalation paths.
 
 ## Deployment

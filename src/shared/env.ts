@@ -71,6 +71,7 @@ export const env = createEnv({
     BETTER_AUTH_URL: z.url(),
     EMAIL_FROM: optionalEnvString,
     EMAIL_REPLY_TO: optionalEnvString,
+    JOBS_REDIS_URL: optionalEnvString,
     REDIS_KEY_PREFIX: z
       .preprocess((value) => {
         if (typeof value === "string" && value.trim() === "") {
@@ -120,6 +121,7 @@ export const env = createEnv({
     AWS_UPLOAD_SESSION_TOKEN: process.env.AWS_UPLOAD_SESSION_TOKEN,
     EMAIL_FROM: process.env.EMAIL_FROM,
     EMAIL_REPLY_TO: process.env.EMAIL_REPLY_TO,
+    JOBS_REDIS_URL: process.env.JOBS_REDIS_URL,
     REDIS_KEY_PREFIX: process.env.REDIS_KEY_PREFIX,
     REDIS_URL: process.env.REDIS_URL,
     TRUSTED_CLIENT_IP_HEADER: process.env.TRUSTED_CLIENT_IP_HEADER,

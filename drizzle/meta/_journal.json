@@ -190,6 +190,20 @@
       "when": 1790703536850,
       "tag": "0026_tough_penance",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1790790911321,
+      "tag": "0027_true_silhouette",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1790791194483,
+      "tag": "0028_first_landau",
+      "breakpoints": true
     }
   ]
 }

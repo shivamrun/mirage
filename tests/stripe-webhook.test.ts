@@ -6,6 +6,8 @@ import db from "@/server/db";
 import { notification, subscription, user } from "@/server/db/schema";
 import { getCreditBalance } from "@/server/db/services/credits/ledger";
 import { setCreditTopUpStripeClientForTests } from "@/server/db/services/credits/top-up";
+import { setJobEnqueueHandlerForTests } from "@/server/jobs/enqueue";
+import { createJobWorkers } from "@/server/jobs/worker";
 import { createTestActor } from "./infra/admin-actor";
 
 const topUpSession = (userId: string) => ({
@@ -254,6 +256,33 @@ describe("Stripe webhook route", () => {
       subjectType: "stripe_checkout_session",
       type: "billing.credit_top_up_completed",
     });
+  });
+
+  it("returns before a durable top-up worker fulfills the checkout", async () => {
+    setJobEnqueueHandlerForTests(null);
+    const actor = await createTestActor();
+    setBetterAuthWebhookStripeClient({
+      eventType: "checkout.session.completed",
+      userId: actor.id,
+    });
+
+    const response = await postBetterAuthStripeWebhook();
+    expect(response.status, await response.clone().text()).toBe(200);
+
+    const beforeWorker = await getCreditBalance(actor.id);
+    expect(beforeWorker.account.availableCredits).toBe(10);
+
+    const workers = createJobWorkers();
+    try {
+      await expect
+        .poll(async () => {
+          const balance = await getCreditBalance(actor.id);
+          return balance.account.availableCredits;
+        })
+        .toBe(210);
+    } finally {
+      await Promise.all(workers.map((worker) => worker.close()));
+    }
   });
 
   it("creates subscription records and grants credits through Better Auth lifecycle hooks", async () => {

@@ -1,4 +1,5 @@
 import { Elysia } from "elysia";
+import { checkJobsRedisHealth } from "@/adapters/jobs/connection";
 import { checkRedisHealth } from "@/adapters/redis/client";
 import { accessVerificationRoutes } from "@/features/auth/access-verification-routes";
 import { checkDatabaseHealth } from "@/server/db/dal/health";
@@ -16,14 +17,29 @@ export const app = new Elysia({ prefix: "/api" })
   .use(apiErrors)
   .get("/", () => "Hello Elysia")
   .get("/health", async ({ status }) => {
-    const redis = await checkRedisHealth();
+    const [jobsRedis, redis] = await Promise.all([
+      checkJobsRedisHealth(),
+      checkRedisHealth(),
+    ]);
 
     try {
       await checkDatabaseHealth();
 
+      if (jobsRedis !== "ok") {
+        return status(503, {
+          checks: {
+            database: "ok",
+            jobsRedis,
+            redis,
+          },
+          ok: false,
+        });
+      }
+
       return {
         checks: {
           database: "ok",
+          jobsRedis,
           redis,
         },
         ok: true,
@@ -32,6 +48,7 @@ export const app = new Elysia({ prefix: "/api" })
       return status(503, {
         checks: {
           database: "error",
+          jobsRedis,
           redis,
         },
         ok: false,

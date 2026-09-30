@@ -28,6 +28,12 @@ function assertNever(type: never): never {
 export const emailNotificationChannel = {
   channel: "email",
   async deliver(input) {
+    const sendNotificationEmail = (options: Parameters<typeof sendEmail>[0]) =>
+      sendEmail({
+        ...options,
+        idempotencyKey: input.idempotencyKey ?? undefined,
+      });
+
     switch (input.type as EmailNotificationType) {
       case "account.two_factor_email_code": {
         const data =
@@ -41,7 +47,7 @@ export const emailNotificationChannel = {
           : "Use this code to continue setting up authenticator app sign-in for your Mirage account.";
 
         return {
-          email: await sendEmail({
+          email: await sendNotificationEmail({
             react: (
               <EmailLayout
                 previewText="Use this code to confirm your two-factor authentication change."
@@ -77,7 +83,7 @@ export const emailNotificationChannel = {
           input.data as NotificationPayloadMap["auth.email_verification"];
 
         return {
-          email: await sendEmail({
+          email: await sendNotificationEmail({
             react: (
               <VerifyEmailTemplate
                 actionLabel={data.actionLabel}
@@ -109,7 +115,7 @@ export const emailNotificationChannel = {
         const expiresAt = formatInvitationExpiration(data.expiresAt);
 
         return {
-          email: await sendEmail({
+          email: await sendNotificationEmail({
             react: (
               <InvitationTemplate
                 acceptUrl={data.acceptUrl}
@@ -139,7 +145,7 @@ export const emailNotificationChannel = {
           input.data as NotificationPayloadMap["auth.password_reset"];
 
         return {
-          email: await sendEmail({
+          email: await sendNotificationEmail({
             react: (
               <ResetPasswordTemplate
                 name={data.name}
@@ -168,7 +174,7 @@ export const emailNotificationChannel = {
         const appUrl = data.appUrl ?? env.NEXT_PUBLIC_BASE_URL;
 
         return {
-          email: await sendEmail({
+          email: await sendNotificationEmail({
             react: <WelcomeEmailTemplate appUrl={appUrl} name={data.name} />,
             subject: "Welcome to Mirage",
             tags: [
@@ -191,7 +197,7 @@ export const emailNotificationChannel = {
           input.data as NotificationPayloadMap["email_list.verification"];
 
         return {
-          email: await sendEmail({
+          email: await sendNotificationEmail({
             react: (
               <EmailListVerificationTemplate
                 listName={data.listName}
@@ -224,7 +230,7 @@ export const emailNotificationChannel = {
         const referredDisplay = data.referredUserName || data.referredUserEmail;
 
         return {
-          email: await sendEmail({
+          email: await sendNotificationEmail({
             react: (
               <EmailLayout
                 previewText={`${data.creditAmount} referral credits were added to your Mirage account.`}

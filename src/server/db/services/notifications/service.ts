@@ -15,6 +15,7 @@ import {
   markNotificationRead,
   markNotificationUnread,
 } from "@/server/db/dal/notifications";
+import { enqueueEmailDelivery } from "@/server/db/services/notifications/email-delivery";
 import { publish } from "@/server/db/services/notifications/realtime-broker";
 import { resolvePaginatedView } from "@/server/db/services/pagination";
 import { notificationRealtimeEventNames } from "@/shared/schemas/notifications";
@@ -38,10 +39,16 @@ export function toNotificationResponse(notification: NotificationRecord) {
 type NotifyResult = {
   deliveries: {
     email?: NotificationDeliveryResult["email"];
+    emailDeliveryId?: string;
   };
   created: boolean;
   notification: NotificationRecord | null;
 };
+
+const durableEmailTypes = new Set<NotifyInput["type"]>([
+  "auth.welcome",
+  "referrals.completed",
+]);
 
 export async function notify<Type extends NotifyInput["type"]>(
   input: NotifyInput<Type>,
@@ -62,13 +69,27 @@ export async function notify<Type extends NotifyInput["type"]>(
   let notificationId: string | undefined;
 
   for (const channel of definition.channels) {
-    const result: NotificationDeliveryResult =
-      channel === "in_app"
-        ? await inAppNotificationChannel.deliver(deliveryInput)
-        : await emailNotificationChannel.deliver(deliveryInput);
+    let result: NotificationDeliveryResult;
+    if (channel === "in_app") {
+      result = await inAppNotificationChannel.deliver(deliveryInput);
+    } else if (durableEmailTypes.has(input.type)) {
+      if (!input.idempotencyKey) {
+        throw new Error("Durable email delivery requires an idempotency key.");
+      }
+      const delivery = await enqueueEmailDelivery({
+        ...deliveryInput,
+        idempotencyKey: input.idempotencyKey,
+      });
+      result = { emailDeliveryId: delivery.id };
+    } else {
+      result = await emailNotificationChannel.deliver(deliveryInput);
+    }
 
     if (result.email) {
       deliveries.email = result.email;
+    }
+    if (result.emailDeliveryId) {
+      deliveries.emailDeliveryId = result.emailDeliveryId;
     }
 
     if (result.notificationId) {
