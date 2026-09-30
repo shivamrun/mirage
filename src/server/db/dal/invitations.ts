@@ -2,7 +2,7 @@ import { and, asc, desc, eq, gt } from "drizzle-orm";
 
 import db, { type DBClient } from "@/server/db";
 import { paginateList, totalCount } from "@/server/db/helpers/paginate";
-import { invitation } from "@/server/db/schema";
+import { invitation, session, user } from "@/server/db/schema";
 
 export type InvitationRecord = typeof invitation.$inferSelect;
 export type CreateInvitationRecordValues = typeof invitation.$inferInsert;
@@ -68,6 +68,20 @@ export async function findInvitationByTokenHash(tokenHash: string) {
   return record ?? null;
 }
 
+export async function findInvitationByTokenHashForUpdate(
+  tokenHash: string,
+  executor: DBClient,
+) {
+  const [record] = await executor
+    .select()
+    .from(invitation)
+    .where(eq(invitation.tokenHash, tokenHash))
+    .for("update")
+    .limit(1);
+
+  return record ?? null;
+}
+
 export async function findActivePendingInvitationByEmail({
   email,
   now = new Date(),
@@ -111,6 +125,65 @@ export async function markInvitationRevoked({
     .returning();
 
   return record ?? null;
+}
+
+export async function claimPendingInvitationForUser({
+  email,
+  executor,
+  now = new Date(),
+  tokenHash,
+  userId,
+}: {
+  email: string;
+  executor: DBClient;
+  now?: Date;
+  tokenHash: string;
+  userId: string;
+}) {
+  const [record] = await executor
+    .update(invitation)
+    .set({
+      acceptedAt: now,
+      acceptedByUserId: userId,
+      status: "accepted",
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(invitation.tokenHash, tokenHash),
+        eq(invitation.email, email),
+        eq(invitation.status, "pending"),
+        gt(invitation.expiresAt, now),
+      ),
+    )
+    .returning();
+
+  return record ?? null;
+}
+
+export async function setUserRole({
+  executor,
+  role,
+  userId,
+}: {
+  executor: DBClient;
+  role: string;
+  userId: string;
+}) {
+  const [record] = await executor
+    .update(user)
+    .set({ role, updatedAt: new Date() })
+    .where(eq(user.id, userId))
+    .returning();
+
+  return record ?? null;
+}
+
+export async function revokeSessionsForUser(
+  userId: string,
+  executor: DBClient = db,
+) {
+  return executor.delete(session).where(eq(session.userId, userId)).returning();
 }
 
 export async function listAdminInvitations({

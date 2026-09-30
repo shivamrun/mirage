@@ -1,9 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { NextRequest } from "next/server";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { auth } from "@/features/auth/better-auth/server";
 import {
   getLoginRedirectPath,
   getSafeAuthRedirect,
 } from "@/features/auth/redirect";
+import { proxy } from "@/proxy";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("auth redirect policy", () => {
   it.each([
@@ -31,5 +38,16 @@ describe("auth redirect policy", () => {
     expect(getLoginRedirectPath("https://evil.example/admin")).toBe(
       "/login?callbackURL=%2F",
     );
+  });
+
+  it("prevents invite token referrer and cache leakage", async () => {
+    vi.spyOn(auth.api, "getSession").mockResolvedValueOnce(null);
+
+    const response = await proxy(
+      new NextRequest("http://localhost:3000/invite/accept?token=secret-token"),
+    );
+
+    expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(response.headers.get("cache-control")).toBe("no-store");
   });
 });

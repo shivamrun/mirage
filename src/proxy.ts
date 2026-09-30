@@ -5,6 +5,7 @@ import { getSafeAuthRedirect } from "@/features/auth/redirect";
 
 const authRoutes = new Set(["/login", "/register"]);
 const protectedRoutePrefixes = ["/account", "/admin"];
+const inviteAcceptPath = "/invite/accept";
 
 function isProtectedRoute(pathname: string) {
   return protectedRoutePrefixes.some(
@@ -59,13 +60,26 @@ export async function proxy(request: NextRequest) {
     );
   }
 
-  return NextResponse.next({
+  const response = NextResponse.next({
     request: {
       headers: requestHeaders,
     },
   });
+
+  if (pathname === inviteAcceptPath) {
+    response.headers.set("referrer-policy", "no-referrer");
+    response.headers.set("cache-control", "no-store");
+  }
+
+  return response;
 }
 
 export const config = {
-  matcher: ["/account/:path*", "/admin/:path*", "/login", "/register"],
+  matcher: [
+    "/account/:path*",
+    "/admin/:path*",
+    "/invite/accept",
+    "/login",
+    "/register",
+  ],
 };

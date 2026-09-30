@@ -9,6 +9,7 @@ import { billingRoutes } from "@/server/routes/billing";
 import { contactRoutes } from "@/server/routes/contact";
 import { creditsRoutes } from "@/server/routes/credits";
 import { emailListRoutes } from "@/server/routes/email-list";
+import { invitationRoutes } from "@/server/routes/invitations";
 import { uploadsRoutes } from "@/server/routes/uploads";
 
 export const app = new Elysia({ prefix: "/api" })
@@ -43,6 +44,7 @@ export const app = new Elysia({ prefix: "/api" })
   .use(contactRoutes)
   .use(creditsRoutes)
   .use(emailListRoutes)
+  .use(invitationRoutes)
   .use(uploadsRoutes)
   .use(adminRoutes);
 

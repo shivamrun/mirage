@@ -14,6 +14,7 @@ import {
 } from "@/server/db/services/invitations/service";
 import { adminRoutes } from "@/server/routes/admin";
 import { createTestActor } from "./infra/admin-actor";
+import { setTestEmailDeliveryHook, testEmailOutbox } from "./infra/email-fake";
 import { httpRequest } from "./infra/http-request";
 
 const origin = "http://localhost:3000";
@@ -22,6 +23,12 @@ const app = new Elysia({ prefix: "/api" }).use(adminRoutes);
 
 function invitationBody(email = `invite-${randomUUID()}@example.com`) {
   return JSON.stringify({ email, role: "admin" });
+}
+
+function invitationEmails() {
+  return testEmailOutbox.filter(
+    (email) => email.subject === "Accept your Mirage invitation",
+  );
 }
 
 async function createInvitationFixture({
@@ -122,6 +129,44 @@ describe("admin invitation routes", () => {
       .where(eq(invitation.id, body.invitation.id));
     expect(stored?.tokenHash).toMatch(/^[a-f0-9]{64}$/);
     expect(JSON.stringify(body)).not.toContain(stored?.tokenHash);
+    const sentInvitationEmails = invitationEmails();
+    expect(sentInvitationEmails).toHaveLength(1);
+    expect(sentInvitationEmails[0]).toMatchObject({
+      subject: "Accept your Mirage invitation",
+      to: email,
+    });
+    expect(sentInvitationEmails[0]?.text).toContain("/invite/accept?token=");
+  });
+
+  it("returns 503 and revokes the invite when invitation email delivery fails", async () => {
+    const admin = await createTestActor({ role: "admin", emailVerified: true });
+    const email = `delivery-failure-${randomUUID()}@example.com`;
+    setTestEmailDeliveryHook(async () => {
+      throw new Error("Email delivery failed.");
+    });
+
+    const response = await httpRequest(app, "/api/admin/invitations", {
+      body: invitationBody(email),
+      cookie: admin.cookie,
+      headers: jsonHeaders,
+      method: "POST",
+    });
+
+    expect(response.status, await response.clone().text()).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      message: "Invitation email could not be delivered.",
+    });
+    expect(invitationEmails()).toHaveLength(0);
+
+    const [stored] = await db
+      .select()
+      .from(invitation)
+      .where(eq(invitation.email, email));
+    expect(stored).toMatchObject({
+      email,
+      status: "revoked",
+    });
+    expect(stored?.revokedAt).toBeInstanceOf(Date);
   });
 
   it.each([
@@ -233,10 +278,12 @@ describe("admin invitation routes", () => {
   it("rejects missing or invalid same-origin headers on create only", async () => {
     const admin = await createTestActor({ role: "admin", emailVerified: true });
 
-    for (const headers of [
+    const headerCases: Record<string, string>[] = [
       { "content-type": "application/json" },
       { "content-type": "application/json", origin: "https://evil.example" },
-    ]) {
+    ];
+
+    for (const headers of headerCases) {
       const response = await httpRequest(app, "/api/admin/invitations", {
         body: invitationBody(),
         cookie: admin.cookie,

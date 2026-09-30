@@ -5,7 +5,7 @@ import {
   toAdminCreateInvitationResponse,
 } from "@/server/db/services/admin/invitations";
 import type { CurrentUser } from "@/server/db/services/auth/current-user";
-import { createInvitation } from "@/server/db/services/invitations/service";
+import { createInvitationAndSendEmail } from "@/server/db/services/invitations/service";
 import { requestPolicy } from "@/server/http/request-policy";
 import {
   adminCreateInvitationResponseSchema,
@@ -53,7 +53,7 @@ export const adminInvitationRoutes = new Elysia()
     "/invitations",
     async (context) => {
       const { body, status } = context;
-      const result = await createInvitation({
+      const result = await createInvitationAndSendEmail({
         email: stringBodyValue(body.email),
         invitedByUserId: getAdminRouteUser(context).id,
         role: invitationRoleBodyValue(body.role),
@@ -73,6 +73,10 @@ export const adminInvitationRoutes = new Elysia()
           return status(409, {
             message: "A user with this email already exists.",
           });
+        case "email-delivery-failed":
+          return status(503, {
+            message: "Invitation email could not be delivered.",
+          });
       }
     },
     {
@@ -85,6 +89,7 @@ export const adminInvitationRoutes = new Elysia()
         403: messageResponseSchema,
         409: messageResponseSchema,
         429: messageResponseSchema,
+        503: messageResponseSchema,
         500: messageResponseSchema,
       },
     },

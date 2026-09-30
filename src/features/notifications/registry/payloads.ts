@@ -21,6 +21,11 @@ export const notificationPayloadSchemas = {
     name: z.string().trim().nullable().optional(),
     verificationUrl: z.string().url(),
   }),
+  "auth.invitation": z.object({
+    acceptUrl: z.string().url(),
+    email: z.string().email(),
+    expiresAt: z.iso.datetime(),
+  }),
   "auth.password_reset": z.object({
     email: z.string().email(),
     name: z.string().trim().nullable().optional(),

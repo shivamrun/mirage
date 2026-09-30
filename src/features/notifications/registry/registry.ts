@@ -28,6 +28,11 @@ export const notificationRegistry = {
     channels: ["email"],
     payloadSchema: notificationPayloadSchemas["auth.email_verification"],
   },
+  "auth.invitation": {
+    category: "security",
+    channels: ["email"],
+    payloadSchema: notificationPayloadSchemas["auth.invitation"],
+  },
   "auth.password_reset": {
     category: "security",
     channels: ["email"],

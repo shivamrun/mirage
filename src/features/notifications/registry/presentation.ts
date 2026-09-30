@@ -38,6 +38,10 @@ const notificationPresenters = {
     href: "/account",
     title: "Email verification",
   }),
+  "auth.invitation": (notification) => ({
+    description: `An invitation email was sent to ${notification.data.email}.`,
+    title: "Invitation sent",
+  }),
   "auth.password_reset": () => ({
     description: "A password reset email was sent.",
     href: "/sign-in",

@@ -37,10 +37,14 @@ import {
 function RegisterForm({
   redirectTo = "/account",
   googleAuthEnabled = false,
+  invitedEmail,
+  invitationToken,
   referralCode,
 }: {
   redirectTo?: string;
   googleAuthEnabled?: boolean;
+  invitedEmail?: string;
+  invitationToken?: string;
   referralCode?: string;
 }) {
   const router = useRouter();
@@ -48,10 +52,11 @@ function RegisterForm({
   const [turnstileToken, setTurnstileToken] = React.useState("");
   const turnstileRef = React.useRef<TurnstileInstance>(null);
   const [isRedirecting, setIsRedirecting] = React.useState(false);
+  const isInvitationSignup = Boolean(invitedEmail && invitationToken);
   const form = useForm<RegisterFormInput, undefined, RegisterFormValues>({
     resolver: zodResolver(registerFormSchema),
     defaultValues: {
-      email: "",
+      email: invitedEmail ?? "",
       password: "",
       agreeToTerms: false,
     },
@@ -66,6 +71,40 @@ function RegisterForm({
     }
 
     try {
+      if (isInvitationSignup && invitedEmail && invitationToken) {
+        const response = await fetch("/api/invitations/accept-signup", {
+          body: JSON.stringify({
+            ...values,
+            callbackURL: redirectTo,
+            email: invitedEmail,
+            token: invitationToken,
+          }),
+          credentials: "include",
+          headers: {
+            "content-type": "application/json",
+            "x-captcha-response": turnstileToken,
+          },
+          method: "POST",
+        });
+        const body = (await response.json().catch(() => null)) as {
+          message?: string;
+          redirectTo?: string;
+          status?: true;
+        } | null;
+
+        if (!response.ok || body?.status !== true) {
+          setError(body?.message || "Invitation signup failed.");
+          setTurnstileToken("");
+          turnstileRef.current?.reset();
+          return;
+        }
+
+        setIsRedirecting(true);
+        router.replace(body.redirectTo || redirectTo);
+        router.refresh();
+        return;
+      }
+
       const result = await authClient.signUp.email({
         ...values,
         name: "",
@@ -101,8 +140,12 @@ function RegisterForm({
 
   return (
     <AuthFormShell
-      title="Create your account"
-      description={`Tell us the basics and we'll get ${siteConfig.name} ready for you.`}
+      title={isInvitationSignup ? "Accept invitation" : "Create your account"}
+      description={
+        isInvitationSignup
+          ? `Create your ${siteConfig.name} account with your invited email.`
+          : `Tell us the basics and we'll get ${siteConfig.name} ready for you.`
+      }
       footer={
         <>
           Already have an account?{" "}
@@ -129,15 +172,19 @@ function RegisterForm({
           ) : null}
           {referralCode ? (
             <AuthStatusMessage tone="success">
-              Referral code applied: {referralCode}. You and your referrer each
-              get 50 credits after email verification.
+              Referral code applied: {referralCode}.
             </AuthStatusMessage>
           ) : null}
           <EmailField
             id="email"
-            description="We'll use this for sign-in and account updates."
+            description={
+              isInvitationSignup
+                ? "This email is locked to your invitation."
+                : "We'll use this for sign-in and account updates."
+            }
             error={form.formState.errors.email?.message}
             placeholder="you@company.com"
+            readOnly={isInvitationSignup}
             required
             {...form.register("email")}
           />
@@ -214,9 +261,11 @@ function RegisterForm({
             ? "Redirecting..."
             : form.formState.isSubmitting
               ? "Creating account..."
-              : "Create account"}
+              : isInvitationSignup
+                ? "Accept invitation"
+                : "Create account"}
         </Button>
-        {googleAuthEnabled ? (
+        {googleAuthEnabled && !isInvitationSignup ? (
           <>
             <AuthDivider label="OR" />
             <GoogleAuthButton

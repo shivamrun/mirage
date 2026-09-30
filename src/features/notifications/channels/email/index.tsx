@@ -1,6 +1,9 @@
 import { EmailLayout, EmailText } from "@/adapters/email/components";
 import { sendEmail } from "@/adapters/email/send-email";
 import EmailListVerificationTemplate from "@/adapters/email/templates/email-list-verification";
+import InvitationTemplate, {
+  formatInvitationExpiration,
+} from "@/adapters/email/templates/invitation";
 import ResetPasswordTemplate from "@/adapters/email/templates/reset-password";
 import VerifyEmailTemplate from "@/adapters/email/templates/verify-email";
 import WelcomeEmailTemplate from "@/adapters/email/templates/welcome-email";
@@ -12,6 +15,7 @@ import type { NotificationChannelHandler } from "../types";
 type EmailNotificationType =
   | "account.two_factor_email_code"
   | "auth.email_verification"
+  | "auth.invitation"
   | "auth.password_reset"
   | "auth.welcome"
   | "email_list.verification"
@@ -95,6 +99,36 @@ export const emailNotificationChannel = {
               data.intro ||
                 "Confirm this email address so we can keep your Mirage account secure.",
               `${data.actionLabel ?? "Verify email"}: ${data.verificationUrl}`,
+            ].join("\n\n"),
+            to: data.email,
+          }),
+        };
+      }
+      case "auth.invitation": {
+        const data = input.data as NotificationPayloadMap["auth.invitation"];
+        const expiresAt = formatInvitationExpiration(data.expiresAt);
+
+        return {
+          email: await sendEmail({
+            react: (
+              <InvitationTemplate
+                acceptUrl={data.acceptUrl}
+                email={data.email}
+                expiresAt={data.expiresAt}
+              />
+            ),
+            subject: "Accept your Mirage invitation",
+            tags: [
+              {
+                name: "category",
+                value: "invitation",
+              },
+            ],
+            text: [
+              "Hi there,",
+              `You have been invited to create a Mirage account for ${data.email}.`,
+              `Accept invitation: ${data.acceptUrl}`,
+              `This invitation expires ${expiresAt}.`,
             ].join("\n\n"),
             to: data.email,
           }),

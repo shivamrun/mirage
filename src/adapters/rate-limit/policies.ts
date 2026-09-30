@@ -82,6 +82,13 @@ const routePolicies: Record<RateLimitPolicyName, RoutePolicyDefinition> = {
     scope: "route:email-list:signup",
     windowMs: ROUTE_WINDOW_MS,
   },
+  "invitation-accept": {
+    fallbackLimit: 500,
+    limit: 30,
+    message: "Too many invitation requests. Please try again later.",
+    scope: "route:invitation:accept",
+    windowMs: ROUTE_WINDOW_MS,
+  },
   "uploads-prepare": {
     limit: 100,
     message: "Too many upload requests. Please try again later.",
