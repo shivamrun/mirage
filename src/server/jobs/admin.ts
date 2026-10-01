@@ -195,15 +195,14 @@ async function loadHeartbeats(): Promise<AdminWorker[]> {
   });
 }
 
-export type AdminJobsSnapshot = {
+export type AdminQueueSnapshot = {
   counts: AdminJobCounts;
   queues: AdminQueueHealth[];
-  schedules: AdminSchedule[];
   snapshotAt: string;
   workers: AdminWorker[];
 };
 
-export async function getAdminJobsSnapshot(): Promise<AdminJobsSnapshot> {
+export async function getAdminQueueSnapshot(): Promise<AdminQueueSnapshot> {
   let workers: AdminWorker[] = [];
   try {
     workers = await loadHeartbeats();
@@ -266,7 +265,6 @@ export async function getAdminJobsSnapshot(): Promise<AdminJobsSnapshot> {
   return {
     counts,
     queues,
-    schedules: await listAdminSchedules().catch(() => []),
     snapshotAt: new Date().toISOString(),
     workers,
   };

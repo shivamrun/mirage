@@ -136,9 +136,14 @@ const adminData = {
       icon: MailPlus,
     },
     {
-      title: "Jobs",
+      title: "Jobs & queues",
       url: "/admin/jobs",
       icon: ListTodo,
+      items: [
+        { title: "Background jobs", url: "/admin/jobs" },
+        { title: "Durable queues", url: "/admin/jobs/queues" },
+        { title: "Scheduling", url: "/admin/jobs/schedules" },
+      ],
     },
     {
       title: "Contact Submission",

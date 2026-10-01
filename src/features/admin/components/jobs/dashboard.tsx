@@ -9,7 +9,6 @@ import {
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
@@ -27,17 +26,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { StatusBadge } from "@/features/admin/components/user-detail/primitives";
-import type { AdminJobsSnapshot } from "@/server/jobs/admin";
+import type { AdminQueueSnapshot } from "@/server/jobs/admin";
 import { jobDefinitions, jobQueueNames } from "@/server/jobs/registry";
 import type {
   AdminJob,
   AdminJobName,
   AdminJobQueue,
   AdminJobStatus,
+  AdminSchedule,
 } from "@/shared/schemas";
 import { formatDate } from "../shared/formatters";
 import { JobActions } from "./job-actions";
-import { adminJobStatuses } from "./query";
+import { adminJobStatuses, adminJobsPageHref } from "./query";
 import { ScheduleTrigger } from "./schedule-trigger";
 
 const allFilterValue = "__all__";
@@ -69,30 +69,28 @@ function JobStatus({ status }: { status: AdminJobStatus }) {
   );
 }
 
-export function JobsOverview({ snapshot }: { snapshot: AdminJobsSnapshot }) {
+export function JobsOverview({ snapshot }: { snapshot: AdminQueueSnapshot }) {
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border bg-card px-4 py-3 sm:grid-cols-5">
       {adminJobStatuses.map((status) => (
-        <Card key={status} size="sm">
-          <CardHeader>
-            <CardTitle className="capitalize">{status}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold tabular-nums">
+        <div key={status}>
+          <dt className="text-muted-foreground text-xs capitalize">{status}</dt>
+          <dd className="mt-1 text-xl font-semibold tabular-nums">
             {snapshot.counts[status].toLocaleString()}
-          </CardContent>
-        </Card>
+          </dd>
+        </div>
       ))}
-    </div>
+    </dl>
   );
 }
 
 export function QueueAndWorkerTables({
   snapshot,
 }: {
-  snapshot: AdminJobsSnapshot;
+  snapshot: AdminQueueSnapshot;
 }) {
   return (
-    <div className="grid gap-5 xl:grid-cols-2">
+    <div className="space-y-5">
       <section>
         <h2 className="mb-2 font-semibold">Queue health</h2>
         <div className="overflow-auto rounded-lg border bg-card">
@@ -103,14 +101,21 @@ export function QueueAndWorkerTables({
                 <TableHead>Status</TableHead>
                 <TableHead>Waiting</TableHead>
                 <TableHead>Active</TableHead>
-                <TableHead>Oldest</TableHead>
+                <TableHead>Oldest waiting</TableHead>
                 <TableHead>Workers</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {snapshot.queues.map((queue) => (
                 <TableRow key={queue.queue}>
-                  <TableCell className="font-medium">{queue.queue}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link
+                      className="link-text"
+                      href={adminJobsPageHref({ queue: queue.queue })}
+                    >
+                      {queue.queue}
+                    </Link>
+                  </TableCell>
                   <TableCell>
                     <StatusBadge
                       icon={
@@ -124,7 +129,9 @@ export function QueueAndWorkerTables({
                             : "danger"
                       }
                     >
-                      {queue.status}
+                      {queue.status === "no-worker"
+                        ? "No worker"
+                        : queue.status}
                     </StatusBadge>
                   </TableCell>
                   <TableCell>{queue.counts.waiting}</TableCell>
@@ -377,17 +384,20 @@ export function JobsTable({
   );
 }
 
-export function SchedulesTable({ snapshot }: { snapshot: AdminJobsSnapshot }) {
+export function SchedulesTable({
+  schedules,
+}: {
+  schedules: AdminSchedule[] | null;
+}) {
   return (
     <section>
-      <h2 className="mb-2 font-semibold">Scheduled jobs</h2>
       <div className="overflow-auto rounded-lg border bg-card">
         <Table className="min-w-[920px]">
           <TableHeader>
             <TableRow>
-              <TableHead>Schedule</TableHead>
+              <TableHead>Job</TableHead>
               <TableHead>Queue</TableHead>
-              <TableHead>Schedule</TableHead>
+              <TableHead>Cadence</TableHead>
               <TableHead>Next run</TableHead>
               <TableHead>Last run</TableHead>
               <TableHead>State</TableHead>
@@ -395,11 +405,19 @@ export function SchedulesTable({ snapshot }: { snapshot: AdminJobsSnapshot }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {snapshot.schedules.length ? (
-              snapshot.schedules.map((schedule) => (
+            {schedules?.length ? (
+              schedules.map((schedule) => (
                 <TableRow key={schedule.id}>
                   <TableCell>
-                    <p className="font-medium">{schedule.name}</p>
+                    <Link
+                      className="link-text font-medium"
+                      href={adminJobsPageHref({
+                        name: schedule.name,
+                        queue: schedule.queue,
+                      })}
+                    >
+                      {schedule.name}
+                    </Link>
                     <p className="font-mono text-muted-foreground text-xs">
                       {schedule.id}
                     </p>
@@ -432,7 +450,9 @@ export function SchedulesTable({ snapshot }: { snapshot: AdminJobsSnapshot }) {
                   className="h-28 text-center text-muted-foreground"
                   colSpan={7}
                 >
-                  Schedules unavailable.
+                  {schedules
+                    ? "No schedules configured."
+                    : "Schedules unavailable."}
                 </TableCell>
               </TableRow>
             )}
