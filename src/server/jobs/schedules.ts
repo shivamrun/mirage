@@ -7,6 +7,7 @@ export const JOB_SCHEDULER_ID_PREFIX = "mirage:";
 export type JobSchedule = {
   [Name in JobName]: {
     id: `${typeof JOB_SCHEDULER_ID_PREFIX}${string}`;
+    manualTrigger: boolean;
     name: Name;
     payload: JobPayload<Name>;
     repeat: Omit<RepeatOptions, "key">;
@@ -16,12 +17,14 @@ export type JobSchedule = {
 export const jobSchedules = [
   {
     id: "mirage:pending-work-recovery:v1",
+    manualTrigger: true,
     name: "system.pending-work.recover.v1",
     payload: {},
     repeat: { every: 60_000 },
   },
   {
     id: "mirage:billing-subscription-reconciliation:v1",
+    manualTrigger: true,
     name: "billing.subscription-reconciliation.scan.v1",
     payload: {},
     repeat: { pattern: "15 2 * * *", tz: "UTC" },

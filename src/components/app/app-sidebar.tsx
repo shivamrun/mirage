@@ -9,6 +9,7 @@ import {
   Home,
   Inbox,
   LayoutDashboard,
+  ListTodo,
   type LucideIcon,
   Mail,
   MailPlus,
@@ -133,6 +134,11 @@ const adminData = {
       title: "Invitations",
       url: "/admin/invitations",
       icon: MailPlus,
+    },
+    {
+      title: "Jobs",
+      url: "/admin/jobs",
+      icon: ListTodo,
     },
     {
       title: "Contact Submission",

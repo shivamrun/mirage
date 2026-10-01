@@ -12,6 +12,7 @@ export const WORKER_HEARTBEAT_INTERVAL_MS = 15_000;
 export const WORKER_HEARTBEAT_TTL_SECONDS = 45;
 
 export type WorkerHeartbeat = {
+  concurrencyByQueue?: Record<string, number>;
   lastSeenAt: string;
   queues: string[];
   release: string | null;
@@ -27,7 +28,10 @@ export function createWorkerId() {
   return `${hostname()}:${process.pid}:${randomUUID()}`;
 }
 
-export async function startWorkerHeartbeat(workerId: string) {
+export async function startWorkerHeartbeat(
+  workerId: string,
+  concurrencyByQueue?: Record<string, number>,
+) {
   const client = createJobsOperationsConnection();
   const startedAt = new Date().toISOString();
   let stopped = false;
@@ -35,6 +39,7 @@ export async function startWorkerHeartbeat(workerId: string) {
 
   async function refresh() {
     const heartbeat: WorkerHeartbeat = {
+      concurrencyByQueue,
       lastSeenAt: new Date().toISOString(),
       queues: Object.values(jobQueueNames),
       release: process.env.RELEASE_ID ?? process.env.GIT_SHA ?? null,

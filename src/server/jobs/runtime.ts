@@ -5,7 +5,7 @@ import { startWorkerHeartbeat } from "./health";
 import { logJobEvent } from "./observability";
 import { jobQueueNames } from "./registry";
 import { syncJobSchedules } from "./schedule-manager";
-import { createJobWorkers } from "./worker";
+import { createJobWorkers, workerConfiguration } from "./worker";
 
 const QUEUE_HEALTH_INTERVAL_MS = 30_000;
 
@@ -70,7 +70,15 @@ export async function startJobWorkerRuntime(workerId: string) {
   const workers = createJobWorkers(workerId);
   let heartbeat: Awaited<ReturnType<typeof startWorkerHeartbeat>>;
   try {
-    heartbeat = await startWorkerHeartbeat(workerId);
+    heartbeat = await startWorkerHeartbeat(
+      workerId,
+      Object.fromEntries(
+        Object.entries(workerConfiguration).map(([queue, { concurrency }]) => [
+          queue,
+          concurrency,
+        ]),
+      ),
+    );
   } catch (error) {
     await Promise.allSettled(workers.map((worker) => worker.close()));
     await closeJobQueues();

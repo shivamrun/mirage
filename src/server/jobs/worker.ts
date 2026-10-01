@@ -9,7 +9,7 @@ import { logJobEvent } from "./observability";
 import { processJob } from "./processor";
 import { jobQueueNames } from "./registry";
 
-const workerConfiguration = {
+export const workerConfiguration = {
   [jobQueueNames.billing]: { concurrency: 2 },
   [jobQueueNames.default]: { concurrency: 5 },
 } as const;

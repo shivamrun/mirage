@@ -48,6 +48,13 @@ const routePolicies: Record<RateLimitPolicyName, RoutePolicyDefinition> = {
     trustedClientLimit: 80,
     windowMs: ROUTE_WINDOW_MS,
   },
+  "admin-jobs-mutation": {
+    limit: 30,
+    message: "Too many admin job requests. Please try again later.",
+    scope: "route:admin:jobs-mutation",
+    trustedClientLimit: 60,
+    windowMs: ROUTE_WINDOW_MS,
+  },
   "admin-security-mutation": {
     limit: 40,
     message: "Too many admin security requests. Please try again later.",
