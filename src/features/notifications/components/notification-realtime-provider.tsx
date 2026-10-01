@@ -10,11 +10,8 @@ import {
   useRef,
   useState,
 } from "react";
-
-import {
-  notificationRealtimeEventNames,
-  unreadNotificationCountResponseSchema,
-} from "@/shared/schemas/notifications";
+import { api } from "@/shared/api/client";
+import { notificationRealtimeEventNames } from "@/shared/schemas/notifications";
 
 type NotificationRealtimeContextValue = {
   unreadCount: number;
@@ -60,14 +57,11 @@ export function NotificationRealtimeProvider({
     }
 
     async function resyncUnreadCount() {
-      const response = await fetch("/api/account/notifications/unread-count", {
-        cache: "no-store",
-      });
-      if (!response.ok) return;
-
-      const data = unreadNotificationCountResponseSchema.parse(
-        await response.json(),
-      );
+      const { data, error } =
+        await api.api.account.notifications["unread-count"].get({
+          fetch: { cache: "no-store" },
+        });
+      if (error || !data) return;
       setUnreadCount(data.unreadCount);
     }
 

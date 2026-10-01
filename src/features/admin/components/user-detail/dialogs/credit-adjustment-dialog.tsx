@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { AuthInputField, AuthStatusMessage } from "@/features/auth/components";
+import { api } from "@/shared/api/client";
 import {
   type AdminCreditAdjustmentInput,
   type AdminCreditAdjustmentValues,
@@ -70,29 +71,20 @@ export function AdminCreditAdjustmentDialog({ userId }: { userId: string }) {
     setStatus(undefined);
 
     try {
-      const response = await fetch(
-        `/api/admin/users/${userId}/credits/adjust`,
-        {
-          body: JSON.stringify({
-            amount: values.amount,
-            idempotencyKey: crypto.randomUUID(),
-            reason: values.reason,
-            sourceId: values.sourceId,
-          }),
-          credentials: "same-origin",
-          headers: {
-            "content-type": "application/json",
-          },
-          method: "POST",
-        },
-      );
+      const { error } = await api.api.admin
+        .users({ userId })
+        .credits.adjust.post({
+          amount: values.amount,
+          idempotencyKey: crypto.randomUUID(),
+          reason: values.reason,
+          sourceId: values.sourceId,
+        });
 
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as {
-          message?: string;
-        } | null;
+      if (error) {
         setStatus({
-          text: payload?.message ?? "Credit adjustment failed.",
+          text:
+            (error.value as { message?: string })?.message ??
+            "Credit adjustment failed.",
           tone: "error",
         });
         return;

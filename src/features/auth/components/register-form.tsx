@@ -27,6 +27,7 @@ import {
   AuthDivider,
   GoogleAuthButton,
 } from "@/features/auth/components/google-auth-button";
+import { api } from "@/shared/api/client";
 import { siteConfig } from "@/shared/metadata";
 import {
   type RegisterFormInput,
@@ -72,35 +73,30 @@ function RegisterForm({
 
     try {
       if (isInvitationSignup && invitedEmail && invitationToken) {
-        const response = await fetch("/api/invitations/accept-signup", {
-          body: JSON.stringify({
+        const { data, error: signupError } = await api.api.invitations[
+          "accept-signup"
+        ].post(
+          {
             ...values,
             callbackURL: redirectTo,
             email: invitedEmail,
             token: invitationToken,
-          }),
-          credentials: "include",
-          headers: {
-            "content-type": "application/json",
-            "x-captcha-response": turnstileToken,
           },
-          method: "POST",
-        });
-        const body = (await response.json().catch(() => null)) as {
-          message?: string;
-          redirectTo?: string;
-          status?: true;
-        } | null;
+          { headers: { "x-captcha-response": turnstileToken } },
+        );
 
-        if (!response.ok || body?.status !== true) {
-          setError(body?.message || "Invitation signup failed.");
+        if (signupError || data?.status !== true) {
+          setError(
+            (signupError?.value as { message?: string })?.message ||
+              "Invitation signup failed.",
+          );
           setTurnstileToken("");
           turnstileRef.current?.reset();
           return;
         }
 
         setIsRedirecting(true);
-        router.replace(body.redirectTo || redirectTo);
+        router.replace(data.redirectTo || redirectTo);
         router.refresh();
         return;
       }

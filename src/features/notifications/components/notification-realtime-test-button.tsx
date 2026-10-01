@@ -4,6 +4,7 @@ import { FlaskConicalIcon } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { api } from "@/shared/api/client";
 
 export function NotificationRealtimeTestButton() {
   const [isPending, setIsPending] = useState(false);
@@ -12,12 +13,9 @@ export function NotificationRealtimeTestButton() {
     setIsPending(true);
 
     try {
-      const response = await fetch("/api/account/notifications/test", {
-        credentials: "same-origin",
-        method: "POST",
-      });
+      const { error } = await api.api.account.notifications.test.post();
 
-      if (!response.ok) {
+      if (error) {
         throw new Error("Unable to send test notification.");
       }
     } finally {

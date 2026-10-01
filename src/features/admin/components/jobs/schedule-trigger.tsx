@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { AuthStatusMessage } from "@/features/auth/components";
+import { api } from "@/shared/api/client";
 import type { AdminSchedule } from "@/shared/schemas";
 
 export function ScheduleTrigger({ schedule }: { schedule: AdminSchedule }) {
@@ -27,20 +28,15 @@ export function ScheduleTrigger({ schedule }: { schedule: AdminSchedule }) {
     setPending(true);
     setError(undefined);
     try {
-      const response = await fetch("/api/admin/jobs/schedules/trigger", {
-        body: JSON.stringify({
-          requestId: crypto.randomUUID(),
-          scheduleId: schedule.id,
-        }),
-        credentials: "same-origin",
-        headers: { "content-type": "application/json" },
-        method: "POST",
+      const { error } = await api.api.admin.jobs.schedules.trigger.post({
+        requestId: crypto.randomUUID(),
+        scheduleId: schedule.id,
       });
-      const body = (await response.json().catch(() => null)) as {
-        message?: string;
-      } | null;
-      if (!response.ok) {
-        setError(body?.message ?? "Could not trigger scheduled job.");
+      if (error) {
+        setError(
+          (error.value as { message?: string })?.message ??
+            "Could not trigger scheduled job.",
+        );
         return;
       }
       setOpen(false);

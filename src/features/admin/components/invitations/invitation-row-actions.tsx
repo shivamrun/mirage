@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AuthStatusMessage } from "@/features/auth/components";
+import { api } from "@/shared/api/client";
 
 type Action = "resend" | "revoke";
 
@@ -42,16 +43,16 @@ export function InvitationRowActions({
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`/api/admin/invitations/${id}/${action}`, {
-        credentials: "same-origin",
-        method: "POST",
-      });
-      const body = (await response.json().catch(() => null)) as {
-        message?: string;
-      } | null;
+      const { error } =
+        action === "resend"
+          ? await api.api.admin.invitations({ id }).resend.post()
+          : await api.api.admin.invitations({ id }).revoke.post();
 
-      if (!response.ok) {
-        setError(body?.message || `Could not ${action} invitation.`);
+      if (error) {
+        setError(
+          (error.value as { message?: string })?.message ||
+            `Could not ${action} invitation.`,
+        );
         return;
       }
 

@@ -1,20 +1,17 @@
+import { treaty } from "@elysia/eden";
+import type { App } from "@/server/routes";
+
 const baseUrl = process.env.SMOKE_TEST_BASE_URL ?? "http://localhost:3000";
-
-async function check(path: string) {
-  const response = await fetch(new URL(path, baseUrl));
-
-  if (!response.ok) {
-    throw new Error(`${path} returned ${response.status}`);
-  }
-
-  return response;
-}
+const api = treaty<App>(baseUrl);
 
 async function main() {
-  const health = await check("/api/health");
-  const healthBody = await health.json();
+  const { data: healthBody, error, response } = await api.api.health.get();
 
-  if (healthBody.ok !== true || healthBody.checks?.database !== "ok") {
+  if (error) {
+    throw new Error(`/api/health returned ${response.status}`);
+  }
+
+  if (healthBody?.ok !== true || healthBody.checks?.database !== "ok") {
     throw new Error("/api/health did not report a healthy database");
   }
 
@@ -38,5 +35,3 @@ main().catch((error) => {
   );
   process.exitCode = 1;
 });
-
-export {};

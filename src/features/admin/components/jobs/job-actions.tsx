@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AuthStatusMessage } from "@/features/auth/components";
+import { api } from "@/shared/api/client";
 import type { AdminJob, AdminJobDetail } from "@/shared/schemas";
 import { formatDate } from "../shared/formatters";
 import { RecordField, RecordGrid } from "../user-detail/primitives";
@@ -50,18 +51,16 @@ export function JobActions({ job }: { job: AdminJob }) {
     setDetail(undefined);
     setPending(true);
     try {
-      const params = new URLSearchParams({ jobId: job.id, queue: job.queue });
-      const response = await fetch(`/api/admin/jobs/detail?${params}`, {
-        credentials: "same-origin",
+      const { data, error } = await api.api.admin.jobs.detail.get({
+        query: { jobId: job.id, queue: job.queue },
       });
-      const body = (await response.json().catch(() => null)) as {
-        job?: AdminJobDetail;
-        message?: string;
-      } | null;
-      if (!response.ok || !body?.job) {
-        setError(body?.message ?? "Could not load job details.");
+      if (error || !data?.job) {
+        setError(
+          (error?.value as { message?: string })?.message ??
+            "Could not load job details.",
+        );
       } else {
-        setDetail(body.job);
+        setDetail(data.job);
       }
     } catch {
       setError("Could not load job details.");
@@ -75,17 +74,16 @@ export function JobActions({ job }: { job: AdminJob }) {
     setPending(true);
     setError(undefined);
     try {
-      const response = await fetch(`/api/admin/jobs/${mode}`, {
-        body: JSON.stringify({ jobId: job.id, queue: job.queue }),
-        credentials: "same-origin",
-        headers: { "content-type": "application/json" },
-        method: "POST",
-      });
-      const body = (await response.json().catch(() => null)) as {
-        message?: string;
-      } | null;
-      if (!response.ok) {
-        setError(body?.message ?? `Could not ${mode} job.`);
+      const body = { jobId: job.id, queue: job.queue };
+      const { error } =
+        mode === "retry"
+          ? await api.api.admin.jobs.retry.post(body)
+          : await api.api.admin.jobs.remove.post(body);
+      if (error) {
+        setError(
+          (error.value as { message?: string })?.message ??
+            `Could not ${mode} job.`,
+        );
         return;
       }
       setMode(undefined);

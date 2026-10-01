@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { api } from "@/shared/api/client";
 import { accountDeletionConfirmationPhrase } from "@/shared/schemas";
 
 type ExportStatus = {
@@ -22,10 +23,10 @@ export function AccountDataExport() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const loadStatus = React.useCallback(async () => {
-    const response = await fetch("/api/account/data-export", {
-      cache: "no-store",
+    const { data, error } = await api.api.account["data-export"].get({
+      fetch: { cache: "no-store" },
     });
-    if (response.ok) setStatus((await response.json()) as ExportStatus);
+    if (!error && data) setStatus(data as ExportStatus);
     setIsLoading(false);
   }, []);
 
@@ -36,12 +37,12 @@ export function AccountDataExport() {
   async function requestExport() {
     setIsSubmitting(true);
     try {
-      const response = await fetch("/api/account/data-export", {
-        method: "POST",
-      });
-      const result = (await response.json()) as { message?: string };
-      if (!response.ok) {
-        throw new Error(result.message ?? "Could not request the data export.");
+      const { error } = await api.api.account["data-export"].post();
+      if (error) {
+        throw new Error(
+          (error.value as { message?: string })?.message ??
+            "Could not request the data export.",
+        );
       }
       toast.success("Your export was requested.");
       await loadStatus();
@@ -101,16 +102,18 @@ export function AccountDeletionDangerZone() {
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (confirmation !== accountDeletionConfirmationPhrase) return;
     setIsSubmitting(true);
     try {
-      const response = await fetch("/api/account/deletion", {
-        body: JSON.stringify({ confirmation, password: password || undefined }),
-        headers: { "content-type": "application/json" },
-        method: "POST",
+      const { error } = await api.api.account.deletion.post({
+        confirmation,
+        password: password || undefined,
       });
-      const result = (await response.json()) as { message?: string };
-      if (!response.ok) {
-        throw new Error(result.message ?? "Could not delete the account.");
+      if (error) {
+        throw new Error(
+          (error.value as { message?: string })?.message ??
+            "Could not delete the account.",
+        );
       }
       router.replace("/login?accountDeleted=true");
       router.refresh();
