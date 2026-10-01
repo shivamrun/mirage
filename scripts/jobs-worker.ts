@@ -18,78 +18,42 @@ if (!process.env.NODE_ENV) {
 }
 
 async function main() {
-  const [
-    { closeJobQueues },
-    { closeDbConnection },
-    { recoverPendingStripeWebhookJobs },
-    { recoverPendingEmailDeliveries },
-    { createJobWorkers },
-  ] = await Promise.all([
-    import("@/adapters/jobs/queues"),
-    import("@/server/db"),
-    import("@/server/db/services/billing/stripe-webhook-jobs"),
-    import("@/server/db/services/notifications/email-delivery"),
-    import("@/server/jobs/worker"),
-  ]);
-
-  const workers = createJobWorkers();
-  let shuttingDown = false;
-  const recoveryIntervalMs = 60_000;
-
-  async function recoverPendingJobs() {
-    const results = await Promise.allSettled([
-      recoverPendingStripeWebhookJobs(),
-      recoverPendingEmailDeliveries(),
+  const [{ createWorkerId }, { logJobEvent }, { startJobWorkerRuntime }] =
+    await Promise.all([
+      import("@/server/jobs/health"),
+      import("@/server/jobs/observability"),
+      import("@/server/jobs/runtime"),
     ]);
-    for (const result of results) {
-      if (result.status === "rejected") {
-        console.error(
-          JSON.stringify({
-            error:
-              result.reason instanceof Error
-                ? result.reason.name
-                : "UnknownError",
-            event: "job_recovery_error",
-          }),
-        );
-      }
-    }
-  }
-
-  void recoverPendingJobs();
-  const recoveryTimer = setInterval(
-    () => void recoverPendingJobs(),
-    recoveryIntervalMs,
-  );
-  recoveryTimer.unref();
-
-  console.info(
-    JSON.stringify({ event: "worker_ready", workers: workers.length }),
-  );
+  const workerId = createWorkerId();
+  const runtime = await startJobWorkerRuntime(workerId);
+  let shuttingDown = false;
 
   async function shutdown(signal: string) {
     if (shuttingDown) return;
     shuttingDown = true;
-    clearInterval(recoveryTimer);
-    console.info(JSON.stringify({ event: "worker_shutdown", signal }));
-
     const deadline = setTimeout(() => process.exit(1), 30_000);
     deadline.unref();
-    await Promise.allSettled(workers.map((worker) => worker.close()));
-    await closeJobQueues();
-    await closeDbConnection();
-    clearTimeout(deadline);
-    process.exit(0);
+    try {
+      await runtime.close(signal);
+      clearTimeout(deadline);
+      process.exit(0);
+    } catch (error) {
+      logJobEvent("error", "worker_shutdown_failed", {
+        errorKind: error instanceof Error ? error.name : "UnknownError",
+        workerId,
+      });
+      process.exit(1);
+    }
   }
 
-  process.on("SIGINT", () => void shutdown("SIGINT"));
-  process.on("SIGTERM", () => void shutdown("SIGTERM"));
+  process.once("SIGINT", () => void shutdown("SIGINT"));
+  process.once("SIGTERM", () => void shutdown("SIGTERM"));
 }
 
 void main().catch((error) => {
   console.error(
     JSON.stringify({
-      error: error instanceof Error ? error.message : String(error),
+      errorKind: error instanceof Error ? error.name : "UnknownError",
       event: "worker_startup_failed",
     }),
   );

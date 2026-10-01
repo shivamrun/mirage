@@ -7,6 +7,7 @@ export type BillingStripeClient = Pick<
   | "billingPortal"
   | "checkout"
   | "customers"
+  | "invoices"
   | "prices"
   | "subscriptionSchedules"
   | "subscriptions"

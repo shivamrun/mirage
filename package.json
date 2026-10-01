@@ -16,6 +16,9 @@
     "format": "biome format --write",
     "lint": "biome check",
     "jobs:worker": "tsx --tsconfig tsconfig.worker.json scripts/jobs-worker.ts",
+    "jobs:health": "tsx --tsconfig tsconfig.worker.json scripts/jobs-health.ts",
+    "jobs:schedules:sync": "tsx --tsconfig tsconfig.worker.json scripts/jobs-schedules.ts",
+    "jobs:schedules:prune": "tsx --tsconfig tsconfig.worker.json scripts/jobs-schedules.ts --prune",
     "postinstall": "fumadocs-mdx source.config.mjs",
     "shadcn:add": "pnpm dlx shadcn@latest add",
     "smoke": "tsx scripts/smoke-test.ts",
@@ -72,6 +75,7 @@
     "stripe": "^22.6.2",
     "tailwind-merge": "^3.6.0",
     "tw-animate-css": "^1.4.0",
+    "tsx": "^4.23.1",
     "vaul": "^1.1.2",
     "zod": "^4.4.3"
   },
@@ -86,7 +90,6 @@
     "dependency-cruiser": "^18.1.0",
     "drizzle-kit": "^0.31.10",
     "tailwindcss": "^4",
-    "tsx": "^4.23.1",
     "typescript": "^5.9.3",
     "vitest": "^5.0.0"
   }

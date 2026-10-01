@@ -55,6 +55,9 @@ function installStripeCustomerStub(
       }),
       update: async (id: string) => ({ id, object: "customer" }),
     },
+    invoices: {
+      list: async () => ({ data: [], has_more: false, object: "list" }),
+    },
   } as never);
 }
 

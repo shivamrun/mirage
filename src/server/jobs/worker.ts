@@ -4,64 +4,54 @@ import {
   createJobWorkerConnection,
   jobsRedisPrefix,
 } from "@/adapters/jobs/connection";
-import { finalizeStripeWebhookJobFailure } from "@/server/db/services/billing/stripe-webhook-jobs";
-import { finalizeEmailDeliveryFailure } from "@/server/db/services/notifications/email-delivery";
+import { finalizeJobFailure } from "./handlers";
+import { logJobEvent } from "./observability";
 import { processJob } from "./processor";
-import { jobDefinitions, jobQueueNames } from "./registry";
+import { jobQueueNames } from "./registry";
 
-function log(event: string, details: Record<string, unknown>) {
-  console.info(JSON.stringify({ event, ...details }));
-}
+const workerConfiguration = {
+  [jobQueueNames.billing]: { concurrency: 2 },
+  [jobQueueNames.default]: { concurrency: 5 },
+} as const;
 
-async function finalizeJobFailure({
-  data,
-  error,
-  name,
-}: {
-  data: unknown;
-  error: Error;
-  name: string;
-}) {
-  if (name === "billing.stripe-event.process.v1") {
-    const payload = jobDefinitions[name].payloadSchema.safeParse(data);
-    if (payload.success) {
-      await finalizeStripeWebhookJobFailure({ error, payload: payload.data });
-    }
-  }
-  if (name === "notification.email.send.v1") {
-    const payload = jobDefinitions[name].payloadSchema.safeParse(data);
-    if (payload.success) {
-      await finalizeEmailDeliveryFailure({
-        deliveryId: payload.data.deliveryId,
-        error,
-      });
-    }
-  }
-}
-
-export function createJobWorkers() {
-  return Object.entries({
-    [jobQueueNames.billing]: 2,
-    [jobQueueNames.default]: 5,
-  }).map(([queue, concurrency]) => {
+export function createJobWorkers(workerId = "unidentified-worker") {
+  return Object.entries(workerConfiguration).map(([queue, configuration]) => {
+    const startedAt = new Map<string, number>();
     const worker = new Worker(queue, (job) => processJob(job.name, job.data), {
-      concurrency,
+      concurrency: configuration.concurrency,
       connection: createJobWorkerConnection(),
+      lockDuration: 30_000,
+      maxStalledCount: 1,
       prefix: jobsRedisPrefix(),
+      stalledInterval: 30_000,
     });
 
-    worker.on("active", (job) =>
-      log("job_started", {
+    worker.on("active", (job) => {
+      if (job.id) startedAt.set(job.id, Date.now());
+      logJobEvent("info", "job_started", {
         attempt: job.attemptsMade + 1,
         jobId: job.id,
         jobName: job.name,
         queue,
-      }),
-    );
-    worker.on("completed", (job) =>
-      log("job_completed", { jobId: job.id, jobName: job.name, queue }),
-    );
+        schedulerId: job.repeatJobKey,
+        workerId,
+      });
+    });
+    worker.on("completed", (job) => {
+      const started = job.id ? startedAt.get(job.id) : undefined;
+      if (job.id) startedAt.delete(job.id);
+      logJobEvent("info", "job_completed", {
+        durationMs: started ? Date.now() - started : undefined,
+        jobId: job.id,
+        jobName: job.name,
+        queue,
+        schedulerId: job.repeatJobKey,
+        workerId,
+      });
+    });
     worker.on("failed", (job, error) => {
+      const started = job?.id ? startedAt.get(job.id) : undefined;
+      if (job?.id) startedAt.delete(job.id);
       const attempts = job?.opts.attempts ?? 1;
       if (job && job.attemptsMade >= attempts) {
         void finalizeJobFailure({
@@ -69,37 +59,37 @@ export function createJobWorkers() {
           error,
           name: job.name,
         }).catch((finalizationError) =>
-          console.error(
-            JSON.stringify({
-              error:
-                finalizationError instanceof Error
-                  ? finalizationError.name
-                  : "UnknownError",
-              event: "job_failure_finalization_error",
-              jobId: job.id,
-              queue,
-            }),
-          ),
+          logJobEvent("error", "job_failure_finalization_error", {
+            errorKind:
+              finalizationError instanceof Error
+                ? finalizationError.name
+                : "UnknownError",
+            jobId: job.id,
+            queue,
+            workerId,
+          }),
         );
       }
-      console.error(
-        JSON.stringify({
-          attempt: job?.attemptsMade,
-          error: error.name,
-          event: "job_failed",
-          jobId: job?.id,
-          jobName: job?.name,
-          queue,
-        }),
-      );
+      logJobEvent("error", "job_failed", {
+        attempt: job?.attemptsMade,
+        durationMs: started ? Date.now() - started : undefined,
+        errorKind: error.name,
+        jobId: job?.id,
+        jobName: job?.name,
+        queue,
+        schedulerId: job?.repeatJobKey,
+        workerId,
+      });
     });
     worker.on("stalled", (jobId) =>
-      console.warn(JSON.stringify({ event: "job_stalled", jobId, queue })),
+      logJobEvent("warn", "job_stalled", { jobId, queue, workerId }),
     );
     worker.on("error", (error) =>
-      console.error(
-        JSON.stringify({ error: error.message, event: "worker_error", queue }),
-      ),
+      logJobEvent("error", "worker_error", {
+        errorKind: error.name,
+        queue,
+        workerId,
+      }),
     );
 
     return worker;

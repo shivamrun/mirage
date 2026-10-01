@@ -1,15 +1,13 @@
-import Stripe from "stripe";
+import type Stripe from "stripe";
 
 import { subscriptionPlans } from "@/features/auth/better-auth/subscription-plans";
 import {
   type BillingSubscriptionRecord,
+  getBillingSubscriptionById,
   updateBillingSubscription,
 } from "@/server/db/dal/billing";
-import { env } from "@/shared/env";
-
-const stripeClient = new Stripe(env.STRIPE_SECRET_KEY, {
-  apiVersion: "2026-08-26.dahlia",
-});
+import { billingStripeClientProxy } from "@/server/db/services/billing/stripe-client";
+import { reconcileCreditGrantForSubscription } from "@/server/db/services/credits/ledger";
 
 type StripeSubscriptionItemWithPeriod = Stripe.SubscriptionItem & {
   current_period_end?: number;
@@ -178,9 +176,10 @@ async function syncSubscriptionFromStripe(
     return subscription;
   }
 
-  const stripeSubscription = await stripeClient.subscriptions.retrieve(
-    subscription.stripeSubscriptionId,
-  );
+  const stripeSubscription =
+    await billingStripeClientProxy.subscriptions.retrieve(
+      subscription.stripeSubscriptionId,
+    );
   const subscriptionItem = getPrimarySubscriptionItem(stripeSubscription);
 
   if (!subscriptionItem) {
@@ -206,6 +205,18 @@ async function syncSubscriptionFromStripe(
       stripeSubscriptionId: stripeSubscription.id,
     })) ?? subscription
   );
+}
+
+export async function reconcileBillingSubscription(subscriptionId: string) {
+  const subscription = await getBillingSubscriptionById(subscriptionId);
+  if (!subscription) return { skipped: true as const };
+
+  const synced = await syncSubscriptionFromStripe(subscription);
+  if (!activeStatuses.has(synced.status ?? "")) {
+    return { skipped: true as const };
+  }
+  await reconcileCreditGrantForSubscription(synced);
+  return { skipped: false as const };
 }
 
 export async function syncBillingSubscriptionsFromStripe(
@@ -272,7 +283,7 @@ export async function getBillingTransactions(
       : [];
   }
 
-  const invoices = await stripeClient.invoices.list({
+  const invoices = await billingStripeClientProxy.invoices.list({
     customer: customerId,
     expand: ["data.lines.data.pricing.price_details.price"],
     limit: 10,

@@ -6,16 +6,58 @@ import { env } from "@/shared/env";
 export class JobsRedisConfigurationError extends Error {
   constructor() {
     super(
-      "JOBS_REDIS_URL or REDIS_URL must be configured for background jobs.",
+      env.NODE_ENV === "production"
+        ? "JOBS_REDIS_URL must be configured for production background jobs."
+        : "JOBS_REDIS_URL or REDIS_URL must be configured for background jobs.",
     );
     this.name = "JobsRedisConfigurationError";
   }
 }
 
-function jobsRedisUrl() {
-  const url = env.JOBS_REDIS_URL ?? env.REDIS_URL;
+export function resolveJobsRedisUrl({
+  jobsRedisUrl,
+  nodeEnv,
+  redisUrl,
+}: {
+  jobsRedisUrl?: string;
+  nodeEnv: "development" | "production" | "test";
+  redisUrl?: string;
+}) {
+  return jobsRedisUrl ?? (nodeEnv === "production" ? undefined : redisUrl);
+}
+
+function configuredJobsRedisUrl() {
+  return resolveJobsRedisUrl({
+    jobsRedisUrl: env.JOBS_REDIS_URL,
+    nodeEnv: env.NODE_ENV,
+    redisUrl: env.REDIS_URL,
+  });
+}
+
+export function jobsRedisUrl() {
+  const url = configuredJobsRedisUrl();
   if (!url) throw new JobsRedisConfigurationError();
   return url;
+}
+
+export function createJobsOperationsConnection({
+  retry = true,
+}: {
+  retry?: boolean;
+} = {}) {
+  const client = createClient({
+    socket: {
+      connectTimeout: retry ? 5_000 : 1_000,
+      reconnectStrategy: retry
+        ? (retries) => Math.min(1_000 * 2 ** retries, 20_000)
+        : false,
+    },
+    url: jobsRedisUrl(),
+  });
+  client.on("error", () => {
+    // Callers surface operation-specific structured errors.
+  });
+  return client;
 }
 
 export function jobsRedisPrefix() {
@@ -53,7 +95,7 @@ export function createJobWorkerConnection() {
 export async function checkJobsRedisHealth(): Promise<
   "degraded" | "not_configured" | "ok"
 > {
-  const url = env.JOBS_REDIS_URL ?? env.REDIS_URL;
+  const url = configuredJobsRedisUrl();
   if (!url) return "not_configured";
 
   const client = createClient({

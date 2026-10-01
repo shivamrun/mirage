@@ -103,6 +103,10 @@ changes, security reviews, or reliability hardening passes.
   notification SSE fanout across instances depends on `REDIS_URL`.
 - Run `pnpm jobs:worker` as a separately supervised process and alert when it is
   absent, restart-looping, or accumulating failed/stalled jobs.
+- Monitor `pnpm jobs:health`; worker heartbeats expire after 45 seconds. After
+  old workers have drained, run `pnpm jobs:schedules:prune` from the new release.
+- Set the worker process-manager stop timeout to at least 35 seconds so its
+  graceful 30-second shutdown deadline can complete.
 - Configure `JOBS_REDIS_URL` with AOF persistence and
   `maxmemory-policy noeviction`; use a dedicated queue Redis instance in
   production rather than the cache/Pub/Sub instance.

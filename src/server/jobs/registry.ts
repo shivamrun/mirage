@@ -11,6 +11,23 @@ const stripeEventTypes = [
 ] as const;
 
 export const jobDefinitions = {
+  "billing.subscription-reconciliation.scan.v1": {
+    attempts: 5,
+    backoff: { delay: 10_000, jitter: 0.2, type: "exponential" as const },
+    payloadSchema: z.object({
+      cursor: z.string().trim().min(1).optional(),
+      runId: z.string().trim().min(1).optional(),
+    }),
+    priority: 10,
+    queue: jobQueueNames.billing,
+  },
+  "billing.subscription.reconcile.v1": {
+    attempts: 5,
+    backoff: { delay: 10_000, jitter: 0.2, type: "exponential" as const },
+    payloadSchema: z.object({ subscriptionId: z.string().trim().min(1) }),
+    priority: 10,
+    queue: jobQueueNames.billing,
+  },
   "billing.stripe-event.process.v1": {
     attempts: 8,
     backoff: { delay: 5_000, jitter: 0.2, type: "exponential" as const },
@@ -27,6 +44,13 @@ export const jobDefinitions = {
     backoff: { delay: 5_000, jitter: 0.2, type: "exponential" as const },
     payloadSchema: z.object({ deliveryId: z.uuid() }),
     priority: 5,
+    queue: jobQueueNames.default,
+  },
+  "system.pending-work.recover.v1": {
+    attempts: 3,
+    backoff: { delay: 5_000, jitter: 0.2, type: "exponential" as const },
+    payloadSchema: z.object({}),
+    priority: 20,
     queue: jobQueueNames.default,
   },
 } as const;

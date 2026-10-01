@@ -48,14 +48,11 @@ export async function enqueueJob<Name extends JobName>(
       return await testEnqueueHandler(name, parsedPayload, options);
     }
 
-    const job = await getJobQueue(definition.queue).add(name, parsedPayload, {
-      ...options,
-      attempts: definition.attempts,
-      backoff: definition.backoff,
-      priority: definition.priority,
-      removeOnComplete: { age: 86_400, count: 1_000 },
-      removeOnFail: { age: 2_592_000, count: 10_000 },
-    });
+    const job = await getJobQueue(definition.queue).add(
+      name,
+      parsedPayload,
+      jobOptions(name, options),
+    );
     console.info(
       JSON.stringify({
         event: "job_enqueued",
@@ -68,4 +65,30 @@ export async function enqueueJob<Name extends JobName>(
   } catch (error) {
     throw new JobEnqueueError(name, { cause: error });
   }
+}
+
+export function jobOptions<Name extends JobName>(
+  name: Name,
+  options: Pick<JobsOptions, "delay" | "jobId"> = {},
+): JobsOptions {
+  const definition = jobDefinitions[name];
+  return {
+    ...options,
+    attempts: definition.attempts,
+    backoff: definition.backoff,
+    priority: definition.priority,
+    removeOnComplete: { age: 86_400, count: 1_000 },
+    removeOnFail: { age: 2_592_000, count: 10_000 },
+  };
+}
+
+export function scheduleJob<Name extends JobName>(
+  name: Name,
+  payload: JobPayload<Name>,
+  { jobId, runAt }: { jobId: string; runAt: Date },
+) {
+  return enqueueJob(name, payload, {
+    delay: Math.max(0, runAt.getTime() - Date.now()),
+    jobId,
+  });
 }

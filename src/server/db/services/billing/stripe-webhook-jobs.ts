@@ -53,6 +53,13 @@ export async function recoverPendingStripeWebhookJobs() {
       );
     }
   }
+  const failures = results.filter((result) => result.status === "rejected");
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures.map((result) => result.reason),
+      "Unable to recover one or more pending Stripe webhook jobs.",
+    );
+  }
 }
 
 export async function enqueueStripeWebhookJob({

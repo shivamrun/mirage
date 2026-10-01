@@ -50,6 +50,13 @@ export async function recoverPendingEmailDeliveries() {
       );
     }
   }
+  const failures = results.filter((result) => result.status === "rejected");
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures.map((result) => result.reason),
+      "Unable to recover one or more pending email deliveries.",
+    );
+  }
 }
 
 export async function processEmailDelivery(deliveryId: string) {
