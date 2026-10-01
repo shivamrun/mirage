@@ -3,6 +3,10 @@ export { AccountBillingPage } from "./account-billing-page";
 export { AccountBillingPortalButton } from "./account-billing-portal-button";
 export { AccountConnectedAccounts } from "./account-connected-accounts";
 export { AccountCreditTopUpButton } from "./account-credit-top-up-button";
+export {
+  AccountDataExport,
+  AccountDeletionDangerZone,
+} from "./account-deletion-danger-zone";
 export { AccountEmailManager } from "./account-email-manager";
 export { AccountImpersonationNotice } from "./account-impersonation-notice";
 export { AccountProfilePage, AccountSecurityPage } from "./account-page";

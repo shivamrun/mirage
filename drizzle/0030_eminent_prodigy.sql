@@ -1,0 +1,2 @@
+ALTER TABLE "mirage_account_deletion_requests" ADD COLUMN "attempt_count" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "mirage_account_deletion_requests" ADD COLUMN "last_attempt_at" timestamp with time zone;

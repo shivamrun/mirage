@@ -15,6 +15,8 @@ export type RateLimitStore = {
 };
 
 export type RateLimitPolicyName =
+  | "account-deletion"
+  | "account-data-export"
   | "account-email-mutation"
   | "account-two-factor-mutation"
   | "admin-invitation-mutation"

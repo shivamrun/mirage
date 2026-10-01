@@ -30,7 +30,10 @@ export const uploadsRoutes = new Elysia({ prefix: "/uploads" })
       }
 
       try {
-        const upload = await createUploadSigner().prepareUpload(key, file);
+        const upload = await createUploadSigner(user.id).prepareUpload(
+          key,
+          file,
+        );
 
         return {
           key: upload.key,

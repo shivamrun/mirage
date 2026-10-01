@@ -12,6 +12,7 @@ import type { createStorageProfiles } from "./storage";
 
 function createUploadAssets(
   storageProfiles: ReturnType<typeof createStorageProfiles>,
+  userId?: string,
 ) {
   return defineAssets(storageProfiles, {
     avatar: {
@@ -23,7 +24,7 @@ function createUploadAssets(
         value: 5,
         unit: "minutes",
       },
-      keyPrefix: "avatars",
+      keyPrefix: userId ? `avatars/${userId}` : "avatars",
       limits: {
         maxFileSize: avatarServerMaxFileSize,
       },

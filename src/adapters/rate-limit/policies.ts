@@ -27,6 +27,20 @@ type RoutePolicyDefinition = {
 };
 
 const routePolicies: Record<RateLimitPolicyName, RoutePolicyDefinition> = {
+  "account-deletion": {
+    limit: 5,
+    message: "Too many account deletion requests. Please try again later.",
+    scope: "route:account:deletion",
+    trustedClientLimit: 20,
+    windowMs: ROUTE_WINDOW_MS,
+  },
+  "account-data-export": {
+    fallbackLimit: 30,
+    limit: 10,
+    message: "Too many data export requests. Please try again later.",
+    scope: "route:account:data-export",
+    windowMs: ROUTE_WINDOW_MS,
+  },
   "account-email-mutation": {
     limit: 12,
     message: "Too many account email requests. Please try again later.",

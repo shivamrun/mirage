@@ -11,6 +11,20 @@ const stripeEventTypes = [
 ] as const;
 
 export const jobDefinitions = {
+  "account.deletion.process.v1": {
+    attempts: 8,
+    backoff: { delay: 30_000, jitter: 0.2, type: "exponential" as const },
+    payloadSchema: z.object({ deletionId: z.uuid() }),
+    priority: 1,
+    queue: jobQueueNames.default,
+  },
+  "account.data-export.prepare.v1": {
+    attempts: 8,
+    backoff: { delay: 30_000, jitter: 0.2, type: "exponential" as const },
+    payloadSchema: z.object({ exportId: z.uuid() }),
+    priority: 5,
+    queue: jobQueueNames.default,
+  },
   "billing.subscription-reconciliation.scan.v1": {
     attempts: 5,
     backoff: { delay: 10_000, jitter: 0.2, type: "exponential" as const },

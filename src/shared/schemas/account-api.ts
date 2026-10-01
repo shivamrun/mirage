@@ -67,4 +67,30 @@ export const twoFactorDeliveryRecoveryResponseSchema = z.object({
   recovery: z.string(),
 });
 
+export const accountDeletionConfirmationPhrase = "DELETE MY ACCOUNT";
+
+export const accountDeletionRequestSchema = z.object({
+  confirmation: z.literal(accountDeletionConfirmationPhrase),
+  password: z.string().min(1).optional(),
+});
+
+export const accountDataExportStatusResponseSchema = z.object({
+  export: z
+    .object({
+      id: z.uuid(),
+      status: z.enum(["pending", "processing", "ready", "failed", "expired"]),
+      requestedAt: z.string(),
+      deliveryDueAt: z.string(),
+      failureKind: z.string().nullable(),
+    })
+    .nullable(),
+});
+
+export const accountDataExportRequestResponseSchema = z.object({
+  exportId: z.uuid(),
+  requestedAt: z.string(),
+  deliveryDueAt: z.string(),
+  status: z.literal(true),
+});
+
 export { emailChangeTokenSchema };

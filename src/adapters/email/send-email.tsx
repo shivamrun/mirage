@@ -11,7 +11,7 @@ type SendEmailOptions = {
   subject: string;
   text: string;
   to: string | string[];
-} & Pick<CreateEmailOptions, "replyTo" | "tags">;
+} & Pick<CreateEmailOptions, "attachments" | "replyTo" | "tags">;
 
 export type SendEmailResult =
   | {
@@ -36,6 +36,7 @@ function getProviderErrorMessage(error: unknown) {
 }
 
 export async function sendEmail({
+  attachments,
   idempotencyKey,
   react,
   replyTo,
@@ -66,6 +67,7 @@ export async function sendEmail({
 
   const response = await getResendClient().emails.send(
     {
+      attachments,
       from: config.from,
       react,
       replyTo: replyTo ?? config.replyTo,

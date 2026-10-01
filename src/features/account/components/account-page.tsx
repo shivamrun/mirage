@@ -6,6 +6,10 @@ import * as React from "react";
 import { HeadingBlock } from "@/components/heading-block";
 import { Button } from "@/components/ui/button";
 import { AccountConnectedAccounts } from "@/features/account/components/account-connected-accounts";
+import {
+  AccountDataExport,
+  AccountDeletionDangerZone,
+} from "@/features/account/components/account-deletion-danger-zone";
 import { AccountEmailManager } from "@/features/account/components/account-email-manager";
 import { AccountImpersonationNotice } from "@/features/account/components/account-impersonation-notice";
 import { AccountPasswordForm } from "@/features/account/components/account-password-form";
@@ -192,6 +196,20 @@ function AccountSecurityPage({
                 {isSigningOut ? "Signing out..." : "Log out"}
               </Button>
             </div>
+          </AccountSection>
+
+          <AccountSection
+            title="Data export"
+            description="Download a private copy of your account data."
+          >
+            <AccountDataExport />
+          </AccountSection>
+
+          <AccountSection
+            title="Danger zone"
+            description="Permanently delete your account and associated data."
+          >
+            <AccountDeletionDangerZone />
           </AccountSection>
         </AccountSectionStack>
       )}

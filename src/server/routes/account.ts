@@ -1,4 +1,6 @@
 import { Elysia, sse } from "elysia";
+import { auth } from "@/features/auth/better-auth/server";
+import { hasCredentialAccount } from "@/server/db/dal/auth";
 import {
   cancelPendingEmailChange,
   changeAccountEmail,
@@ -15,6 +17,11 @@ import {
   startAccountTwoFactorSetup,
   verifyAccountTwoFactorSetup,
 } from "@/server/db/services/account/two-factor";
+import {
+  getUserDataExportStatus,
+  requestUserDataExport,
+  startAccountDeletion,
+} from "@/server/db/services/account-deletion/lifecycle";
 import { completeAdminTotpStepUp } from "@/server/db/services/auth/admin-step-up";
 import { subscribe } from "@/server/db/services/notifications/realtime-broker";
 import {
@@ -32,6 +39,9 @@ import { accountErrorResponse } from "@/server/http/result-response";
 import { env } from "@/shared/env";
 import { DEFAULT_PAGE_SIZE } from "@/shared/pagination";
 import {
+  accountDataExportRequestResponseSchema,
+  accountDataExportStatusResponseSchema,
+  accountDeletionRequestSchema,
   accountEmailMutationResponseSchema,
   accountEmailStateResponseSchema,
   accountRedirectResponseSchema,
@@ -175,6 +185,97 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       response: {
         200: unreadNotificationCountResponseSchema,
         401: messageResponseSchema,
+      },
+    },
+  )
+  .get(
+    "/data-export",
+    async ({ user }) => {
+      const result = await getUserDataExportStatus(user.id);
+      return result
+        ? {
+            export: {
+              id: result.id,
+              status: result.status,
+              requestedAt: result.createdAt.toISOString(),
+              deliveryDueAt: result.deliveryDueAt.toISOString(),
+              failureKind: result.failureKind,
+            },
+          }
+        : { export: null };
+    },
+    {
+      auth: true,
+      response: {
+        200: accountDataExportStatusResponseSchema,
+        401: messageResponseSchema,
+      },
+    },
+  )
+  .post(
+    "/deletion",
+    async ({ body, request, session, status, user }) => {
+      if (
+        session.impersonatedBy ||
+        Date.now() - new Date(session.createdAt).getTime() > 10 * 60 * 1000
+      ) {
+        return status(403, {
+          message: "Please sign in again before deleting your account.",
+        });
+      }
+
+      if (await hasCredentialAccount(user.id)) {
+        if (!body.password) {
+          return status(400, { message: "Your password is required." });
+        }
+
+        try {
+          await auth.api.verifyPassword({
+            body: { password: body.password },
+            headers: request.headers,
+          });
+        } catch {
+          return status(400, { message: "The password is incorrect." });
+        }
+      }
+
+      await startAccountDeletion(user.id);
+      return { status: true as const };
+    },
+    {
+      auth: true,
+      body: accountDeletionRequestSchema,
+      sameOrigin: true,
+      routeLimit: "account-deletion",
+      response: {
+        200: statusSuccessResponseSchema,
+        400: messageResponseSchema,
+        401: messageResponseSchema,
+        403: messageResponseSchema,
+        429: messageResponseSchema,
+      },
+    },
+  )
+  .post(
+    "/data-export",
+    async ({ user }) => {
+      const result = await requestUserDataExport(user.id);
+      return {
+        exportId: result.id,
+        requestedAt: result.createdAt.toISOString(),
+        deliveryDueAt: result.deliveryDueAt.toISOString(),
+        status: true as const,
+      };
+    },
+    {
+      auth: true,
+      sameOrigin: true,
+      routeLimit: "account-data-export",
+      response: {
+        200: accountDataExportRequestResponseSchema,
+        401: messageResponseSchema,
+        403: messageResponseSchema,
+        429: messageResponseSchema,
       },
     },
   )

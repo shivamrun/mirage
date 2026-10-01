@@ -1,9 +1,9 @@
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import db, { type DBClient } from "@/server/db";
 import * as schema from "@/server/db/schema";
-import { user as userTable } from "@/server/db/schema";
+import { account as accountTable, user as userTable } from "@/server/db/schema";
 
 export type AuthUserRecord = typeof userTable.$inferSelect;
 
@@ -35,4 +35,22 @@ export async function getAuthUserByEmail(
     .limit(1);
 
   return user ?? null;
+}
+
+export async function hasCredentialAccount(
+  userId: string,
+  executor: DBClient = db,
+) {
+  const [credential] = await executor
+    .select({ id: accountTable.id })
+    .from(accountTable)
+    .where(
+      and(
+        eq(accountTable.userId, userId),
+        eq(accountTable.providerId, "credential"),
+      ),
+    )
+    .limit(1);
+
+  return Boolean(credential);
 }

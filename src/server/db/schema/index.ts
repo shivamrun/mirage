@@ -1,3 +1,4 @@
+export * from "./account-deletion";
 export * from "./admin-session-assurance";
 export * from "./auth-schema";
 export * from "./contact-submission";

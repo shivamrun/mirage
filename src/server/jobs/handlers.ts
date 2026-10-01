@@ -1,4 +1,10 @@
 import { listStripeSubscriptionsForReconciliation } from "@/server/db/dal/billing";
+import {
+  prepareAccountDataExport,
+  processAccountDeletion,
+  recoverAccountDeletionWork,
+  recoverAccountExportWork,
+} from "@/server/db/services/account-deletion/lifecycle";
 import { reconcileBillingSubscription } from "@/server/db/services/billing/stripe-subscriptions";
 import {
   finalizeStripeWebhookJobFailure,
@@ -25,6 +31,10 @@ function utcDateKey(date = new Date()) {
 }
 
 export const jobHandlers = {
+  "account.deletion.process.v1": ({ deletionId }) =>
+    processAccountDeletion(deletionId),
+  "account.data-export.prepare.v1": ({ exportId }) =>
+    prepareAccountDataExport(exportId),
   "billing.stripe-event.process.v1": processStripeWebhookJob,
   "billing.subscription-reconciliation.scan.v1": async ({ cursor, runId }) => {
     const subscriptions = await listStripeSubscriptionsForReconciliation({
@@ -62,6 +72,8 @@ export const jobHandlers = {
     processEmailDelivery(deliveryId),
   "system.pending-work.recover.v1": async () => {
     const results = await Promise.allSettled([
+      recoverAccountDeletionWork(),
+      recoverAccountExportWork(),
       recoverPendingStripeWebhookJobs(),
       recoverPendingEmailDeliveries(),
     ]);

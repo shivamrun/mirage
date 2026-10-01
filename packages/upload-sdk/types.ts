@@ -121,6 +121,8 @@ export type StorageProvider = {
   abortMultipartUpload?(
     input: ProviderAbortMultipartUploadInput,
   ): Promise<void>;
+  deleteObject?(key: string): Promise<void>;
+  deletePrefix?(prefix: string): Promise<void>;
 };
 
 export type AssetUploadConfig<TStorageProfileName extends string = string> = {

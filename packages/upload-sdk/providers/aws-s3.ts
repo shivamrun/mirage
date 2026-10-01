@@ -316,10 +316,66 @@ export function awsS3(config: AwsS3Config): StorageProvider {
     }
   }
 
+  async function deleteObject(keyValue: string): Promise<void> {
+    const key = normalizeKey(keyValue);
+    const response = await signedFetch({
+      body: "",
+      config,
+      endpoint,
+      headers: {},
+      key,
+      method: "DELETE",
+      query: [],
+    });
+    if (!response.ok && response.status !== 404) {
+      throw new UploadSDKError("S3 could not delete the object.", {
+        code: "UPLOAD_PROVIDER_ERROR",
+        statusCode: response.status,
+      });
+    }
+  }
+
+  async function deletePrefix(prefixValue: string): Promise<void> {
+    const prefix = normalizeKey(prefixValue).replace(/\/?$/, "/");
+    let continuationToken: string | undefined;
+
+    do {
+      const query: [string, string][] = [
+        ["list-type", "2"],
+        ["prefix", prefix],
+      ];
+      if (continuationToken) {
+        query.push(["continuation-token", continuationToken]);
+      }
+      const response = await signedFetch({
+        body: "",
+        config,
+        endpoint,
+        headers: {},
+        key: "",
+        method: "GET",
+        query,
+      });
+      const body = await response.text();
+      if (!response.ok) {
+        throw new UploadSDKError("S3 could not list objects for deletion.", {
+          code: "UPLOAD_PROVIDER_ERROR",
+          statusCode: response.status,
+        });
+      }
+
+      const keys = readXmlValues(body, "Key");
+      await Promise.all(keys.map(deleteObject));
+      continuationToken = readXmlValue(body, "NextContinuationToken");
+    } while (continuationToken);
+  }
+
   return {
     abortMultipartUpload,
     completeMultipartUpload,
     createMultipartUpload,
+    deleteObject,
+    deletePrefix,
     prepareUpload,
     prepareMultipartUploadParts,
   };
@@ -346,7 +402,7 @@ async function createSignature(
 
 type SignedFetchOptions = {
   config: AwsS3Config;
-  method: "DELETE" | "POST";
+  method: "DELETE" | "GET" | "POST";
   endpoint: string;
   key: string;
   query: readonly [string, string][];
@@ -591,7 +647,26 @@ function createCompleteMultipartUploadXml(
 }
 
 function readXmlValue(xml: string, tagName: string): string | undefined {
-  return xml.match(new RegExp(`<${tagName}>(.*?)</${tagName}>`, "s"))?.[1];
+  const value = xml.match(
+    new RegExp(`<${tagName}>(.*?)</${tagName}>`, "s"),
+  )?.[1];
+  return value == null ? undefined : decodeXmlEntities(value);
+}
+
+function readXmlValues(xml: string, tagName: string): string[] {
+  const expression = new RegExp(`<${tagName}>([\\s\\S]*?)</${tagName}>`, "g");
+  return [...xml.matchAll(expression)].map((match) =>
+    decodeXmlEntities(match[1] ?? ""),
+  );
+}
+
+function decodeXmlEntities(value: string) {
+  return value
+    .replaceAll("&amp;", "&")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&apos;", "'");
 }
 
 function readS3Error(
