@@ -783,7 +783,10 @@ describe("credit ledger", () => {
     const { checkoutSessionCreateParams } = setStripeTopUpClient();
 
     const unauthenticated = await httpRequest(app, "/api/billing/checkout", {
-      body: JSON.stringify({ type: "credit_top_up" }),
+      body: JSON.stringify({
+        requestId: randomUUID(),
+        type: "credit_top_up",
+      }),
       headers: {
         "content-type": "application/json",
         origin: "http://localhost:3000",
@@ -791,7 +794,10 @@ describe("credit ledger", () => {
       method: "POST",
     });
     const wrongOrigin = await httpRequest(app, "/api/billing/checkout", {
-      body: JSON.stringify({ type: "credit_top_up" }),
+      body: JSON.stringify({
+        requestId: randomUUID(),
+        type: "credit_top_up",
+      }),
       cookie: actor.cookie,
       headers: {
         "content-type": "application/json",
@@ -800,7 +806,10 @@ describe("credit ledger", () => {
       method: "POST",
     });
     const checkout = await httpRequest(app, "/api/billing/checkout", {
-      body: JSON.stringify({ type: "credit_top_up" }),
+      body: JSON.stringify({
+        requestId: randomUUID(),
+        type: "credit_top_up",
+      }),
       cookie: actor.cookie,
       headers: {
         "content-type": "application/json",
@@ -843,7 +852,10 @@ describe("credit ledger", () => {
     setStripeTopUpClient({ topUpUnitAmount: 4999 });
 
     const checkout = await httpRequest(app, "/api/billing/checkout", {
-      body: JSON.stringify({ type: "credit_top_up" }),
+      body: JSON.stringify({
+        requestId: randomUUID(),
+        type: "credit_top_up",
+      }),
       cookie: actor.cookie,
       headers: {
         "content-type": "application/json",
@@ -866,6 +878,7 @@ describe("credit ledger", () => {
       body: JSON.stringify({
         interval: "yearly",
         plan: "hacker",
+        requestId: randomUUID(),
         type: "subscription",
       }),
       cookie: actor.cookie,

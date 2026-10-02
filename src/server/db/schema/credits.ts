@@ -1,4 +1,5 @@
 import { relations } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import {
   index,
   integer,
@@ -47,9 +48,13 @@ export const creditLedgerEntries = createTable(
     periodStart: requiredTimestamp("period_start"),
     periodEnd: requiredTimestamp("period_end"),
     idempotencyKey: text("idempotency_key").notNull(),
+    operationFingerprint: text("operation_fingerprint"),
     source: text("source").notNull(),
     sourceId: text("source_id"),
-    reversesLedgerEntryId: uuid("reverses_ledger_entry_id"),
+    reversesLedgerEntryId: uuid("reverses_ledger_entry_id").references(
+      (): AnyPgColumn => creditLedgerEntries.id,
+      { onDelete: "restrict" },
+    ),
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
     ...auditTimestamps(),
   },
@@ -63,6 +68,7 @@ export const creditLedgerEntries = createTable(
     ),
     index("credit_ledger_entries_period_end_idx").on(table.periodEnd),
     index("credit_ledger_entries_source_idx").on(table.source, table.sourceId),
+    index("credit_ledger_entries_reversal_idx").on(table.reversesLedgerEntryId),
   ],
 );
 

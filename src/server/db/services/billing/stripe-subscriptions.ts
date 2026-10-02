@@ -1,15 +1,26 @@
-import type Stripe from "stripe";
-
-import { subscriptionPlans } from "@/features/auth/better-auth/subscription-plans";
 import {
+  type StripeInvoice,
+  type StripePrice,
+  type StripeSubscription,
+  type StripeSubscriptionItem,
+  stripeBillingProvider,
+} from "@/adapters/stripe/billing-provider";
+
+import {
+  applyBillingSubscriptionStripeEvent,
   type BillingSubscriptionRecord,
   getBillingSubscriptionById,
   updateBillingSubscription,
 } from "@/server/db/dal/billing";
-import { billingStripeClientProxy } from "@/server/db/services/billing/stripe-client";
 import { reconcileCreditGrantForSubscription } from "@/server/db/services/credits/ledger";
+import {
+  billingPlansMatch,
+  getBillingPlanByLookupKey,
+  getBillingPlanDisplayName,
+  normalizeBillingPlan,
+} from "@/shared/billing";
 
-type StripeSubscriptionItemWithPeriod = Stripe.SubscriptionItem & {
+type StripeSubscriptionItemWithPeriod = StripeSubscriptionItem & {
   current_period_end?: number;
   current_period_start?: number;
 };
@@ -29,43 +40,34 @@ export type BillingTransaction = {
 
 const activeStatuses = new Set(["active", "trialing"]);
 
-function getPrimarySubscriptionItem(stripeSubscription: Stripe.Subscription) {
+function getPrimarySubscriptionItem(stripeSubscription: StripeSubscription) {
   return stripeSubscription.items.data.find(
     (item): item is StripeSubscriptionItemWithPeriod =>
       Boolean(item.price.recurring),
   );
 }
 
-function resolvePlanName(stripePrice: Stripe.Price, fallbackPlanName: string) {
-  const plan = subscriptionPlans.find(
-    (plan) =>
-      "lookupKey" in plan &&
-      (plan.lookupKey === stripePrice.lookup_key ||
-        plan.annualDiscountLookupKey === stripePrice.lookup_key),
-  );
-
-  return plan?.name.toLowerCase() ?? fallbackPlanName;
-}
-
-function resolvePlanDisplayName(stripePrice: Stripe.Price) {
+function resolvePlanName(stripePrice: StripePrice, fallbackPlanName: string) {
   return (
-    subscriptionPlans.find(
-      (plan) =>
-        "lookupKey" in plan &&
-        (plan.lookupKey === stripePrice.lookup_key ||
-          plan.annualDiscountLookupKey === stripePrice.lookup_key),
-    )?.name ?? null
+    getBillingPlanByLookupKey(stripePrice.lookup_key)?.key ??
+    normalizeBillingPlan(fallbackPlanName) ??
+    fallbackPlanName
   );
 }
 
-function getInvoicePlanLine(invoice: Stripe.Invoice) {
+function resolvePlanDisplayName(stripePrice: StripePrice) {
+  const match = getBillingPlanByLookupKey(stripePrice.lookup_key);
+  return match ? match.plan.displayName : null;
+}
+
+function getInvoicePlanLine(invoice: StripeInvoice) {
   return (
     invoice.lines.data.find((line) => line.pricing?.price_details) ??
     invoice.lines.data[0]
   );
 }
 
-function getInvoicePlanName(invoice: Stripe.Invoice) {
+function getInvoicePlanName(invoice: StripeInvoice) {
   const planLine = getInvoicePlanLine(invoice);
   const price = planLine?.pricing?.price_details?.price;
 
@@ -80,7 +82,7 @@ function getInvoicePlanName(invoice: Stripe.Invoice) {
   return planLine?.description ?? null;
 }
 
-function getInvoiceBillingInterval(invoice: Stripe.Invoice) {
+function getInvoiceBillingInterval(invoice: StripeInvoice) {
   const price = getInvoicePlanLine(invoice)?.pricing?.price_details?.price;
 
   return price && typeof price !== "string"
@@ -88,81 +90,16 @@ function getInvoiceBillingInterval(invoice: Stripe.Invoice) {
     : null;
 }
 
-function getInvoiceExpiresAt(invoice: Stripe.Invoice) {
+function getInvoiceExpiresAt(invoice: StripeInvoice) {
   return fromStripeTimestamp(getInvoicePlanLine(invoice)?.period.end);
 }
 
-function normalizePlanName(value: null | string | undefined) {
-  return value?.toLowerCase().replace(/\s+/g, " ").trim() ?? null;
-}
-
 function planMatches(first: null | string | undefined, second: string) {
-  const normalizedFirst = normalizePlanName(first);
-  const normalizedSecond = normalizePlanName(second);
-
-  if (normalizedFirst === normalizedSecond) {
-    return true;
-  }
-
-  const matchingPlan = subscriptionPlans.find((plan) => {
-    if (!("limits" in plan)) {
-      return false;
-    }
-
-    const planKey =
-      typeof plan.limits === "object" &&
-      plan.limits !== null &&
-      "plan" in plan.limits
-        ? plan.limits.plan
-        : null;
-
-    return (
-      normalizePlanName(plan.name) === normalizedFirst ||
-      normalizePlanName(plan.name) === normalizedSecond ||
-      normalizePlanName(typeof planKey === "string" ? planKey : null) ===
-        normalizedFirst ||
-      normalizePlanName(typeof planKey === "string" ? planKey : null) ===
-        normalizedSecond
-    );
-  });
-
-  if (!matchingPlan || !("limits" in matchingPlan)) {
-    return false;
-  }
-
-  const planKey =
-    typeof matchingPlan.limits === "object" &&
-    matchingPlan.limits !== null &&
-    "plan" in matchingPlan.limits
-      ? matchingPlan.limits.plan
-      : null;
-
-  const normalizedPlanName = normalizePlanName(matchingPlan.name);
-  const normalizedPlanKey = normalizePlanName(
-    typeof planKey === "string" ? planKey : null,
-  );
-
-  return (
-    (normalizedFirst === normalizedPlanName ||
-      normalizedFirst === normalizedPlanKey) &&
-    (normalizedSecond === normalizedPlanName ||
-      normalizedSecond === normalizedPlanKey)
-  );
+  return billingPlansMatch(first, second);
 }
 
 function formatSubscriptionPlanName(value: string) {
-  const matchingPlan = subscriptionPlans.find((plan) =>
-    planMatches(plan.name, value),
-  );
-
-  if (matchingPlan) {
-    return matchingPlan.name;
-  }
-
-  return value
-    .split(" ")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+  return getBillingPlanDisplayName(value) ?? value;
 }
 
 function fromStripeTimestamp(value?: null | number) {
@@ -176,10 +113,9 @@ async function syncSubscriptionFromStripe(
     return subscription;
   }
 
-  const stripeSubscription =
-    await billingStripeClientProxy.subscriptions.retrieve(
-      subscription.stripeSubscriptionId,
-    );
+  const stripeSubscription = await stripeBillingProvider.retrieveSubscription(
+    subscription.stripeSubscriptionId,
+  );
   const subscriptionItem = getPrimarySubscriptionItem(stripeSubscription);
 
   if (!subscriptionItem) {
@@ -205,6 +141,56 @@ async function syncSubscriptionFromStripe(
       stripeSubscriptionId: stripeSubscription.id,
     })) ?? subscription
   );
+}
+
+function stripeObjectId(value: unknown) {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && "id" in value) {
+    return typeof value.id === "string" ? value.id : null;
+  }
+  return null;
+}
+
+export async function applySubscriptionStateFromStripeEvent({
+  eventCreatedAt,
+  localSubscription,
+  stripeSubscription,
+}: {
+  eventCreatedAt: number;
+  localSubscription: BillingSubscriptionRecord;
+  stripeSubscription: StripeSubscription;
+}) {
+  const subscriptionItem = getPrimarySubscriptionItem(stripeSubscription);
+  if (!subscriptionItem) {
+    throw new Error("Stripe subscription has no recurring subscription item.");
+  }
+
+  const eventSubscription = {
+    ...localSubscription,
+    billingInterval: subscriptionItem.price.recurring?.interval ?? null,
+    cancelAt: fromStripeTimestamp(stripeSubscription.cancel_at),
+    cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
+    canceledAt: fromStripeTimestamp(stripeSubscription.canceled_at),
+    endedAt: fromStripeTimestamp(stripeSubscription.ended_at),
+    periodEnd: fromStripeTimestamp(subscriptionItem.current_period_end),
+    periodStart: fromStripeTimestamp(subscriptionItem.current_period_start),
+    plan: resolvePlanName(subscriptionItem.price, localSubscription.plan),
+    seats: subscriptionItem.quantity ?? null,
+    status: stripeSubscription.status,
+    stripeCustomerId:
+      stripeObjectId(stripeSubscription.customer) ??
+      localSubscription.stripeCustomerId,
+    stripeScheduleId: stripeObjectId(stripeSubscription.schedule),
+    stripeSubscriptionId: stripeSubscription.id,
+  } satisfies BillingSubscriptionRecord;
+
+  const persisted = await applyBillingSubscriptionStripeEvent({
+    eventCreatedAt,
+    id: localSubscription.id,
+    values: eventSubscription,
+  });
+
+  return { applied: Boolean(persisted), eventSubscription };
 }
 
 export async function reconcileBillingSubscription(subscriptionId: string) {
@@ -283,11 +269,7 @@ export async function getBillingTransactions(
       : [];
   }
 
-  const invoices = await billingStripeClientProxy.invoices.list({
-    customer: customerId,
-    expand: ["data.lines.data.pricing.price_details.price"],
-    limit: 10,
-  });
+  const invoices = await stripeBillingProvider.listInvoices(customerId);
 
   const transactions = invoices.data.map((invoice): BillingTransaction => {
     return {

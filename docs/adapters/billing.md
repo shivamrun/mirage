@@ -1,10 +1,9 @@
 # Billing adapter
 
-The billing system uses Better Auth's Stripe plugin as the single webhook
-entrypoint, Mirage's own Stripe Checkout flow to create one-time credit top-up
-sessions, and a local credit ledger. Product code should use these
-adapter/service entry points instead of talking to Stripe or mutating billing
-tables directly.
+The billing system uses Better Auth's Stripe plugin as the signature-verified
+webhook and subscription entrypoint, a Stripe provider adapter for all Mirage
+Stripe SDK calls, and a local credit ledger. Product code should use billing
+services rather than talking to Stripe or mutating billing tables directly.
 
 This document describes the implementation as it exists today. If Stripe,
 Better Auth, or UI copy disagree with this file, inspect the code paths named
@@ -19,7 +18,7 @@ webhook.
 ```mermaid
 flowchart TD
   pricing[Pricing UI config<br/>src/features/pricing/plans.ts]
-  catalog[Billing catalog<br/>src/server/db/services/billing/catalog.ts]
+  catalog[Billing catalog<br/>src/shared/billing.ts]
   plans[Better Auth Stripe plans<br/>subscription-plans.ts]
   checkout[authClient.subscription.upgrade]
   stripeSub[Stripe subscription checkout<br/>and subscription webhooks]
@@ -41,30 +40,35 @@ flowchart TD
 flowchart TD
   topupButton[Buy 200 credits button]
   api[/POST /api/billing/checkout/]
-  customCheckout[createBillingCheckoutSession]
+  customCheckout[Billing checkout service]
   stripePayment[Stripe Checkout payment]
   webhook[/POST /api/auth/stripe/webhook/]
   onEvent[Better Auth Stripe onEvent]
+  inbox[Durable webhook inbox + worker]
   grant[grantCreditTopUpForCheckoutSession]
   ledger[(credit ledger and account)]
 
-  topupButton --> api --> customCheckout --> stripePayment --> webhook --> onEvent --> grant --> ledger
+  topupButton --> api --> customCheckout --> stripePayment --> webhook --> onEvent --> inbox --> grant --> ledger
 ```
 
-Better Auth handles subscription webhook events with its built-in lifecycle
-logic. Mirage handles one-time top-up checkout events from Better Auth's
-`onEvent` hook only after the plugin has verified the Stripe signature.
+Better Auth handles core subscription persistence. Its `onEvent` callback
+persists supported Mirage billing events to a durable inbox and queues a worker;
+the worker performs replay-safe top-up fulfillment and billing side effects.
+
+Top-up checkout requests include a client-generated UUID `requestId`. Mirage
+persists it in `billing_credit_purchases` and sends it as Stripe's idempotency
+key, preventing duplicate Checkout Sessions when the browser retries.
 
 ## Source Of Truth
 
 | Concern | Source of truth | Local representation |
 | --- | --- | --- |
 | Stripe customer | Stripe, with cached IDs in Better Auth/user records | `user.stripeCustomerId` and `subscription.stripeCustomerId` are remembered when checkout/webhooks expose a customer. |
-| Stripe subscription | Stripe | Better Auth writes the `subscription` table from its Stripe plugin; `syncBillingSubscriptionsFromStripe(...)` can refresh local rows on the pricing page. |
-| Current application plan | Local `subscription.plan` for paid users; free fallback when no active paid subscription applies | Plans are normalized against `subscriptionPlans` and `pricingPlans`. |
+| Stripe subscription | Stripe | Better Auth writes the `subscription` table from its Stripe plugin; local reads use the webhook-backed projection and scheduled reconciliation. |
+| Current application plan | Local `subscription.plan` for paid users; free fallback when no active paid subscription applies | Plans are normalized by `src/shared/billing.ts`. |
 | Billing interval | Stripe price recurring interval | Stored as `subscription.billingInterval` using Stripe values such as `month` or `year`. UI maps these to `monthly` or `annual`. |
 | Subscription status and period dates | Stripe subscription item and subscription status | Cached in `subscription.status`, `periodStart`, `periodEnd`, cancellation fields, seats, and schedule ID. |
-| Subscription checkout prices | Stripe Price lookup keys configured in code | `billingCatalog.subscriptions.*.prices.*.lookupKey` and `subscriptionPlans` point Better Auth to Stripe prices. Amounts are not validated locally for subscription checkout. |
+| Subscription checkout prices | Stripe Price lookup keys configured in code | `billingCatalog.plans.*.prices.*.lookupKey` and `subscriptionPlans` point Better Auth to Stripe prices. Amounts are not validated locally for subscription checkout. |
 | Pricing display amounts | Code | `src/features/pricing/plans.ts` displays `$10`, `$100`, `$30`, and `$300`; Stripe still determines the final checkout price. |
 | Credit entitlement | Code | `subscriptionPlans[].limits.credits` derived from `billingCatalog` for paid plans; free plan is defined in `subscription-plans.ts`. |
 | Current credit balance | Database | `credit_accounts` caches totals. It is updated only through ledger services. |
@@ -92,19 +96,18 @@ Paid subscription plans use Better Auth Stripe `prorationBehavior:
 
 ## Code Map
 
-`src/server/db/services/billing/catalog.ts`
+`src/shared/billing.ts`
 
 Purpose: central app billing catalog for paid subscription lookup keys and the
 one-time credit top-up package.
 
-Important symbols: `billingCatalog`, `BillingCheckoutInterval`,
-`BillingCheckoutPlan`, `getSubscriptionCatalogEntry`,
-`getSubscriptionPlanByLookupKey`.
+Important symbols: `billingCatalog`, plan/interval types, normalization helpers,
+and `getBillingPlanByLookupKey`.
 
 Called by: Better Auth subscription plan config, top-up checkout, top-up
 webhook validation, subscription reconciliation.
 
-Notes: catalog intervals are `monthly`/`yearly` for type keys, but Stripe
+Notes: catalog intervals are `monthly`/`annual` for type keys, but Stripe
 recurring intervals are `month`/`year`.
 
 `src/features/auth/better-auth/subscription-plans.ts`
@@ -113,24 +116,21 @@ Purpose: Better Auth Stripe `plans` array.
 
 Important symbols: `subscriptionPlans`.
 
-Called by: Better Auth server config, credit allowance normalization,
-subscription invoice/plan formatting, tests.
+Called by: Better Auth server config and tests. Its values are derived from the
+canonical shared billing catalog.
 
-Notes: the free plan lives here, not in `billingCatalog`.
+Notes: the free plan and its allowance also live in `billingCatalog`.
 
 `src/features/auth/better-auth/server.ts`
 
 Purpose: Better Auth server setup and Stripe subscription plugin registration.
 
-Important symbols: `auth`, subscription callbacks
-`onSubscriptionComplete`, `onSubscriptionCreated`, `onSubscriptionUpdate`,
-`onSubscriptionCancel`.
+Important symbols: `auth` and the Better Auth Stripe plugin registration.
 
 Called by: `/api/auth/[...all]`.
 
-Notes: subscription create/complete/update reconcile credits.
-Create/complete emit `subscription_started` only when a new grant is created.
-Cancel emits `subscription_cancelled`.
+Notes: Mirage subscription side effects are queued from `onEvent`; synchronous
+Better Auth lifecycle callbacks are intentionally not used for those effects.
 
 `src/app/(backend)/api/auth/[...all]/route.ts`
 
@@ -169,8 +169,8 @@ Important symbols: `getCreditBalance`, `reconcileCreditGrantsForUser`,
 `grantCreditTopUp`, `adjustCredits`, `InsufficientCreditsError`,
 `CreditIdempotencyConflictError`.
 
-Called by: billing UI page, Better Auth Stripe callbacks, Better Auth Stripe
-`onEvent`, credit sample API, admin adjustment API.
+Called by: billing UI page, the durable Stripe event worker, credit sample API,
+and admin adjustment API.
 
 Notes: do not update `credit_accounts` directly. This service locks the account
 row, appends the ledger entry, updates cached totals, and enforces idempotency.
@@ -222,23 +222,26 @@ Called by: Better Auth Stripe `onEvent`.
 Notes: validates payment status, amount, currency, lookup key, metadata credits,
 and the actual line item price lookup key before granting.
 
-`src/server/db/services/billing/stripe-client.ts`
+`src/adapters/stripe/client.ts` and `src/adapters/stripe/billing-provider.ts`
 
-Purpose: shared Stripe client for custom billing services.
+Purpose: the only Mirage-owned Stripe SDK boundary. Provider methods validate
+prices, create/retrieve Checkout Sessions, retrieve invoices/subscriptions, and
+perform customer/subscription lifecycle operations.
 
 Important symbols: `getBillingStripeClient`,
 `setBillingStripeClientForTests`.
 
 Notes: production code uses Stripe API version `2026-08-26.dahlia`.
 
-`src/server/db/dal/billing.ts`
+`src/server/db/dal/billing.ts`, `billing-purchases.ts`, and
+`stripe-webhook-events.ts`
 
 Purpose: reads and updates local subscription rows.
 
 Important symbols: `getBillingSubscriptionsByUserId`,
 `updateBillingSubscription`, `BillingSubscriptionRecord`.
 
-Called by: pricing page, billing page, Stripe sync helper.
+Called by: billing application services and reconciliation jobs.
 
 `src/server/db/services/billing/stripe-subscriptions.ts`
 
@@ -248,8 +251,8 @@ helpers.
 Important symbols: `syncBillingSubscriptionsFromStripe`,
 `getBillingTransactions`, `BillingTransaction`.
 
-Called by: pricing page today. `getBillingTransactions` is available but the
-current billing UI opens Stripe for transaction history instead of rendering
+Called by: scheduled reconciliation. `getBillingTransactions` remains unused;
+the current billing UI opens Stripe for transaction history instead of rendering
 these rows.
 
 `src/features/pricing/plans.ts`
@@ -380,12 +383,12 @@ emitted today.
 8. If checkout is abandoned, no local subscription or credit grant is created by
    this app. The user lands back on `cancelUrl` only if Stripe redirects them.
 9. Stripe sends subscription events to `/api/auth/stripe/webhook`.
-10. Better Auth updates the local `subscription` table and invokes configured
-    subscription callbacks.
-11. Create/complete/update callbacks call
-    `reconcileCreditGrantForSubscription(...)`.
-12. Create/complete callbacks emit `subscription_started` only if the credit
-    grant was newly created.
+10. Better Auth updates the local `subscription` table and `onEvent` persists a
+    durable inbox record.
+11. The billing worker maps the immutable Stripe event subscription snapshot to
+    the local row and calls `reconcileCreditGrantForSubscription(...)`.
+12. A create event emits `subscription_started` only if the credit grant was
+    newly created.
 
 Validation happens in multiple places:
 
@@ -402,14 +405,14 @@ Validation happens in multiple places:
 
 User starts Better Auth subscription checkout from pricing or checkout resume.
 Stripe completes checkout and sends Better Auth webhooks. Better Auth writes the
-local `subscription` row. `onSubscriptionComplete` and/or
-`onSubscriptionCreated` reconcile credits. Duplicate callback execution is safe
-because credit grants use period keys and ledger idempotency keys.
+local `subscription` row, then Mirage's durable worker maps the event snapshot
+and reconciles credits. Duplicate execution is safe because credit grants use
+period keys and ledger idempotency keys.
 
 ### Renewal
 
-Renewals arrive as subscription updates through Better Auth. The
-`onSubscriptionUpdate` callback reconciles the subscription period. If the
+Renewals arrive as subscription updates through Better Auth. The durable event
+worker reconciles the subscription period. If the
 period dates changed, the period key changes and the new allowance can be
 granted. Previous non-carry-forward period credits are expired during
 reconciliation when the latest ledger period has ended before the new period.
@@ -452,10 +455,10 @@ Better Auth own the invoice/proration behavior.
 return URL. If Better Auth returns a URL, the browser redirects there; otherwise
 the page refreshes.
 
-When Better Auth invokes `onSubscriptionCancel`, Mirage emits
-`subscription_cancelled` with the normalized plan, interval, and
-`cancelAtPeriodEnd` flag. The current implementation does not grant, revoke, or
-expire credits directly in the cancel callback.
+When a durable `customer.subscription.updated` event changes
+`cancel_at_period_end` from false to true, Mirage records the transition once
+and emits `subscription_cancelled` with the normalized plan and interval. It
+does not grant, revoke, or expire credits directly for that transition.
 
 Restore uses `authClient.subscription.restore(...)` and refreshes the page.
 Credit consequences depend on the subscription row/webhook state that Better
@@ -565,8 +568,9 @@ Top-ups are independent of subscriptions.
    `checkout.session.async_payment_succeeded` to
    `/api/auth/stripe/webhook`.
 9. Better Auth verifies the Stripe signature with `STRIPE_WEBHOOK_SECRET`,
-   then Mirage's Stripe `onEvent` handler filters for the top-up lookup key.
-10. `grantCreditTopUpForCheckoutSession(...)` verifies mode, paid status,
+   then Mirage stores the event in its durable inbox and queues a worker.
+10. The worker retrieves and verifies the Stripe event/session before
+    `grantCreditTopUpForCheckoutSession(...)` validates mode, paid status,
     metadata lookup key, metadata credits, user ID, amount, currency, and line
     item price lookup key.
 11. `grantCreditTopUp(...)` writes a `top_up` ledger entry with idempotency key
@@ -613,7 +617,7 @@ The portal button is disabled unless the account has a Stripe customer ID from
 `user.stripeCustomerId` or the current local subscription row.
 
 Billing portal changes are expected to come back through Better Auth Stripe
-webhooks and callbacks.
+webhooks and the durable event worker.
 
 ## Analytics
 
@@ -623,8 +627,8 @@ currently emits:
 | Event | Where | Meaning |
 | --- | --- | --- |
 | `subscription_checkout_started` | Browser pricing button | Checkout URL returned; intent only. |
-| `subscription_started` | Better Auth create/complete callbacks | A new subscription period credit grant was created. |
-| `subscription_cancelled` | Better Auth cancel callback | Better Auth reported a cancel transition. |
+| `subscription_started` | Durable subscription-created worker | A new subscription period credit grant was created. |
+| `subscription_cancelled` | Durable subscription-updated worker | Stripe changed `cancel_at_period_end` from false to true. |
 | `credit_top_up_checkout_started` | `/api/billing/checkout` | Top-up Checkout session created; intent only. |
 | `credits_purchased` | Top-up webhook after ledger insert | Paid top-up credits were durably granted. |
 | `credits_consumed` | Credit sample API | Sample spend succeeded. |
@@ -654,7 +658,7 @@ Production Stripe endpoints from `docs/PRODUCTION_CHECKLIST.md`:
 
 Change display name:
 
-- Update `billingCatalog.subscriptions.*.displayName` for paid plans.
+- Update `billingCatalog.plans.*.displayName` for paid plans.
 - Update `pricingPlans[].name` and `checkoutPlanName` if the UI/checkout name
   should match.
 - Update tests in `tests/subscription-plans.test.ts` if the Better Auth plan
@@ -665,7 +669,7 @@ Change display name:
 Change subscription lookup key:
 
 - Create the new Stripe Price with the desired lookup key first.
-- Update `billingCatalog.subscriptions.<plan>.prices.<interval>.lookupKey`.
+- Update `billingCatalog.plans.<plan>.prices.<interval>.lookupKey`.
 - Keep old lookup keys in mind for existing subscriptions and invoices. Current
   lookup-key resolution maps only the configured current keys.
 - Run subscription plan and billing tests.
@@ -680,8 +684,7 @@ Change monthly or annual amount:
 
 Change included credits:
 
-- Update `billingCatalog.subscriptions.<plan>.credits` for paid plans.
-- Update the free plan credits in `subscription-plans.ts` if changing free.
+- Update `billingCatalog.plans.<plan>.credits`.
 - Update `pricingPlans[].credits` so pricing/account UI matches.
 - Update tests in `pricing-plans.test.ts`, `subscription-plans.test.ts`, and
   credit ledger expectations.
@@ -690,7 +693,7 @@ Change included credits:
 
 Add a paid plan:
 
-- Add the plan to `billingCatalog.subscriptions`.
+- Add the plan to `billingCatalog.plans`.
 - Add a `subscriptionPlans` entry with lookup keys, proration behavior, limits,
   and internal `plan` key.
 - Add a `pricingPlans` card, rank entry, checkout intent validation, and any
@@ -705,7 +708,8 @@ Add another billing interval:
   the mapping to Better Auth's checkout arguments. Better Auth currently
   receives a boolean `annual`; another interval will likely need a different
   integration shape.
-- Extend normalization in Better Auth callbacks and pricing page mapping.
+- Extend canonical normalization in `src/shared/billing.ts` and update the UI
+  interval controls.
 
 Add another one-time credit package:
 
@@ -747,8 +751,8 @@ Debug a wrong subscription:
 
 - Check Stripe subscription/customer first.
 - Check local `subscription` rows by `referenceId` and `stripeSubscriptionId`.
-- Open `/pricing` as the user or run `syncBillingSubscriptionsFromStripe(...)`
-  from a trusted context if local period/status fields look stale.
+- Run the scheduled reconciliation job from a trusted context if local
+  period/status fields look stale.
 - Confirm the Stripe price lookup key maps through `billingCatalog`.
 - Confirm the Better Auth webhook endpoint and `STRIPE_WEBHOOK_SECRET`.
 

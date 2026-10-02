@@ -8,6 +8,10 @@ export const jobQueueNames = {
 const stripeEventTypes = [
   "checkout.session.completed",
   "checkout.session.async_payment_succeeded",
+  "customer.subscription.created",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+  "invoice.payment_failed",
 ] as const;
 
 export const jobDefinitions = {

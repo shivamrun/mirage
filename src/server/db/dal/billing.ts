@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, isNotNull } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNotNull, isNull, lt, or } from "drizzle-orm";
 
 import db from "@/server/db";
 import { subscription } from "@/server/db/schema";
@@ -18,6 +18,8 @@ export type BillingSubscriptionUpdate = Partial<
     | "seats"
     | "status"
     | "stripeScheduleId"
+    | "stripeCustomerId"
+    | "stripeEventCreatedAt"
     | "stripeSubscriptionId"
   >
 >;
@@ -93,6 +95,32 @@ export async function updateBillingSubscription(
     .update(subscription)
     .set(values)
     .where(eq(subscription.id, id))
+    .returning();
+
+  return updatedSubscription ?? null;
+}
+
+export async function applyBillingSubscriptionStripeEvent({
+  eventCreatedAt,
+  id,
+  values,
+}: {
+  eventCreatedAt: number;
+  id: string;
+  values: BillingSubscriptionUpdate;
+}) {
+  const [updatedSubscription] = await db
+    .update(subscription)
+    .set({ ...values, stripeEventCreatedAt: eventCreatedAt })
+    .where(
+      and(
+        eq(subscription.id, id),
+        or(
+          isNull(subscription.stripeEventCreatedAt),
+          lt(subscription.stripeEventCreatedAt, eventCreatedAt),
+        ),
+      ),
+    )
     .returning();
 
   return updatedSubscription ?? null;

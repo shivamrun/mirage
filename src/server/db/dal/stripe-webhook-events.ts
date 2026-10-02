@@ -1,4 +1,5 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { and, asc, eq, isNull, lt, or, sql } from "drizzle-orm";
 
 import db from "@/server/db";
 import { stripeWebhookEvents } from "@/server/db/schema";
@@ -49,76 +50,166 @@ export async function getStripeWebhookEvent(stripeEventId: string) {
   return event ?? null;
 }
 
-export function listPendingStripeWebhookEvents(limit = 100) {
+export function listRecoverableStripeWebhookEvents(limit = 100) {
+  const staleBefore = new Date(Date.now() - 5 * 60_000);
   return db
     .select()
     .from(stripeWebhookEvents)
-    .where(eq(stripeWebhookEvents.status, "pending"))
+    .where(
+      or(
+        eq(stripeWebhookEvents.status, "pending"),
+        and(
+          eq(stripeWebhookEvents.status, "processing"),
+          or(
+            isNull(stripeWebhookEvents.processingStartedAt),
+            lt(stripeWebhookEvents.processingStartedAt, staleBefore),
+          ),
+        ),
+      ),
+    )
     .orderBy(asc(stripeWebhookEvents.createdAt))
     .limit(limit);
 }
 
-export async function markStripeWebhookEventProcessing(stripeEventId: string) {
+export async function claimStripeWebhookEvent(stripeEventId: string) {
+  const staleBefore = new Date(Date.now() - 5 * 60_000);
+  const processingToken = randomUUID();
   const [event] = await db
     .update(stripeWebhookEvents)
     .set({
       attemptCount: sql`${stripeWebhookEvents.attemptCount} + 1`,
       lastErrorKind: null,
       lastErrorMessage: null,
+      processingStartedAt: new Date(),
+      processingToken,
       status: "processing",
     })
-    .where(eq(stripeWebhookEvents.stripeEventId, stripeEventId))
+    .where(
+      and(
+        eq(stripeWebhookEvents.stripeEventId, stripeEventId),
+        or(
+          eq(stripeWebhookEvents.status, "pending"),
+          and(
+            eq(stripeWebhookEvents.status, "processing"),
+            or(
+              isNull(stripeWebhookEvents.processingStartedAt),
+              lt(stripeWebhookEvents.processingStartedAt, staleBefore),
+            ),
+          ),
+        ),
+      ),
+    )
     .returning();
 
   return event ?? null;
 }
 
-export async function markStripeWebhookEventCompleted(stripeEventId: string) {
-  await db
+export async function markStripeWebhookEventCompleted({
+  processingToken,
+  stripeEventId,
+}: {
+  processingToken: string;
+  stripeEventId: string;
+}) {
+  const [event] = await db
     .update(stripeWebhookEvents)
     .set({
       lastErrorKind: null,
       lastErrorMessage: null,
       processedAt: new Date(),
+      processingStartedAt: null,
+      processingToken: null,
       status: "completed",
     })
-    .where(eq(stripeWebhookEvents.stripeEventId, stripeEventId));
+    .where(
+      and(
+        eq(stripeWebhookEvents.stripeEventId, stripeEventId),
+        eq(stripeWebhookEvents.processingToken, processingToken),
+        eq(stripeWebhookEvents.status, "processing"),
+      ),
+    )
+    .returning();
+  return event ?? null;
 }
 
 export async function markStripeWebhookEventFailed({
   errorKind,
   errorMessage,
+  processingToken,
   stripeEventId,
 }: {
   errorKind: string;
   errorMessage: string;
+  processingToken: string;
   stripeEventId: string;
 }) {
-  await db
+  const [event] = await db
     .update(stripeWebhookEvents)
     .set({
       lastErrorKind: errorKind,
       lastErrorMessage: errorMessage.slice(0, 500),
+      processingStartedAt: null,
+      processingToken: null,
       status: "failed",
     })
-    .where(eq(stripeWebhookEvents.stripeEventId, stripeEventId));
+    .where(
+      and(
+        eq(stripeWebhookEvents.stripeEventId, stripeEventId),
+        eq(stripeWebhookEvents.processingToken, processingToken),
+      ),
+    )
+    .returning();
+  return event ?? null;
 }
 
 export async function markStripeWebhookEventRetrying({
   errorKind,
   errorMessage,
+  processingToken,
   stripeEventId,
 }: {
   errorKind: string;
   errorMessage: string;
+  processingToken: string;
   stripeEventId: string;
 }) {
-  await db
+  const [event] = await db
     .update(stripeWebhookEvents)
     .set({
       lastErrorKind: errorKind,
       lastErrorMessage: errorMessage.slice(0, 500),
+      processingStartedAt: null,
       status: "pending",
     })
-    .where(eq(stripeWebhookEvents.stripeEventId, stripeEventId));
+    .where(
+      and(
+        eq(stripeWebhookEvents.stripeEventId, stripeEventId),
+        eq(stripeWebhookEvents.processingToken, processingToken),
+        eq(stripeWebhookEvents.status, "processing"),
+      ),
+    )
+    .returning();
+  return event ?? null;
+}
+
+export async function recordStripeWebhookLifecycleTransition({
+  processingToken,
+  stripeEventId,
+}: {
+  processingToken: string;
+  stripeEventId: string;
+}) {
+  const [event] = await db
+    .update(stripeWebhookEvents)
+    .set({ lifecycleRecordedAt: new Date() })
+    .where(
+      and(
+        eq(stripeWebhookEvents.stripeEventId, stripeEventId),
+        eq(stripeWebhookEvents.processingToken, processingToken),
+        eq(stripeWebhookEvents.status, "processing"),
+        isNull(stripeWebhookEvents.lifecycleRecordedAt),
+      ),
+    )
+    .returning();
+  return event ?? null;
 }

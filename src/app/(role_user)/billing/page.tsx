@@ -1,7 +1,6 @@
 import { AccountBillingPage } from "@/features/account/components";
-import { getBillingSubscriptionsByUserId } from "@/server/db/dal/billing";
 import { requireAuth } from "@/server/db/services/auth/access";
-import { getCreditBalance } from "@/server/db/services/credits/ledger";
+import { getBillingOverview } from "@/server/db/services/billing/overview";
 import { getPageMetadata } from "@/shared/metadata";
 
 export const metadata = getPageMetadata("Billing", {
@@ -20,8 +19,7 @@ export default async function Page({ searchParams }: BillingPageProps) {
     callbackUrl: "/billing",
   });
 
-  const subscriptions = await getBillingSubscriptionsByUserId(user.id);
-  const creditBalance = await getCreditBalance(user.id);
+  const { creditBalance, subscriptions } = await getBillingOverview(user.id);
 
   return (
     <AccountBillingPage

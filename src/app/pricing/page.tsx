@@ -2,17 +2,16 @@ import type { Metadata } from "next";
 
 import { AppHeader } from "@/components/app/app-header";
 import { PricingPage } from "@/features/pricing/components";
-import {
-  type BillingInterval,
-  type PricingPlanKey,
-  pricingPlans,
-} from "@/features/pricing/plans";
+import type { BillingInterval, PricingPlanKey } from "@/features/pricing/plans";
+import { getCurrentUser } from "@/server/db/services/auth/access";
 import {
   type BillingSubscriptionRecord,
-  getBillingSubscriptionsByUserId,
-} from "@/server/db/dal/billing";
-import { getCurrentUser } from "@/server/db/services/auth/access";
-import { syncBillingSubscriptionsFromStripe } from "@/server/db/services/billing/stripe-subscriptions";
+  getBillingSubscriptionsForUser,
+} from "@/server/db/services/billing/overview";
+import {
+  normalizeBillingInterval,
+  normalizeBillingPlan,
+} from "@/shared/billing";
 import { getPageMetadata } from "@/shared/metadata";
 
 export const metadata: Metadata = getPageMetadata("Pricing", {
@@ -30,46 +29,20 @@ function getCurrentSubscription(subscriptions: BillingSubscriptionRecord[]) {
   );
 }
 
-function normalizePlanName(plan?: null | string) {
-  return plan?.toLowerCase().replace(/\s+/g, " ").trim() ?? "";
-}
-
 function getPlanKey(plan?: null | string): PricingPlanKey {
-  const normalizedPlan = normalizePlanName(plan);
-  const matchedPlan = pricingPlans.find((pricingPlan) => {
-    const checkoutPlanName =
-      "checkoutPlanName" in pricingPlan
-        ? pricingPlan.checkoutPlanName
-        : undefined;
-
-    return (
-      normalizedPlan === normalizePlanName(pricingPlan.key) ||
-      normalizedPlan === normalizePlanName(pricingPlan.name) ||
-      normalizedPlan === normalizePlanName(checkoutPlanName)
-    );
-  });
-
-  return matchedPlan?.key ?? "free";
+  return normalizeBillingPlan(plan) ?? "free";
 }
 
 function getBillingInterval(
   interval?: null | string,
 ): BillingInterval | undefined {
-  if (interval === "month") {
-    return "monthly";
-  }
-
-  if (interval === "year") {
-    return "annual";
-  }
+  return normalizeBillingInterval(interval) ?? undefined;
 }
 
 const Page = async () => {
   const user = await getCurrentUser();
   const subscriptions = user
-    ? await syncBillingSubscriptionsFromStripe(
-        await getBillingSubscriptionsByUserId(user.id),
-      )
+    ? await getBillingSubscriptionsForUser(user.id)
     : [];
   const currentSubscription = getCurrentSubscription(subscriptions);
 

@@ -14,7 +14,7 @@ import type { AuthSession } from "@/server/http/auth";
 import { elysiaAuth } from "@/server/http/auth";
 import { requestPolicy } from "@/server/http/request-policy";
 import { responseCache } from "@/server/http/response-cache";
-import { getCreditSampleItem } from "@/shared/credits/sample-catalog";
+import { getCreditSampleItem } from "@/shared/credit-sample-catalog";
 import {
   creditBalanceResponseSchema,
   creditSampleCreateRequestSchema,

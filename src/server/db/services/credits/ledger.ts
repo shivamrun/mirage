@@ -1,14 +1,24 @@
-import { and, desc, eq, gt, inArray, lte, sql } from "drizzle-orm";
-
-import { subscriptionPlans } from "@/features/auth/better-auth/subscription-plans";
-import db, { type DBClient } from "@/server/db";
 import {
-  creditAccounts,
-  creditLedgerEntries,
-  creditPeriodGrants,
-  subscription,
-  user,
-} from "@/server/db/schema";
+  type CreditAccount,
+  type CreditTransaction,
+  findCreditPeriodGrant,
+  findCreditUser,
+  findCurrentPaidSubscription,
+  findLatestCreditLedgerEntry,
+  findLedgerEntryByIdempotencyKey,
+  findSpendLedgerEntry,
+  insertCreditLedgerEntry,
+  type LedgerEntry,
+  listRecentCreditLedger,
+  lockCreditAccount,
+  type SubscriptionRecord,
+  sumCreditRefunds,
+  type UserRecord,
+  updateCreditAccount,
+  upsertCreditPeriodGrant,
+  withCreditTransaction,
+} from "@/server/db/dal/credits";
+import { getBillingPlanCredits, normalizeBillingPlan } from "@/shared/billing";
 import { invalidateCreditBalanceCache } from "./cache";
 
 const activeSubscriptionStatuses = ["active", "trialing"] as const;
@@ -34,10 +44,6 @@ export class CreditIdempotencyConflictError extends Error {
   }
 }
 
-type LedgerEntry = typeof creditLedgerEntries.$inferSelect;
-type CreditAccount = typeof creditAccounts.$inferSelect;
-type SubscriptionRecord = typeof subscription.$inferSelect;
-type UserRecord = typeof user.$inferSelect;
 type SubscriptionGrantRecord = Pick<
   SubscriptionRecord,
   "id" | "plan" | "referenceId"
@@ -72,6 +78,19 @@ type CreditWriteOptions = {
   userId: string;
 };
 
+function operationFingerprint(entry: CreditWriteOptions) {
+  return JSON.stringify({
+    amount: entry.amount,
+    carryForwardDelta: entry.carryForwardDelta ?? null,
+    metadata: entry.metadata ?? null,
+    reversesLedgerEntryId: entry.reversesLedgerEntryId ?? null,
+    source: entry.source,
+    sourceId: entry.sourceId ?? null,
+    type: entry.type,
+    userId: entry.userId,
+  });
+}
+
 function assertPositiveInteger(amount: number, label: string) {
   if (!Number.isInteger(amount) || amount <= 0) {
     throw new Error(`${label} must be a positive integer.`);
@@ -79,68 +98,11 @@ function assertPositiveInteger(amount: number, label: string) {
 }
 
 function normalizePlanKey(value: null | string | undefined) {
-  const normalized = value?.toLowerCase().replace(/\s+/g, " ").trim();
-  if (!normalized) return null;
-
-  const matchingPlan = subscriptionPlans.find((plan) => {
-    const planKey =
-      "limits" in plan &&
-      typeof plan.limits === "object" &&
-      plan.limits !== null &&
-      "plan" in plan.limits &&
-      typeof plan.limits.plan === "string"
-        ? plan.limits.plan
-        : null;
-
-    return (
-      plan.name.toLowerCase() === normalized ||
-      planKey?.toLowerCase() === normalized
-    );
-  });
-
-  if (
-    matchingPlan &&
-    "limits" in matchingPlan &&
-    typeof matchingPlan.limits === "object" &&
-    matchingPlan.limits !== null &&
-    "plan" in matchingPlan.limits &&
-    typeof matchingPlan.limits.plan === "string"
-  ) {
-    return matchingPlan.limits.plan;
-  }
-
-  return normalized;
+  return normalizeBillingPlan(value);
 }
 
 function planAllowance(plan: string) {
-  const normalizedPlan = normalizePlanKey(plan);
-  const matchingPlan = subscriptionPlans.find((candidate) => {
-    const candidatePlan =
-      "limits" in candidate &&
-      typeof candidate.limits === "object" &&
-      candidate.limits !== null &&
-      "plan" in candidate.limits &&
-      typeof candidate.limits.plan === "string"
-        ? candidate.limits.plan
-        : candidate.name;
-
-    return normalizePlanKey(candidatePlan) === normalizedPlan;
-  });
-
-  const credits =
-    matchingPlan &&
-    "limits" in matchingPlan &&
-    typeof matchingPlan.limits === "object" &&
-    matchingPlan.limits !== null &&
-    "credits" in matchingPlan.limits
-      ? matchingPlan.limits.credits
-      : null;
-
-  if (!Number.isInteger(credits) || Number(credits) < 0) {
-    return 0;
-  }
-
-  return Number(credits);
+  return getBillingPlanCredits(plan);
 }
 
 function addMonthsClamped(date: Date, months: number) {
@@ -254,32 +216,12 @@ function freeBenefitPeriodForPaidPeriod({
   } satisfies CreditPeriod;
 }
 
-async function getUserRecord(userId: string, tx: DBClient = db) {
-  const [record] = await tx.select().from(user).where(eq(user.id, userId));
-  return record ?? null;
-}
-
-async function getCurrentPaidSubscription(userId: string, tx: DBClient = db) {
-  const now = new Date();
-  const [record] = await tx
-    .select()
-    .from(subscription)
-    .where(
-      and(
-        eq(subscription.referenceId, userId),
-        inArray(subscription.status, activeSubscriptionStatuses),
-        lte(subscription.periodStart, now),
-        gt(subscription.periodEnd, now),
-      ),
-    )
-    .orderBy(desc(subscription.periodEnd), desc(subscription.periodStart))
-    .limit(1);
-
-  return record ?? null;
-}
-
-async function resolveCurrentPeriod(userId: string, tx: DBClient = db) {
-  const paidSubscription = await getCurrentPaidSubscription(userId, tx);
+async function resolveCurrentPeriod(userId: string, tx?: CreditTransaction) {
+  const paidSubscription = await findCurrentPaidSubscription(
+    userId,
+    activeSubscriptionStatuses,
+    tx,
+  );
   const paidPeriod = paidSubscription
     ? paidPeriodForSubscription(paidSubscription)
     : null;
@@ -288,40 +230,12 @@ async function resolveCurrentPeriod(userId: string, tx: DBClient = db) {
     return paidPeriod;
   }
 
-  const userRecord = await getUserRecord(userId, tx);
+  const userRecord = await findCreditUser(userId, tx);
   if (!userRecord) {
     throw new Error("User not found.");
   }
 
   return freePeriodForUser(userRecord);
-}
-
-async function ensureCreditAccount(userId: string, tx: DBClient) {
-  await tx
-    .insert(creditAccounts)
-    .values({ userId })
-    .onConflictDoNothing({ target: creditAccounts.userId });
-}
-
-async function lockCreditAccount(userId: string, tx: DBClient) {
-  await ensureCreditAccount(userId, tx);
-  await tx.execute(sql`
-    select ${creditAccounts.userId}
-    from ${creditAccounts}
-    where ${creditAccounts.userId} = ${userId}
-    for update
-  `);
-
-  const [account] = await tx
-    .select()
-    .from(creditAccounts)
-    .where(eq(creditAccounts.userId, userId));
-
-  if (!account) {
-    throw new Error("Credit account could not be initialized.");
-  }
-
-  return account;
 }
 
 function accountTotalsForEntry(
@@ -404,19 +318,11 @@ function creditEntryForAccount(
   return entry;
 }
 
-async function findEntryByIdempotencyKey(idempotencyKey: string, tx: DBClient) {
-  const [entry] = await tx
-    .select()
-    .from(creditLedgerEntries)
-    .where(eq(creditLedgerEntries.idempotencyKey, idempotencyKey));
-
-  return entry ?? null;
-}
-
 function assertMatchingIdempotentEntry(
   existing: LedgerEntry,
   nextEntry: CreditWriteOptions,
 ) {
+  const fingerprint = operationFingerprint(nextEntry);
   if (
     existing.amount !== nextEntry.amount ||
     existing.reversesLedgerEntryId !==
@@ -424,24 +330,29 @@ function assertMatchingIdempotentEntry(
     existing.source !== nextEntry.source ||
     existing.sourceId !== (nextEntry.sourceId ?? null) ||
     existing.type !== nextEntry.type ||
-    existing.userId !== nextEntry.userId
+    existing.userId !== nextEntry.userId ||
+    (existing.operationFingerprint !== null &&
+      existing.operationFingerprint !== fingerprint)
   ) {
     throw new CreditIdempotencyConflictError(nextEntry.idempotencyKey);
   }
 }
 
 async function appendLedgerEntryWithResult(
-  tx: DBClient,
+  tx: CreditTransaction,
   entry: CreditWriteOptions,
 ) {
-  const existing = await findEntryByIdempotencyKey(entry.idempotencyKey, tx);
+  const existing = await findLedgerEntryByIdempotencyKey(
+    entry.idempotencyKey,
+    tx,
+  );
   if (existing) {
     assertMatchingIdempotentEntry(existing, entry);
     return { created: false, entry: existing };
   }
 
   const account = await lockCreditAccount(entry.userId, tx);
-  const existingAfterLock = await findEntryByIdempotencyKey(
+  const existingAfterLock = await findLedgerEntryByIdempotencyKey(
     entry.idempotencyKey,
     tx,
   );
@@ -460,12 +371,12 @@ async function appendLedgerEntryWithResult(
     );
   }
 
-  const [ledgerEntry] = await tx
-    .insert(creditLedgerEntries)
-    .values({
+  const ledgerEntry = await insertCreditLedgerEntry(
+    {
       amount: ledgerWrite.amount,
       idempotencyKey: ledgerWrite.idempotencyKey,
       metadata: ledgerWrite.metadata,
+      operationFingerprint: operationFingerprint(entry),
       periodEnd: ledgerWrite.periodEnd,
       periodStart: ledgerWrite.periodStart,
       reversesLedgerEntryId: ledgerWrite.reversesLedgerEntryId,
@@ -473,24 +384,29 @@ async function appendLedgerEntryWithResult(
       sourceId: ledgerWrite.sourceId,
       type: ledgerWrite.type,
       userId: ledgerWrite.userId,
-    })
-    .returning();
+    },
+    tx,
+  );
 
-  await tx
-    .update(creditAccounts)
-    .set({
+  await updateCreditAccount(
+    entry.userId,
+    {
       availableCredits: nextAccount.availableCredits,
       carryForwardCredits: nextAccount.carryForwardCredits,
       lifetimeExpired: nextAccount.lifetimeExpired,
       lifetimeGranted: nextAccount.lifetimeGranted,
       lifetimeSpent: nextAccount.lifetimeSpent,
-    })
-    .where(eq(creditAccounts.userId, entry.userId));
+    },
+    tx,
+  );
 
   return { created: true, entry: ledgerEntry };
 }
 
-async function appendLedgerEntry(tx: DBClient, entry: CreditWriteOptions) {
+async function appendLedgerEntry(
+  tx: CreditTransaction,
+  entry: CreditWriteOptions,
+) {
   const result = await appendLedgerEntryWithResult(tx, entry);
 
   return result.entry;
@@ -504,7 +420,7 @@ async function expirePreviousPeriodCredits({
 }: {
   account: CreditAccount;
   currentPeriod: CreditPeriod;
-  tx: DBClient;
+  tx: CreditTransaction;
   userId: string;
 }) {
   const expirableCredits = Math.max(
@@ -516,15 +432,7 @@ async function expirePreviousPeriodCredits({
     return;
   }
 
-  const [latestEntry] = await tx
-    .select()
-    .from(creditLedgerEntries)
-    .where(eq(creditLedgerEntries.userId, userId))
-    .orderBy(
-      desc(creditLedgerEntries.periodEnd),
-      desc(creditLedgerEntries.createdAt),
-    )
-    .limit(1);
+  const latestEntry = await findLatestCreditLedgerEntry(userId, tx);
 
   if (!latestEntry || latestEntry.periodEnd > currentPeriod.periodStart) {
     return;
@@ -551,30 +459,16 @@ async function grantPeriodCredits({
   userId,
 }: {
   currentPeriod: CreditPeriod;
-  tx: DBClient;
+  tx: CreditTransaction;
   userId: string;
 }) {
-  const [existingGrant] = await tx
-    .select()
-    .from(creditPeriodGrants)
-    .where(eq(creditPeriodGrants.periodKey, currentPeriod.key));
+  const existingGrant = await findCreditPeriodGrant(currentPeriod.key, tx);
 
   const previousAllowance = existingGrant?.allowance ?? 0;
   const topUpAmount = Math.max(0, currentPeriod.allowance - previousAllowance);
 
-  if (existingGrant) {
-    await tx
-      .update(creditPeriodGrants)
-      .set({
-        allowance: currentPeriod.allowance,
-        periodEnd: currentPeriod.periodEnd,
-        periodStart: currentPeriod.periodStart,
-        plan: currentPeriod.plan,
-        subscriptionId: currentPeriod.subscriptionId,
-      })
-      .where(eq(creditPeriodGrants.id, existingGrant.id));
-  } else {
-    await tx.insert(creditPeriodGrants).values({
+  await upsertCreditPeriodGrant(
+    {
       allowance: currentPeriod.allowance,
       periodEnd: currentPeriod.periodEnd,
       periodKey: currentPeriod.key,
@@ -582,8 +476,9 @@ async function grantPeriodCredits({
       plan: currentPeriod.plan,
       subscriptionId: currentPeriod.subscriptionId,
       userId,
-    });
-  }
+    },
+    tx,
+  );
 
   if (topUpAmount > 0) {
     const grantResult = await appendLedgerEntryWithResult(tx, {
@@ -615,7 +510,7 @@ async function grantPeriodCredits({
 
 async function reconcilePeriodGrantsForUser(
   userId: string,
-  tx: DBClient,
+  tx: CreditTransaction,
   period?: CreditPeriod,
 ) {
   const currentPeriod = period ?? (await resolveCurrentPeriod(userId, tx));
@@ -659,14 +554,14 @@ async function reconcilePeriodGrantsForUser(
 
 async function reconcilePeriodGrantForUser(
   userId: string,
-  tx: DBClient,
+  tx: CreditTransaction,
   period?: CreditPeriod,
 ) {
   return reconcilePeriodGrantsForUser(userId, tx, period);
 }
 
 export async function reconcileCreditGrantsForUser(userId: string) {
-  const result = await db.transaction(async (tx) =>
+  const result = await withCreditTransaction(async (tx) =>
     reconcilePeriodGrantForUser(userId, tx),
   );
 
@@ -684,7 +579,7 @@ export async function reconcileCreditGrantForSubscription(
     return null;
   }
 
-  const result = await db.transaction(async (tx) =>
+  const result = await withCreditTransaction(async (tx) =>
     reconcilePeriodGrantForUser(record.referenceId, tx, period),
   );
 
@@ -714,7 +609,7 @@ export async function spendCredits({
 }) {
   assertPositiveInteger(amount, "Credit spend amount");
 
-  const entry = await db.transaction(async (tx) => {
+  const entry = await withCreditTransaction(async (tx) => {
     const result = await reconcilePeriodGrantForUser(userId, tx);
 
     return appendLedgerEntry(tx, {
@@ -751,17 +646,13 @@ export async function refundCreditSpend({
   spendLedgerEntryId: string;
   userId: string;
 }) {
-  const entry = await db.transaction(async (tx) => {
-    const [spendEntry] = await tx
-      .select()
-      .from(creditLedgerEntries)
-      .where(
-        and(
-          eq(creditLedgerEntries.id, spendLedgerEntryId),
-          eq(creditLedgerEntries.userId, userId),
-          eq(creditLedgerEntries.type, "spend"),
-        ),
-      );
+  const entry = await withCreditTransaction(async (tx) => {
+    await lockCreditAccount(userId, tx);
+    const spendEntry = await findSpendLedgerEntry(
+      spendLedgerEntryId,
+      userId,
+      tx,
+    );
 
     if (!spendEntry) {
       throw new Error("Spend ledger entry not found.");
@@ -771,6 +662,10 @@ export async function refundCreditSpend({
     assertPositiveInteger(refundAmount, "Credit refund amount");
     if (refundAmount > Math.abs(spendEntry.amount)) {
       throw new Error("Refund amount cannot exceed the original spend.");
+    }
+    const alreadyRefunded = await sumCreditRefunds(spendEntry.id, tx);
+    if (alreadyRefunded + refundAmount > Math.abs(spendEntry.amount)) {
+      throw new Error("Total refunds cannot exceed the original spend.");
     }
     const carryForwardCreditsSpent = readCarryForwardCreditsSpent(
       spendEntry.metadata,
@@ -820,7 +715,7 @@ export async function grantCreditTopUp({
 }) {
   assertPositiveInteger(amount, "Credit top-up amount");
 
-  const entry = await db.transaction(async (tx) => {
+  const entry = await withCreditTransaction(async (tx) => {
     const result = await reconcilePeriodGrantForUser(userId, tx);
 
     const topUpResult = await appendLedgerEntryWithResult(tx, {
@@ -865,7 +760,7 @@ export async function grantCreditTopUps(
     assertPositiveInteger(topUp.amount, "Credit top-up amount");
   }
 
-  const entries = await db.transaction(async (tx) => {
+  const entries = await withCreditTransaction(async (tx) => {
     const ledgerEntries = [];
 
     for (const topUp of topUps) {
@@ -920,7 +815,7 @@ export async function adjustCredits({
     throw new Error("Credit adjustment amount must be a non-zero integer.");
   }
 
-  const entry = await db.transaction(async (tx) => {
+  const entry = await withCreditTransaction(async (tx) => {
     const result = await reconcilePeriodGrantForUser(userId, tx);
 
     return appendLedgerEntry(tx, {
@@ -942,15 +837,14 @@ export async function adjustCredits({
 }
 
 export async function getCreditBalance(userId: string) {
-  return db.transaction(async (tx) => {
+  return withCreditTransaction(async (tx) => {
     const result = await reconcilePeriodGrantForUser(userId, tx);
     const account = await lockCreditAccount(userId, tx);
-    const recentLedger = await tx
-      .select()
-      .from(creditLedgerEntries)
-      .where(eq(creditLedgerEntries.userId, userId))
-      .orderBy(desc(creditLedgerEntries.createdAt))
-      .limit(defaultRecentLedgerLimit);
+    const recentLedger = await listRecentCreditLedger(
+      userId,
+      defaultRecentLedgerLimit,
+      tx,
+    );
 
     return {
       account,

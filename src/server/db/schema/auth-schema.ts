@@ -6,6 +6,7 @@ import {
   jsonb,
   pgTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 import {
@@ -158,11 +159,12 @@ export const subscription = pgTable(
     seats: integer("seats"),
     billingInterval: text("billing_interval"),
     stripeScheduleId: text("stripe_schedule_id"),
+    stripeEventCreatedAt: integer("stripe_event_created_at"),
   },
   (table) => [
     index("subscription_referenceId_idx").on(table.referenceId),
     index("subscription_stripeCustomerId_idx").on(table.stripeCustomerId),
-    index("subscription_stripeSubscriptionId_idx").on(
+    uniqueIndex("subscription_stripeSubscriptionId_unique").on(
       table.stripeSubscriptionId,
     ),
   ],

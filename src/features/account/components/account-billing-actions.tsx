@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
-import { authClient } from "@/features/auth/better-auth/client";
 import { getUnexpectedAuthErrorMessage } from "@/features/auth/components/auth-errors";
+import { billingClient } from "@/features/billing-client";
 
 function AccountBillingActions({
   canCancel,
@@ -37,7 +37,7 @@ function AccountBillingActions({
     React.startTransition(async () => {
       try {
         const origin = window.location.origin;
-        const result = await authClient.subscription.cancel({
+        const result = await billingClient.cancelSubscription({
           disableRedirect: true,
           returnUrl: `${origin}/billing?subscription=cancelled`,
           subscriptionId,
@@ -78,7 +78,7 @@ function AccountBillingActions({
 
     React.startTransition(async () => {
       try {
-        const result = await authClient.subscription.restore({
+        const result = await billingClient.restoreSubscription({
           subscriptionId,
         });
 

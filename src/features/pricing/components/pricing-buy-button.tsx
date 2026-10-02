@@ -7,8 +7,8 @@ import * as React from "react";
 import { getAnalyticsAttribution } from "@/adapters/analytics/attribution";
 import { analytics } from "@/adapters/analytics/client";
 import { Button } from "@/components/ui/button";
-import { authClient } from "@/features/auth/better-auth/client";
 import { getUnexpectedAuthErrorMessage } from "@/features/auth/components/auth-errors";
+import { billingClient } from "@/features/billing-client";
 import { getPricingCheckoutPath } from "@/features/pricing/checkout-intent";
 import type { BillingInterval, PricingPlanKey } from "@/features/pricing/plans";
 
@@ -52,7 +52,7 @@ function PricingBuyButton({
     startTransition(async () => {
       try {
         const origin = window.location.origin;
-        const result = await authClient.subscription.upgrade({
+        const result = await billingClient.changeSubscription({
           annual: interval === "annual",
           cancelUrl: `${origin}/pricing?checkout=cancelled`,
           disableRedirect: true,

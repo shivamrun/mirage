@@ -218,6 +218,20 @@
       "when": 1790874089363,
       "tag": "0030_eminent_prodigy",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1790914304972,
+      "tag": "0031_lucky_arclight",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790921545296,
+      "tag": "0032_closed_sister_grimm",
+      "breakpoints": true
     }
   ]
 }

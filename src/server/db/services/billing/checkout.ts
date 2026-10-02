@@ -1,12 +1,17 @@
 import type { AnalyticsAttribution } from "@/adapters/analytics/events";
 import { compactAnalyticsAttribution } from "@/adapters/analytics/events";
-import { billingCatalog } from "@/server/db/services/billing/catalog";
-import { getBillingStripeClient } from "@/server/db/services/billing/stripe-client";
+import { stripeBillingProvider } from "@/adapters/stripe/billing-provider";
+import {
+  createOrGetCreditPurchase,
+  markCreditPurchaseCheckoutCreated,
+} from "@/server/db/dal/billing-purchases";
+import { billingCatalog } from "@/shared/billing";
 import { env } from "@/shared/env";
 
 type CreateBillingCheckoutSessionInput = {
   attribution?: AnalyticsAttribution;
   customerEmail: string;
+  requestId: string;
   stripeCustomerId?: null | string;
   type: "credit_top_up";
   userId: string;
@@ -23,13 +28,7 @@ async function resolvePrice({
   interval?: "month" | "year";
   lookupKey: string;
 }) {
-  const prices = await getBillingStripeClient().prices.list({
-    active: true,
-    expand: ["data.product"],
-    limit: 1,
-    lookup_keys: [lookupKey],
-  });
-  const price = prices.data[0];
+  const price = await stripeBillingProvider.getPriceByLookupKey(lookupKey);
 
   if (
     !price ||
@@ -44,19 +43,6 @@ async function resolvePrice({
   }
 
   return price;
-}
-
-function customerFields({
-  customerEmail,
-  stripeCustomerId,
-}: {
-  customerEmail: string;
-  stripeCustomerId?: null | string;
-}) {
-  return {
-    customer: stripeCustomerId ?? undefined,
-    customer_email: stripeCustomerId ? undefined : customerEmail,
-  };
 }
 
 function attributionMetadata(attribution: AnalyticsAttribution | undefined) {
@@ -84,6 +70,21 @@ export async function createBillingCheckoutSession(
   input: CreateBillingCheckoutSessionInput,
 ) {
   const baseUrl = env.NEXT_PUBLIC_BASE_URL;
+  const purchase = await createOrGetCreditPurchase({
+    amount: billingCatalog.creditTopUp.amount,
+    credits: billingCatalog.creditTopUp.credits,
+    currency: billingCatalog.creditTopUp.currency,
+    packageKey: billingCatalog.creditTopUp.key,
+    requestId: input.requestId,
+    userId: input.userId,
+  });
+
+  if (purchase.stripeCheckoutSessionId) {
+    const session = await stripeBillingProvider.retrieveCheckoutSession(
+      purchase.stripeCheckoutSessionId,
+    );
+    return session;
+  }
 
   const price = await resolvePrice({
     amount: billingCatalog.creditTopUp.amount,
@@ -94,24 +95,25 @@ export async function createBillingCheckoutSession(
     credits: String(billingCatalog.creditTopUp.credits),
     lookupKey: billingCatalog.creditTopUp.lookupKey,
     purchaseType: "credit_top_up",
+    purchaseId: purchase.id,
     userId: input.userId,
     ...attributionMetadata(input.attribution),
   };
 
-  return getBillingStripeClient().checkout.sessions.create({
-    cancel_url: `${baseUrl}/billing?checkout=cancelled`,
-    client_reference_id: input.userId,
-    ...customerFields(input),
-    invoice_creation: {
-      enabled: true,
-      invoice_data: {
-        description: "Mirage credit top-up",
-        metadata,
-      },
-    },
-    line_items: [{ price: price.id, quantity: 1 }],
+  const session = await stripeBillingProvider.createCreditCheckout({
+    cancelUrl: `${baseUrl}/billing?checkout=cancelled`,
+    customerEmail: input.customerEmail,
+    idempotencyKey: `credit-top-up:${input.requestId}`,
     metadata,
-    mode: "payment",
-    success_url: `${baseUrl}/billing?checkout=credit_top_up_success`,
+    priceId: price.id,
+    stripeCustomerId: input.stripeCustomerId,
+    successUrl: `${baseUrl}/billing?checkout=credit_top_up_success`,
+    userId: input.userId,
   });
+
+  await markCreditPurchaseCheckoutCreated({
+    purchaseId: purchase.id,
+    sessionId: session.id,
+  });
+  return session;
 }

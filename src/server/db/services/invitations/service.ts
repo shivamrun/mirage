@@ -25,7 +25,7 @@ import {
   rotateActivePendingInvitationToken,
   setUserRole,
 } from "@/server/db/dal/invitations";
-import { getBillingStripeClient } from "@/server/db/services/billing/stripe-client";
+import { deleteBillingCustomer } from "@/server/db/services/billing/customer-lifecycle";
 import { notify } from "@/server/db/services/notifications/service";
 import { env } from "@/shared/env";
 import { emailSchema } from "@/shared/schemas/helpers/email";
@@ -514,9 +514,7 @@ async function cleanupFailedInvitationSignup({
 
   try {
     if (createdUser.stripeCustomerId) {
-      await getBillingStripeClient().customers.del(
-        createdUser.stripeCustomerId,
-      );
+      await deleteBillingCustomer(createdUser.stripeCustomerId);
     }
 
     const deleted = await deletePartialInvitationUser({ email, userId });

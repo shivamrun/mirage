@@ -1,16 +1,34 @@
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { POST as AUTH_WEBHOOK_POST } from "@/app/(backend)/api/auth/[...all]/route";
 import db from "@/server/db";
-import { notification, subscription, user } from "@/server/db/schema";
+import {
+  createOrGetCreditPurchase,
+  markCreditPurchaseCheckoutCreated,
+} from "@/server/db/dal/billing-purchases";
+import {
+  claimStripeWebhookEvent,
+  createOrGetStripeWebhookEvent,
+  markStripeWebhookEventCompleted,
+  markStripeWebhookEventFailed,
+  markStripeWebhookEventRetrying,
+} from "@/server/db/dal/stripe-webhook-events";
+import {
+  notification,
+  stripeWebhookEvents,
+  subscription,
+  user,
+} from "@/server/db/schema";
+import { processStripeWebhookJob } from "@/server/db/services/billing/stripe-webhook-jobs";
 import { getCreditBalance } from "@/server/db/services/credits/ledger";
 import { setCreditTopUpStripeClientForTests } from "@/server/db/services/credits/top-up";
 import { setJobEnqueueHandlerForTests } from "@/server/jobs/enqueue";
 import { createJobWorkers } from "@/server/jobs/worker";
 import { createTestActor } from "./infra/admin-actor";
 
-const topUpSession = (userId: string) => ({
+const topUpSession = (userId: string, purchaseId?: string) => ({
   amount_total: 5000,
   client_reference_id: userId,
   currency: "usd",
@@ -19,6 +37,7 @@ const topUpSession = (userId: string) => ({
     credits: "200",
     lookupKey: "one_time_credit",
     purchaseType: "credit_top_up",
+    ...(purchaseId ? { purchaseId } : {}),
     userId,
   },
   mode: "payment",
@@ -81,6 +100,7 @@ function setBetterAuthWebhookStripeClient({
   invoiceSubscriptionId,
   throwOnConstruct = false,
   userId,
+  purchaseId,
 }: {
   eventType:
     | "checkout.session.completed"
@@ -90,7 +110,39 @@ function setBetterAuthWebhookStripeClient({
   invoiceSubscriptionId?: string;
   throwOnConstruct?: boolean;
   userId: string;
+  purchaseId?: string;
 }) {
+  const event = {
+    created: Math.floor(Date.now() / 1000),
+    data: {
+      object:
+        eventType === "checkout.session.completed"
+          ? topUpSession(userId, purchaseId)
+          : eventType === "invoice.payment_failed"
+            ? {
+                customer: "cus_test",
+                id: "in_test_failed",
+                metadata: invoiceMetadata ?? {
+                  plan: "Mirage Pro",
+                  userId,
+                },
+                object: "invoice",
+                parent: invoiceSubscriptionId
+                  ? {
+                      subscription_details: {
+                        subscription: invoiceSubscriptionId,
+                      },
+                    }
+                  : undefined,
+              }
+            : subscriptionObject(),
+    },
+    id: `evt_test_${eventType.replaceAll(".", "_")}`,
+    object: "event",
+    type: eventType,
+  };
+  const invoice =
+    eventType === "invoice.payment_failed" ? event.data.object : null;
   setCreditTopUpStripeClientForTests({
     checkout: {
       sessions: {
@@ -115,7 +167,7 @@ function setBetterAuthWebhookStripeClient({
           object: "list",
           url: "/v1/checkout/sessions/cs_test_top_up/line_items",
         }),
-        retrieve: async () => topUpSession(userId),
+        retrieve: async () => topUpSession(userId, purchaseId),
       },
     },
     customers: {
@@ -132,6 +184,12 @@ function setBetterAuthWebhookStripeClient({
         url: "/v1/prices",
       }),
     },
+    events: {
+      retrieve: async () => event,
+    },
+    invoices: {
+      retrieve: async () => invoice,
+    },
     subscriptions: {
       retrieve: async () => subscriptionObject(),
     },
@@ -141,37 +199,26 @@ function setBetterAuthWebhookStripeClient({
           throw new Error("invalid signature");
         }
 
-        return {
-          data: {
-            object:
-              eventType === "checkout.session.completed"
-                ? topUpSession(userId)
-                : eventType === "invoice.payment_failed"
-                  ? {
-                      customer: "cus_test",
-                      id: "in_test_failed",
-                      metadata: invoiceMetadata ?? {
-                        plan: "Mirage Pro",
-                        userId,
-                      },
-                      object: "invoice",
-                      parent: invoiceSubscriptionId
-                        ? {
-                            subscription_details: {
-                              subscription: invoiceSubscriptionId,
-                            },
-                          }
-                        : undefined,
-                    }
-                  : subscriptionObject(),
-          },
-          id: `evt_test_${eventType.replaceAll(".", "_")}`,
-          object: "event",
-          type: eventType,
-        };
+        return event;
       },
     },
   } as never);
+}
+
+async function createTopUpPurchase(userId: string) {
+  const purchase = await createOrGetCreditPurchase({
+    amount: 5000,
+    credits: 200,
+    currency: "usd",
+    packageKey: "standard",
+    requestId: randomUUID(),
+    userId,
+  });
+  await markCreditPurchaseCheckoutCreated({
+    purchaseId: purchase.id,
+    sessionId: "cs_test_top_up",
+  });
+  return purchase;
 }
 
 async function postBetterAuthStripeWebhook(body = "{}") {
@@ -220,8 +267,10 @@ describe("Stripe webhook route", () => {
 
   it("grants one-time top-up credits idempotently through Better Auth onEvent", async () => {
     const actor = await createTestActor();
+    const purchase = await createTopUpPurchase(actor.id);
     setBetterAuthWebhookStripeClient({
       eventType: "checkout.session.completed",
+      purchaseId: purchase.id,
       userId: actor.id,
     });
 
@@ -258,11 +307,28 @@ describe("Stripe webhook route", () => {
     });
   });
 
-  it("returns before a durable top-up worker fulfills the checkout", async () => {
-    setJobEnqueueHandlerForTests(null);
+  it("does not grant a top-up without its matching purchase", async () => {
     const actor = await createTestActor();
     setBetterAuthWebhookStripeClient({
       eventType: "checkout.session.completed",
+      purchaseId: randomUUID(),
+      userId: actor.id,
+    });
+
+    const response = await postBetterAuthStripeWebhook();
+    expect(response.status).toBe(400);
+    expect((await getCreditBalance(actor.id)).account.availableCredits).toBe(
+      10,
+    );
+  });
+
+  it("returns before a durable top-up worker fulfills the checkout", async () => {
+    setJobEnqueueHandlerForTests(null);
+    const actor = await createTestActor();
+    const purchase = await createTopUpPurchase(actor.id);
+    setBetterAuthWebhookStripeClient({
+      eventType: "checkout.session.completed",
+      purchaseId: purchase.id,
       userId: actor.id,
     });
 
@@ -309,7 +375,7 @@ describe("Stripe webhook route", () => {
     expect(records).toHaveLength(1);
     expect(records[0]).toMatchObject({
       billingInterval: "month",
-      plan: "mirage pro",
+      plan: "pro",
       status: "active",
     });
     expect(balance.account.availableCredits).toBe(60);
@@ -335,7 +401,7 @@ describe("Stripe webhook route", () => {
     });
     expect(notifications[0].data).toEqual({
       interval: "monthly",
-      plan: "Mirage Pro",
+      plan: "Pro",
     });
   });
 
@@ -410,5 +476,140 @@ describe("Stripe webhook route", () => {
       invoiceId: "in_test_failed",
       plan: "mirage pro",
     });
+  });
+
+  it("keeps webhook completion and retries scoped to the current lease", async () => {
+    const eventId = `evt_lease_${randomUUID()}`;
+    await createOrGetStripeWebhookEvent({
+      eventType: "invoice.payment_failed",
+      objectId: "in_lease_test",
+      stripeEventId: eventId,
+    });
+    const firstClaim = await claimStripeWebhookEvent(eventId);
+    expect(firstClaim?.processingToken).toBeTruthy();
+
+    await db
+      .update(stripeWebhookEvents)
+      .set({ processingStartedAt: new Date(Date.now() - 6 * 60_000) })
+      .where(eq(stripeWebhookEvents.stripeEventId, eventId));
+    const secondClaim = await claimStripeWebhookEvent(eventId);
+    expect(secondClaim?.processingToken).not.toBe(firstClaim?.processingToken);
+
+    await expect(
+      markStripeWebhookEventRetrying({
+        errorKind: "StaleWorker",
+        errorMessage: "stale",
+        processingToken: firstClaim?.processingToken ?? "",
+        stripeEventId: eventId,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      markStripeWebhookEventFailed({
+        errorKind: "StaleWorker",
+        errorMessage: "stale",
+        processingToken: firstClaim?.processingToken ?? "",
+        stripeEventId: eventId,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      markStripeWebhookEventCompleted({
+        processingToken: secondClaim?.processingToken ?? "",
+        stripeEventId: eventId,
+      }),
+    ).resolves.toMatchObject({ status: "completed" });
+  });
+
+  it("persists event subscription state without regressing on stale events", async () => {
+    const actor = await createTestActor();
+    await db.insert(subscription).values({
+      id: "sub_record_transition",
+      billingInterval: "month",
+      plan: "pro",
+      referenceId: actor.id,
+      status: "active",
+      stripeCustomerId: "cus_test",
+      stripeSubscriptionId: "sub_test",
+    });
+
+    const eventObjects = new Map([
+      [
+        "evt_cancel_scheduled",
+        {
+          created: 200,
+          data: {
+            object: {
+              ...subscriptionObject(),
+              cancel_at_period_end: true,
+            },
+            previous_attributes: { cancel_at_period_end: false },
+          },
+          id: "evt_cancel_scheduled",
+          object: "event",
+          type: "customer.subscription.updated",
+        },
+      ],
+      [
+        "evt_cancel_stale",
+        {
+          created: 100,
+          data: {
+            object: subscriptionObject(),
+            previous_attributes: { cancel_at_period_end: true },
+          },
+          id: "evt_cancel_stale",
+          object: "event",
+          type: "customer.subscription.updated",
+        },
+      ],
+      [
+        "evt_cancel_unchanged",
+        {
+          created: 300,
+          data: {
+            object: {
+              ...subscriptionObject(),
+              cancel_at_period_end: true,
+            },
+            previous_attributes: { cancel_at_period_end: true },
+          },
+          id: "evt_cancel_unchanged",
+          object: "event",
+          type: "customer.subscription.updated",
+        },
+      ],
+    ]);
+    setCreditTopUpStripeClientForTests({
+      events: {
+        retrieve: async (eventId: string) => eventObjects.get(eventId),
+      },
+    } as never);
+
+    for (const eventId of eventObjects.keys()) {
+      await createOrGetStripeWebhookEvent({
+        eventType: "customer.subscription.updated",
+        objectId: "sub_test",
+        stripeEventId: eventId,
+      });
+      await processStripeWebhookJob({
+        eventId,
+        eventType: "customer.subscription.updated",
+        objectId: "sub_test",
+      });
+    }
+
+    const [record] = await db
+      .select()
+      .from(subscription)
+      .where(eq(subscription.id, "sub_record_transition"));
+    expect(record).toMatchObject({
+      cancelAtPeriodEnd: true,
+      stripeEventCreatedAt: 300,
+    });
+
+    const cancellationNotifications = await db
+      .select()
+      .from(notification)
+      .where(eq(notification.type, "billing.subscription_canceled"));
+    expect(cancellationNotifications).toHaveLength(1);
   });
 });

@@ -1,34 +1,33 @@
 import type { StripePlan } from "@better-auth/stripe";
 
-import { billingCatalog } from "@/server/db/services/billing/catalog";
+import { billingCatalog } from "@/shared/billing";
 
 export const subscriptionPlans = [
   {
     name: "Free",
     limits: {
-      credits: 10,
+      credits: billingCatalog.plans.free.credits,
       plan: "free",
     },
   },
   {
-    name: billingCatalog.subscriptions.pro.displayName,
-    lookupKey: billingCatalog.subscriptions.pro.prices.monthly.lookupKey,
-    annualDiscountLookupKey:
-      billingCatalog.subscriptions.pro.prices.yearly.lookupKey,
+    name: billingCatalog.plans.pro.checkoutName,
+    lookupKey: billingCatalog.plans.pro.prices.monthly.lookupKey,
+    annualDiscountLookupKey: billingCatalog.plans.pro.prices.annual.lookupKey,
     prorationBehavior: "always_invoice",
     limits: {
-      credits: billingCatalog.subscriptions.pro.credits,
+      credits: billingCatalog.plans.pro.credits,
       plan: "pro",
     },
   },
   {
-    name: billingCatalog.subscriptions.hacker.displayName,
-    lookupKey: billingCatalog.subscriptions.hacker.prices.monthly.lookupKey,
+    name: billingCatalog.plans.hacker.checkoutName,
+    lookupKey: billingCatalog.plans.hacker.prices.monthly.lookupKey,
     annualDiscountLookupKey:
-      billingCatalog.subscriptions.hacker.prices.yearly.lookupKey,
+      billingCatalog.plans.hacker.prices.annual.lookupKey,
     prorationBehavior: "always_invoice",
     limits: {
-      credits: billingCatalog.subscriptions.hacker.credits,
+      credits: billingCatalog.plans.hacker.credits,
       plan: "hacker",
     },
   },

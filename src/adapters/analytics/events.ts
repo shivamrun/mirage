@@ -2,8 +2,8 @@ import type { BillingInterval, PricingPlanKey } from "@/features/pricing/plans";
 import type {
   BillingCheckoutInterval,
   BillingCheckoutPlan,
-} from "@/server/db/services/billing/catalog";
-import type { CreditSampleItemKey } from "@/shared/credits/sample-catalog";
+} from "@/shared/billing";
+import type { CreditSampleItemKey } from "@/shared/credit-sample-catalog";
 
 const distinctIdMaxLength = 50;
 const analyticsAttributionValueMaxLength = 120;

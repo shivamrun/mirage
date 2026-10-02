@@ -12,9 +12,13 @@ import {
   AccountSectionStack,
 } from "@/features/account/components/account-section";
 import { pricingPlans } from "@/features/pricing/plans";
-import type { BillingSubscriptionRecord } from "@/server/db/dal/billing";
 import type { CurrentUser } from "@/server/db/services/auth/access";
+import type { BillingSubscriptionRecord } from "@/server/db/services/billing/overview";
 import type { getCreditBalance } from "@/server/db/services/credits/ledger";
+import {
+  getBillingPlanCredits,
+  getBillingPlanDisplayName,
+} from "@/shared/billing";
 
 type CreditBalance = Awaited<ReturnType<typeof getCreditBalance>>;
 
@@ -29,32 +33,11 @@ function formatDate(value: Date | null | undefined) {
 }
 
 function formatPlanName(value: string) {
-  return value
-    .split(" ")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function normalizePlanName(value?: null | string) {
-  return value?.toLowerCase().replace(/\s+/g, " ").trim() ?? "";
+  return getBillingPlanDisplayName(value) ?? value;
 }
 
 function getPlanCredits(plan?: null | string) {
-  const normalizedPlan = normalizePlanName(plan);
-  const matchedPlan = pricingPlans.find((pricingPlan) => {
-    const checkoutPlanName =
-      "checkoutPlanName" in pricingPlan
-        ? pricingPlan.checkoutPlanName
-        : undefined;
-
-    return (
-      normalizedPlan === normalizePlanName(pricingPlan.key) ||
-      normalizedPlan === normalizePlanName(pricingPlan.name) ||
-      normalizedPlan === normalizePlanName(checkoutPlanName)
-    );
-  });
-
-  return matchedPlan?.credits ?? pricingPlans[0].credits;
+  return getBillingPlanCredits(plan) || pricingPlans[0].credits;
 }
 
 function formatCredits(value: number) {

@@ -201,7 +201,7 @@ function requestBody(path: string) {
     });
   }
   if (path === "/api/billing/checkout") {
-    return JSON.stringify({ type: "credit_top_up" });
+    return JSON.stringify({ requestId: randomUUID(), type: "credit_top_up" });
   }
   if (path === "/api/email-list/") {
     return JSON.stringify({

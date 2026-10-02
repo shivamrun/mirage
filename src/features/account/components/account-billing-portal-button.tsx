@@ -4,8 +4,8 @@ import { ExternalLink, Loader2 } from "lucide-react";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
-import { authClient } from "@/features/auth/better-auth/client";
 import { getUnexpectedAuthErrorMessage } from "@/features/auth/components/auth-errors";
+import { billingClient } from "@/features/billing-client";
 
 function AccountBillingPortalButton({
   disabled,
@@ -29,7 +29,7 @@ function AccountBillingPortalButton({
     startTransition(async () => {
       try {
         const origin = window.location.origin;
-        const result = await authClient.subscription.billingPortal({
+        const result = await billingClient.openPortal({
           disableRedirect: true,
           returnUrl: `${origin}${returnPath}`,
         });

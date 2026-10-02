@@ -7,7 +7,7 @@ import { getAnalyticsAttribution } from "@/adapters/analytics/attribution";
 import { Button } from "@/components/ui/button";
 import { markBillingCheckoutStarted } from "@/features/account/billing-finalization";
 import { getUnexpectedAuthErrorMessage } from "@/features/auth/components/auth-errors";
-import { api } from "@/shared/api/client";
+import { billingClient } from "@/features/billing-client";
 
 function AccountCreditTopUpButton({
   billingSnapshotKey,
@@ -17,6 +17,7 @@ function AccountCreditTopUpButton({
   const [error, setError] = React.useState<string>();
   const [isRedirecting, setIsRedirecting] = React.useState(false);
   const [isPending, startTransition] = React.useTransition();
+  const requestId = React.useRef<string | undefined>(undefined);
   const isBusy = isPending || isRedirecting;
 
   function handleTopUp() {
@@ -24,17 +25,12 @@ function AccountCreditTopUpButton({
 
     startTransition(async () => {
       try {
-        const response = await api.api.billing.checkout.post(
-          {
-            attribution: getAnalyticsAttribution(),
-            type: "credit_top_up",
-          },
-          {
-            headers: {
-              "content-type": "application/json",
-            },
-          },
-        );
+        requestId.current ??= crypto.randomUUID();
+        const response = await billingClient.startCreditTopUp({
+          attribution: getAnalyticsAttribution(),
+          requestId: requestId.current,
+          type: "credit_top_up",
+        });
 
         if (response.error) {
           setError(

@@ -4,10 +4,10 @@ import {
   normalizeAnalyticsCurrency,
 } from "@/adapters/analytics/events";
 import { analytics } from "@/adapters/analytics/server";
-import { billingCatalog } from "@/server/db/services/billing/catalog";
 import { createBillingCheckoutSession } from "@/server/db/services/billing/checkout";
 import { elysiaAuth } from "@/server/http/auth";
 import { requestPolicy } from "@/server/http/request-policy";
+import { billingCatalog } from "@/shared/billing";
 import {
   billingCheckoutRequestSchema,
   billingCheckoutResponseSchema,

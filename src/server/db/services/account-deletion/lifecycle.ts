@@ -17,7 +17,10 @@ import {
   userDataExports,
   verification,
 } from "@/server/db/schema";
-import { billingStripeClientProxy } from "@/server/db/services/billing/stripe-client";
+import {
+  cancelBillingSubscriptions,
+  deleteBillingCustomer,
+} from "@/server/db/services/billing/customer-lifecycle";
 import { enqueueJob } from "@/server/jobs/enqueue";
 import { deliverUserDataExport } from "./export";
 
@@ -605,30 +608,11 @@ async function deleteStripeResources({
   customerId: null | string;
   subscriptionIds: string[];
 }) {
-  for (const subscriptionId of new Set(subscriptionIds)) {
-    try {
-      await billingStripeClientProxy.subscriptions.cancel(subscriptionId);
-    } catch (error) {
-      if (!isProviderResourceMissing(error)) throw error;
-    }
-  }
+  await cancelBillingSubscriptions(subscriptionIds);
 
   if (customerId) {
-    try {
-      await billingStripeClientProxy.customers.del(customerId);
-    } catch (error) {
-      if (!isProviderResourceMissing(error)) throw error;
-    }
+    await deleteBillingCustomer(customerId);
   }
-}
-
-function isProviderResourceMissing(error: unknown) {
-  return Boolean(
-    error &&
-      typeof error === "object" &&
-      (("statusCode" in error && error.statusCode === 404) ||
-        ("code" in error && error.code === "resource_missing")),
-  );
 }
 
 async function deleteUserUploads(userId: string) {

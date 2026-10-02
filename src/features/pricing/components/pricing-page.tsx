@@ -9,38 +9,10 @@ import { PricingBuyButton } from "@/features/pricing/components/pricing-buy-butt
 import {
   type BillingInterval,
   billingIntervalLabels,
-  billingIntervalRank,
   type PricingPlanKey,
-  pricingPlanRank,
   pricingPlans,
 } from "@/features/pricing/plans";
-
-function shouldSchedulePlanChangeAtPeriodEnd({
-  currentInterval,
-  currentPlan,
-  interval,
-  plan,
-}: {
-  currentInterval?: BillingInterval;
-  currentPlan: PricingPlanKey;
-  interval: BillingInterval;
-  plan: PricingPlanKey;
-}) {
-  // TODO: Add an explicit immediate-downgrade flow with Stripe credit/refund copy.
-  if (pricingPlanRank[plan] < pricingPlanRank[currentPlan]) {
-    return true;
-  }
-
-  if (
-    plan === currentPlan &&
-    currentInterval &&
-    billingIntervalRank[interval] < billingIntervalRank[currentInterval]
-  ) {
-    return true;
-  }
-
-  return false;
-}
+import { shouldScheduleSubscriptionChange } from "@/shared/billing";
 
 function PricingPage({
   currentInterval,
@@ -147,7 +119,7 @@ function PricingPage({
                     isAuthenticated={isAuthenticated}
                     plan={plan.key}
                     planName={plan.checkoutPlanName}
-                    scheduleAtPeriodEnd={shouldSchedulePlanChangeAtPeriodEnd({
+                    scheduleAtPeriodEnd={shouldScheduleSubscriptionChange({
                       currentInterval,
                       currentPlan,
                       interval,

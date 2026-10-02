@@ -5,8 +5,8 @@ import Link from "next/link";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
-import { authClient } from "@/features/auth/better-auth/client";
 import { getUnexpectedAuthErrorMessage } from "@/features/auth/components/auth-errors";
+import { billingClient } from "@/features/billing-client";
 import type { BillingInterval } from "@/features/pricing/plans";
 import { pricingPlans } from "@/features/pricing/plans";
 
@@ -38,7 +38,7 @@ function CheckoutResume({
         }
 
         const origin = window.location.origin;
-        const result = await authClient.subscription.upgrade({
+        const result = await billingClient.changeSubscription({
           annual: interval === "annual",
           cancelUrl: `${origin}/pricing?checkout=cancelled`,
           disableRedirect: true,

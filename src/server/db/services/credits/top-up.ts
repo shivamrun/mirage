@@ -1,17 +1,25 @@
-import type Stripe from "stripe";
 import {
   analyticsAttributionFromMetadata,
   normalizeAnalyticsCurrency,
 } from "@/adapters/analytics/events";
 import { analytics } from "@/adapters/analytics/server";
-import { billingCatalog } from "@/server/db/services/billing/catalog";
+import {
+  type StripeCheckoutSession,
+  type StripeMetadata,
+  stripeBillingProvider,
+} from "@/adapters/stripe/billing-provider";
+import {
+  getCreditPurchaseByCheckoutSessionId,
+  markCreditPurchaseFulfilled,
+  markCreditPurchasePaid,
+} from "@/server/db/dal/billing-purchases";
 import {
   type BillingStripeClient,
-  getBillingStripeClient,
   setBillingStripeClientForTests,
 } from "@/server/db/services/billing/stripe-client";
 import { grantCreditTopUp } from "@/server/db/services/credits/ledger";
 import { notifyBestEffort } from "@/server/db/services/notifications/service";
+import { billingCatalog } from "@/shared/billing";
 
 export const creditTopUpProduct = {
   amount: billingCatalog.creditTopUp.amount,
@@ -27,21 +35,15 @@ export function setCreditTopUpStripeClientForTests(
 }
 
 function metadataValue(
-  metadata: Stripe.Metadata | null | undefined,
+  metadata: StripeMetadata | null | undefined,
   key: string,
 ) {
   return metadata?.[key] ?? null;
 }
 
 async function assertCheckoutSessionUsesTopUpPrice(sessionId: string) {
-  const stripeClient = getBillingStripeClient();
-  const lineItems = await stripeClient.checkout.sessions.listLineItems(
-    sessionId,
-    {
-      expand: ["data.price"],
-      limit: 1,
-    },
-  );
+  const lineItems =
+    await stripeBillingProvider.listCheckoutLineItems(sessionId);
   const price = lineItems.data[0]?.price;
 
   if (
@@ -54,7 +56,7 @@ async function assertCheckoutSessionUsesTopUpPrice(sessionId: string) {
 }
 
 export async function grantCreditTopUpForCheckoutSession(
-  session: Stripe.Checkout.Session,
+  session: StripeCheckoutSession,
 ) {
   if (session.mode !== "payment" || session.payment_status !== "paid") {
     return null;
@@ -76,6 +78,25 @@ export async function grantCreditTopUpForCheckoutSession(
   }
 
   await assertCheckoutSessionUsesTopUpPrice(session.id);
+  const purchase = await getCreditPurchaseByCheckoutSessionId(session.id);
+  if (
+    !purchase ||
+    metadataValue(session.metadata, "purchaseId") !== purchase.id ||
+    purchase.userId !== userId ||
+    purchase.packageKey !== billingCatalog.creditTopUp.key ||
+    purchase.amount !== creditTopUpProduct.amount ||
+    purchase.currency !== creditTopUpProduct.currency ||
+    purchase.credits !== creditTopUpProduct.credits
+  ) {
+    throw new Error("Stripe credit top-up purchase does not match checkout.");
+  }
+  await markCreditPurchasePaid({
+    paymentIntentId:
+      typeof session.payment_intent === "string"
+        ? session.payment_intent
+        : session.payment_intent?.id,
+    purchaseId: purchase.id,
+  });
 
   const result = await grantCreditTopUp({
     amount: creditTopUpProduct.credits,
@@ -89,6 +110,8 @@ export async function grantCreditTopUpForCheckoutSession(
     sourceId: session.id,
     userId,
   });
+
+  await markCreditPurchaseFulfilled(purchase.id);
 
   await notifyBestEffort(
     {

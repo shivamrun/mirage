@@ -55,6 +55,31 @@ changes, security reviews, or reliability hardening passes.
 
 - Run migrations through the normal Drizzle migration workflow.
 - Do not edit generated migration files manually.
+- Before applying migration `0031_lucky_arclight.sql`, back up the database and
+  audit the rows covered by its new constraints:
+
+  ```sql
+  SELECT child.id, child.reverses_ledger_entry_id
+  FROM mirage_credit_ledger_entries AS child
+  LEFT JOIN mirage_credit_ledger_entries AS parent
+    ON parent.id = child.reverses_ledger_entry_id
+  WHERE child.reverses_ledger_entry_id IS NOT NULL AND parent.id IS NULL;
+
+  SELECT stripe_subscription_id, count(*) AS duplicate_count,
+         array_agg(id ORDER BY period_end DESC NULLS LAST) AS subscription_ids
+  FROM subscription
+  WHERE stripe_subscription_id IS NOT NULL
+  GROUP BY stripe_subscription_id
+  HAVING count(*) > 1;
+  ```
+
+  Both queries must return zero rows before migration. For an orphaned reversal,
+  restore the missing parent from backup or, after verifying the ledger history,
+  clear the invalid reversal pointer and record the remediation. For duplicate
+  Stripe subscription IDs, identify the canonical row from Stripe and related
+  ledger/period records, repoint any application references if needed, then
+  archive or clear the Stripe ID on the duplicate row. Perform remediation in a
+  transaction, retain an audit export of affected rows, and rerun both queries.
 - Verify backup, restore, and rollback procedures before launch.
 - Confirm production database access is restricted to expected services and
   operators.
@@ -72,11 +97,11 @@ changes, security reviews, or reliability hardening passes.
 - Confirm `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are configured in the
   production environment.
 - Create the Better Auth Stripe webhook endpoint:
-  `https://<production-domain>/api/auth/stripe/webhdocs(repo): streamline repository guidelinesook`.
+  `https://<production-domain>/api/auth/stripe/webhook`.
 - Select at least these events for the Better Auth endpoint:
   `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
   `customer.subscription.created`, `customer.subscription.updated`, and
-  `customer.subscription.deleted`.
+  `customer.subscription.deleted`, plus `invoice.payment_failed`.
 - Verify the Stripe lookup keys used by the billing catalog exist in the
   production Stripe account: `mirage_pro_2_monthly`,
   `mirage_pro_2_yearly`, `mirage_hacker_monthly`, and

@@ -15,7 +15,7 @@ import { api } from "@/shared/api/client";
 import {
   type CreditSampleItemKey,
   creditSampleItems,
-} from "@/shared/credits/sample-catalog";
+} from "@/shared/credit-sample-catalog";
 import type {
   CreditBalanceResponse,
   CreditSampleCreateResponse,

@@ -24,6 +24,9 @@ export const stripeWebhookEvents = createTable(
     lastErrorMessage: text("last_error_message"),
     objectId: text("object_id").notNull(),
     processedAt: eventTimestamp("processed_at"),
+    processingStartedAt: eventTimestamp("processing_started_at"),
+    processingToken: text("processing_token"),
+    lifecycleRecordedAt: eventTimestamp("lifecycle_recorded_at"),
     status: text("status", { enum: stripeWebhookEventStatuses })
       .notNull()
       .default("pending"),
