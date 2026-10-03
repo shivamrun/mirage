@@ -32,11 +32,11 @@ export const invitation = createTable(
     ...auditTimestamps(),
   },
   (table) => [
-    index("mirage_invitation_email_idx").on(table.email),
-    index("mirage_invitation_status_idx").on(table.status),
-    index("mirage_invitation_expiresAt_idx").on(table.expiresAt),
-    uniqueIndex("mirage_invitation_tokenHash_idx").on(table.tokenHash),
-    index("mirage_invitation_invitedByUserId_idx").on(table.invitedByUserId),
-    index("mirage_invitation_acceptedByUserId_idx").on(table.acceptedByUserId),
+    index("invitation_email_idx").on(table.email),
+    index("invitation_status_idx").on(table.status),
+    index("invitation_expires_at_idx").on(table.expiresAt),
+    uniqueIndex("invitation_token_hash_idx").on(table.tokenHash),
+    index("invitation_invited_by_user_id_idx").on(table.invitedByUserId),
+    index("invitation_accepted_by_user_id_idx").on(table.acceptedByUserId),
   ],
 );

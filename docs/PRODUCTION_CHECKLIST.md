@@ -60,8 +60,8 @@ changes, security reviews, or reliability hardening passes.
 
   ```sql
   SELECT child.id, child.reverses_ledger_entry_id
-  FROM mirage_credit_ledger_entries AS child
-  LEFT JOIN mirage_credit_ledger_entries AS parent
+  FROM credit_ledger_entries AS child
+  LEFT JOIN credit_ledger_entries AS parent
     ON parent.id = child.reverses_ledger_entry_id
   WHERE child.reverses_ledger_entry_id IS NOT NULL AND parent.id IS NULL;
 

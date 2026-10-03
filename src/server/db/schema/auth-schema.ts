@@ -16,8 +16,7 @@ import {
   requiredTimestamp,
 } from "./../helpers/base-column";
 
-// Better Auth expects these default table names unless table mapping is
-// configured explicitly, so auth tables intentionally do not use createTable.
+// Better Auth uses these table names through the Drizzle adapter schema.
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
 
@@ -59,7 +58,7 @@ export const session = pgTable(
         onDelete: "cascade",
       }),
   },
-  (table) => [index("session_userId_idx").on(table.userId)],
+  (table) => [index("session_user_id_idx").on(table.userId)],
 );
 
 export const account = pgTable(
@@ -89,7 +88,7 @@ export const account = pgTable(
 
     ...auditTimestamps(),
   },
-  (table) => [index("account_userId_idx").on(table.userId)],
+  (table) => [index("account_user_id_idx").on(table.userId)],
 );
 
 export const verification = pgTable(
@@ -108,7 +107,7 @@ export const verification = pgTable(
 );
 
 export const twoFactor = pgTable(
-  "twoFactor",
+  "two_factor",
   {
     id: text("id").primaryKey(),
 
@@ -128,8 +127,8 @@ export const twoFactor = pgTable(
     lockedUntil: eventTimestamp("locked_until"),
   },
   (table) => [
-    index("twoFactor_secret_idx").on(table.secret),
-    index("twoFactor_userId_idx").on(table.userId),
+    index("two_factor_secret_idx").on(table.secret),
+    index("two_factor_user_id_idx").on(table.userId),
   ],
 );
 
@@ -162,16 +161,16 @@ export const subscription = pgTable(
     stripeEventCreatedAt: integer("stripe_event_created_at"),
   },
   (table) => [
-    index("subscription_referenceId_idx").on(table.referenceId),
-    index("subscription_stripeCustomerId_idx").on(table.stripeCustomerId),
-    uniqueIndex("subscription_stripeSubscriptionId_unique").on(
+    index("subscription_reference_id_idx").on(table.referenceId),
+    index("subscription_stripe_customer_id_idx").on(table.stripeCustomerId),
+    uniqueIndex("subscription_stripe_subscription_id_unique").on(
       table.stripeSubscriptionId,
     ),
   ],
 );
 
 export const referralCode = pgTable(
-  "referralCode",
+  "referral_code",
   {
     id: text("id").primaryKey(),
 
@@ -187,8 +186,8 @@ export const referralCode = pgTable(
     createdAt: requiredTimestamp("created_at").defaultNow(),
   },
   (table) => [
-    index("referralCode_userId_idx").on(table.userId),
-    index("referralCode_code_idx").on(table.code),
+    index("referral_code_user_id_idx").on(table.userId),
+    index("referral_code_code_idx").on(table.code),
   ],
 );
 
@@ -225,16 +224,16 @@ export const referrals = pgTable(
     createdAt: requiredTimestamp("created_at").defaultNow(),
   },
   (table) => [
-    index("referrals_referrerUserId_idx").on(table.referrerUserId),
-    index("referrals_referredUserId_idx").on(table.referredUserId),
-    index("referrals_referralCodeId_idx").on(table.referralCodeId),
+    index("referrals_referrer_user_id_idx").on(table.referrerUserId),
+    index("referrals_referred_user_id_idx").on(table.referredUserId),
+    index("referrals_referral_code_id_idx").on(table.referralCodeId),
     index("referrals_status_idx").on(table.status),
-    index("referrals_createdAt_idx").on(table.createdAt),
+    index("referrals_created_at_idx").on(table.createdAt),
   ],
 );
 
 export const referralStepCompletion = pgTable(
-  "referralStepCompletion",
+  "referral_step_completion",
   {
     id: text("id").primaryKey(),
 
@@ -251,8 +250,10 @@ export const referralStepCompletion = pgTable(
     completedAt: requiredTimestamp("completed_at").defaultNow(),
   },
   (table) => [
-    index("referralStepCompletion_referralId_idx").on(table.referralId),
-    index("referralStepCompletion_completionKey_idx").on(table.completionKey),
+    index("referral_step_completion_referral_id_idx").on(table.referralId),
+    index("referral_step_completion_completion_key_idx").on(
+      table.completionKey,
+    ),
   ],
 );
 

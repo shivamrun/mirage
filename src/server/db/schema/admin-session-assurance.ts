@@ -8,7 +8,7 @@ import {
 import { session, user } from "./auth-schema";
 
 export const adminSessionAssurance = pgTable(
-  "adminSessionAssurance",
+  "admin_session_assurance",
   {
     ...idColumn(),
     sessionId: text("session_id")
@@ -22,7 +22,7 @@ export const adminSessionAssurance = pgTable(
     ...auditTimestamps(),
   },
   (table) => [
-    uniqueIndex("adminSessionAssurance_sessionId_idx").on(table.sessionId),
-    index("adminSessionAssurance_userId_idx").on(table.userId),
+    uniqueIndex("admin_session_assurance_session_id_idx").on(table.sessionId),
+    index("admin_session_assurance_user_id_idx").on(table.userId),
   ],
 );

@@ -53,11 +53,11 @@ describe("test harness", () => {
     const client = await openTestDatabase();
     try {
       const tables = await client<{ name: string | null }[]>`
-        select to_regclass('public.mirage_contact_submission')::text as name
+        select to_regclass('public.contact_submission')::text as name
       `;
-      expect(tables[0]?.name).toBe("mirage_contact_submission");
+      expect(tables[0]?.name).toBe("contact_submission");
       await client`
-        insert into public.mirage_contact_submission (name, email, message)
+        insert into public.contact_submission (name, email, message)
         values ('Test', 'test@example.com', 'Test message')
       `;
     } finally {
@@ -79,7 +79,7 @@ describe("test harness", () => {
     const client = await openTestDatabase();
     try {
       const rows = await client<{ count: number }[]>`
-        select count(*)::integer as count from public.mirage_contact_submission
+        select count(*)::integer as count from public.contact_submission
       `;
       expect(rows[0]?.count).toBe(0);
     } finally {

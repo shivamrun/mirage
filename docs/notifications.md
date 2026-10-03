@@ -128,7 +128,7 @@ of surfacing a raw constraint error.
 
 ## Channels
 
-`in_app` writes structured notification data to `mirage_notification`. Stored
+`in_app` writes structured notification data to `notification`. Stored
 rows include recipient, optional actor, type, category, optional subject, JSON
 payload, idempotency key, `seenAt`, `readAt`, `archivedAt`, and timestamps.
 

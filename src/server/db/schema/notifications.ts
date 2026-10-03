@@ -40,15 +40,13 @@ export const notification = createTable(
     ...auditTimestamps(),
   },
   (table) => [
-    uniqueIndex("mirage_notification_idempotency_key_idx").on(
-      table.idempotencyKey,
-    ),
-    index("mirage_notification_recipient_idx").on(table.recipientId),
-    index("mirage_notification_recipient_created_at_idx").on(
+    uniqueIndex("notification_idempotency_key_idx").on(table.idempotencyKey),
+    index("notification_recipient_idx").on(table.recipientId),
+    index("notification_recipient_created_at_idx").on(
       table.recipientId,
       table.createdAt,
     ),
-    index("mirage_notification_recipient_read_at_idx").on(
+    index("notification_recipient_read_at_idx").on(
       table.recipientId,
       table.readAt,
     ),
