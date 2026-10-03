@@ -5,12 +5,13 @@ import { auth } from "@/features/auth/better-auth/server";
 import db from "@/server/db";
 import { markAdminSessionAssurance } from "@/server/db/dal/admin-session-assurance";
 import { user } from "@/server/db/schema";
+import { app } from "@/server/routes";
 
 const password = "TestPassword123!";
 const origin = "http://localhost:3000";
 
 async function authRequest(path: string, body: object) {
-  const response = await auth.handler(
+  const response = await app.fetch(
     new Request(`${origin}/api/auth${path}`, {
       method: "POST",
       headers: { "content-type": "application/json", origin },

@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
-import { POST as AUTH_WEBHOOK_POST } from "@/app/(backend)/api/auth/[...all]/route";
 import db from "@/server/db";
 import {
   createOrGetCreditPurchase,
@@ -26,6 +25,7 @@ import { getCreditBalance } from "@/server/db/services/credits/ledger";
 import { setCreditTopUpStripeClientForTests } from "@/server/db/services/credits/top-up";
 import { setJobEnqueueHandlerForTests } from "@/server/jobs/enqueue";
 import { createJobWorkers } from "@/server/jobs/worker";
+import { app } from "@/server/routes";
 import { createTestActor } from "./infra/admin-actor";
 
 const topUpSession = (userId: string, purchaseId?: string) => ({
@@ -137,7 +137,7 @@ function setBetterAuthWebhookStripeClient({
               }
             : subscriptionObject(),
     },
-    id: `evt_test_${eventType.replaceAll(".", "_")}`,
+    id: `evt_test_${eventType.replaceAll(".", "_")}_${randomUUID()}`,
     object: "event",
     type: eventType,
   };
@@ -222,7 +222,7 @@ async function createTopUpPurchase(userId: string) {
 }
 
 async function postBetterAuthStripeWebhook(body = "{}") {
-  return AUTH_WEBHOOK_POST(
+  return app.fetch(
     new Request("http://localhost:3000/api/auth/stripe/webhook", {
       body,
       headers: {
@@ -236,7 +236,7 @@ async function postBetterAuthStripeWebhook(body = "{}") {
 
 describe("Stripe webhook route", () => {
   it("is mounted through the Better Auth handler", async () => {
-    const response = await AUTH_WEBHOOK_POST(
+    const response = await app.fetch(
       new Request("http://localhost:3000/api/auth/stripe/webhook", {
         body: "{}",
         headers: {

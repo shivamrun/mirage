@@ -7,10 +7,6 @@ import { Elysia } from "elysia";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  GET as authGet,
-  POST as authPost,
-} from "@/app/(backend)/api/auth/[...all]/route";
-import {
   bulkUpdateContactSubmissionStatusAction,
   updateContactSubmissionStatusAction,
 } from "@/app/admin/contact-submission/all/actions";
@@ -106,14 +102,14 @@ describe("phase 0 auth policy locks", () => {
     );
     expect(customMutation.status).toBe(403);
 
-    const authRead = await authGet(
+    const authRead = await app.fetch(
       new Request(`${origin}/api/auth/admin/list-users`, {
         headers: { cookie: admin.cookie },
       }),
     );
     expect(authRead.status).toBe(403);
 
-    const authMutation = await authPost(
+    const authMutation = await app.fetch(
       new Request(`${origin}/api/auth/admin/set-role`, {
         method: "POST",
         headers: {

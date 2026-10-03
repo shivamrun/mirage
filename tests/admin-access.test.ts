@@ -2,12 +2,9 @@ import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { describe, expect, it } from "vitest";
 
-import {
-  GET as authGet,
-  POST as authPost,
-} from "@/app/(backend)/api/auth/[...all]/route";
 import db from "@/server/db";
 import { emailList, session, user } from "@/server/db/schema";
+import { app as apiApp } from "@/server/routes";
 import { adminRoutes } from "@/server/routes/admin";
 import { createTestActor } from "./infra/admin-actor";
 import { setTestEmailDeliveryHook, testEmailOutbox } from "./infra/email-fake";
@@ -126,12 +123,12 @@ describe("admin HTTP access", () => {
         .where(eq(emailList.key, listKey));
       expect(lists).toHaveLength(actor === "verified admin" ? 1 : 0);
 
-      const authRead = await authGet(
+      const authRead = await apiApp.fetch(
         new Request(`${origin}/api/auth/admin/list-users`, { headers }),
       );
       expect(authRead.status).toBe(expectedAuth);
 
-      const authMutation = await authPost(
+      const authMutation = await apiApp.fetch(
         new Request(`${origin}/api/auth/admin/set-role`, {
           method: "POST",
           headers: { ...headers, "content-type": "application/json", origin },

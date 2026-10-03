@@ -266,9 +266,11 @@ async function readFirstStreamChunk(response: Response) {
 describe("current Elysia HTTP contract", () => {
   it("keeps the composed method and path inventory", () => {
     const expected = [
+      "ALL /api/auth/*",
       "GET /api/",
       "GET /api/health",
       "GET /api/account/",
+      "GET /api/account/data-export",
       "GET /api/account/google-account",
       "GET /api/account/notifications",
       "GET /api/account/notifications/events",
@@ -279,6 +281,10 @@ describe("current Elysia HTTP contract", () => {
       "GET /api/email-list/verify",
       "GET /api/admin/",
       "GET /api/admin/invitations",
+      "GET /api/admin/metrics",
+      "POST /api/account/data-export",
+      "POST /api/account/deletion",
+      "POST /api/admin/schedules/trigger",
       ...mutationRoutes.map(({ method, path }) => `${method} ${path}`),
     ].sort();
     expect(

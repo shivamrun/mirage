@@ -13,6 +13,7 @@ import {
   type NotificationSubscription,
   subscribe,
 } from "@/server/db/services/notifications/realtime-broker";
+import { app } from "@/server/routes";
 import { notificationRealtimeEventNames } from "@/shared/schemas/notifications";
 import { createTestActor } from "./infra/admin-actor";
 import { testEmailOutbox } from "./infra/email-fake";
@@ -34,7 +35,7 @@ async function authRequest(
     method?: string;
   } = {},
 ) {
-  return auth.handler(
+  return app.fetch(
     new Request(`${origin}/api/auth${path}`, {
       method,
       headers: {

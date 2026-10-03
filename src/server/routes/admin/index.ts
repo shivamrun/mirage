@@ -3,6 +3,7 @@ import { Elysia } from "elysia";
 import { elysiaAuth } from "@/server/http/auth";
 import { adminEmailListRoutes } from "./email-list";
 import { adminInvitationRoutes } from "./invitations";
+import { adminMetricsRoutes } from "./metrics";
 import { adminScheduleRoutes } from "./schedules";
 import { adminUserCreditsRoutes } from "./user-credits";
 import { adminUserSecurityRoutes } from "./user-security";
@@ -24,6 +25,7 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
           },
         }))
         .use(adminInvitationRoutes)
+        .use(adminMetricsRoutes)
         .use(adminScheduleRoutes)
         .use(adminUserCreditsRoutes)
         .use(adminUserSecurityRoutes)

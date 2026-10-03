@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getMetricsSnapshot } from "@/adapters/operations/metrics";
 import { observeRequest } from "@/adapters/operations/request-observability";
-import { GET as metricsRoute } from "@/app/(backend)/api/admin/metrics/route";
 import { app } from "@/server/routes";
 import { createTestActor } from "./infra/admin-actor";
 import { httpRequest } from "./infra/http-request";
@@ -74,7 +73,7 @@ describe("operational observability", () => {
   });
 
   it("protects the concrete admin metrics route", async () => {
-    const anonymous = await metricsRoute(
+    const anonymous = await app.fetch(
       new Request("http://localhost/api/admin/metrics"),
     );
 
@@ -84,7 +83,7 @@ describe("operational observability", () => {
       emailVerified: true,
       role: "admin",
     });
-    const authorized = await metricsRoute(
+    const authorized = await app.fetch(
       new Request("http://localhost/api/admin/metrics", {
         headers: { cookie: admin.cookie },
       }),

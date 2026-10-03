@@ -57,10 +57,11 @@ export function NotificationRealtimeProvider({
     }
 
     async function resyncUnreadCount() {
-      const { data, error } =
-        await api.api.account.notifications["unread-count"].get({
-          fetch: { cache: "no-store" },
-        });
+      const { data, error } = await api.api.account.notifications[
+        "unread-count"
+      ].get({
+        fetch: { cache: "no-store" },
+      });
       if (error || !data) return;
       setUnreadCount(data.unreadCount);
     }

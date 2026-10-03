@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { auth } from "@/features/auth/better-auth/server";
+import { app } from "@/server/routes";
 import { createTestActor } from "./infra/admin-actor";
 
 const origin = "http://localhost:3000";
 const password = "TestPassword123!";
 
 function signIn(email: string) {
-  return auth.handler(
+  return app.fetch(
     new Request(`${origin}/api/auth/sign-in/email`, {
       method: "POST",
       headers: { "content-type": "application/json", origin },

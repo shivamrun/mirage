@@ -238,7 +238,7 @@ export const auth = betterAuth({
       },
     }),
     ...authCaptchaPlugins,
-    nextCookies(),
     authStripePlugin,
+    nextCookies(),
   ],
 });

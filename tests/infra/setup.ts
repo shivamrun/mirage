@@ -16,6 +16,8 @@ delete process.env.TRUSTED_CLIENT_IP_HEADER;
 process.env.BETTER_AUTH_SECRET ??= "test-only-secret-at-least-32-characters";
 process.env.BETTER_AUTH_URL ??= "http://localhost:3000";
 process.env.NEXT_PUBLIC_BASE_URL ??= "http://localhost:3000";
+process.env.GOOGLE_CLIENT_ID ??= "test-google-client-id";
+process.env.GOOGLE_CLIENT_SECRET ??= "test-google-client-secret";
 process.env.STRIPE_SECRET_KEY ??= "sk_test_test-only";
 process.env.STRIPE_WEBHOOK_SECRET ??= "whsec_test-only";
 process.env.TURNSTILE_SECRET_KEY ??= "test-turnstile-secret";
@@ -24,10 +26,21 @@ process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ??= "test-turnstile-site-key";
 vi.mock("@/adapters/email/send-email", () => ({ sendEmail: sendTestEmail }));
 
 beforeEach(async () => {
-  const [{ setJobEnqueueHandlerForTests }, { processJob }] = await Promise.all([
+  const [
+    { setBillingStripeClientForTests },
+    { setJobEnqueueHandlerForTests },
+    { processJob },
+  ] = await Promise.all([
+    import("@/server/db/services/billing/stripe-client"),
     import("@/server/jobs/enqueue"),
     import("@/server/jobs/processor"),
   ]);
+  setBillingStripeClientForTests({
+    customers: {
+      create: async () => ({ id: `cus_test_${crypto.randomUUID()}` }),
+      search: async () => ({ data: [] }),
+    },
+  } as never);
   setJobEnqueueHandlerForTests(async (name, payload, options) => {
     await processJob(name, payload);
     return { id: options.jobId };
