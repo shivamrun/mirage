@@ -1,15 +1,15 @@
 import { headers } from "next/headers";
 
 import {
-  JobsPageHeader,
+  SchedulesPageHeader,
   SchedulesTable,
-} from "@/features/admin/components/jobs";
+} from "@/features/admin/components/schedules";
 import { requireAdmin } from "@/server/db/services/auth/access";
-import { listAdminSchedules } from "@/server/jobs/admin";
+import { listAdminSchedules } from "@/server/jobs/admin-schedules";
 import { getPageMetadata } from "@/shared/metadata";
 
-export const metadata = getPageMetadata("Scheduling", {
-  path: "/admin/jobs/schedules",
+export const metadata = getPageMetadata("Schedules", {
+  path: "/admin/schedules",
 });
 
 export default async function AdminSchedulesPage() {
@@ -19,7 +19,7 @@ export default async function AdminSchedulesPage() {
 
   return (
     <div className="space-y-5 pb-6">
-      <JobsPageHeader snapshotAt={snapshotAt} title="Scheduling" />
+      <SchedulesPageHeader snapshotAt={snapshotAt} />
       <SchedulesTable schedules={schedules} />
     </div>
   );

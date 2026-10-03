@@ -28,7 +28,7 @@ export function ScheduleTrigger({ schedule }: { schedule: AdminSchedule }) {
     setPending(true);
     setError(undefined);
     try {
-      const { error } = await api.api.admin.jobs.schedules.trigger.post({
+      const { error } = await api.api.admin.schedules.trigger.post({
         requestId: crypto.randomUUID(),
         scheduleId: schedule.id,
       });

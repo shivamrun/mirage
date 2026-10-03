@@ -3,13 +3,13 @@
 import {
   ArrowLeft,
   Bell,
+  CalendarClock,
   ChevronRight,
   Coins,
   CreditCard,
   Home,
   Inbox,
   LayoutDashboard,
-  ListTodo,
   type LucideIcon,
   Mail,
   MailPlus,
@@ -136,14 +136,9 @@ const adminData = {
       icon: MailPlus,
     },
     {
-      title: "Jobs & queues",
-      url: "/admin/jobs",
-      icon: ListTodo,
-      items: [
-        { title: "Background jobs", url: "/admin/jobs" },
-        { title: "Durable queues", url: "/admin/jobs/queues" },
-        { title: "Scheduling", url: "/admin/jobs/schedules" },
-      ],
+      title: "Schedules",
+      url: "/admin/schedules",
+      icon: CalendarClock,
     },
     {
       title: "Contact Submission",
