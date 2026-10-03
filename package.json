@@ -2,6 +2,7 @@
   "name": "mirage",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@12.4.2",
   "scripts": {
     "build": "next build",
     "db:down": "docker compose down --volumes --remove-orphans",
@@ -14,6 +15,10 @@
     "dev": "next dev",
     "email:dev": "email dev --dir src/adapters/email/templates --port 3050",
     "format": "biome format --write",
+    "host:config": "node scripts/validate-self-host-config.mjs && docker compose --env-file .env.self-host -f docker-compose.self-host.yml config",
+    "host:down": "docker compose --env-file .env.self-host -f docker-compose.self-host.yml down",
+    "host:logs": "docker compose --env-file .env.self-host -f docker-compose.self-host.yml logs -f app worker",
+    "host:up": "node scripts/validate-self-host-config.mjs && docker compose --env-file .env.self-host -f docker-compose.self-host.yml up -d --build",
     "lint": "biome check",
     "jobs:worker": "tsx --tsconfig tsconfig.worker.json scripts/jobs-worker.ts",
     "jobs:health": "tsx --tsconfig tsconfig.worker.json scripts/jobs-health.ts",

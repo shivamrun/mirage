@@ -1,0 +1,157 @@
+name: mirage-self-host
+
+x-app-environment: &app-environment
+  NODE_ENV: production
+  DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env.self-host}
+  REDIS_URL: redis://redis:6379
+  JOBS_REDIS_URL: redis://jobs-redis:6379
+
+x-app-build: &app-build
+  context: .
+  dockerfile: Dockerfile
+  args:
+    NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:?Set NEXT_PUBLIC_BASE_URL in .env.self-host}
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:?Set NEXT_PUBLIC_TURNSTILE_SITE_KEY in .env.self-host}
+    NEXT_PUBLIC_UPLOAD_BASE_URL: ${NEXT_PUBLIC_UPLOAD_BASE_URL:-}
+    NEXT_PUBLIC_UMAMI_DOMAINS: ${NEXT_PUBLIC_UMAMI_DOMAINS:-}
+    NEXT_PUBLIC_UMAMI_ENABLED: ${NEXT_PUBLIC_UMAMI_ENABLED:-}
+    # It must remain a syntactically valid URL during Next.js compilation.
+    # Analytics stays disabled unless NEXT_PUBLIC_UMAMI_ENABLED is true and a
+    # website ID is configured.
+    NEXT_PUBLIC_UMAMI_SCRIPT_URL: ${NEXT_PUBLIC_UMAMI_SCRIPT_URL:-https://example.invalid/script.js}
+    NEXT_PUBLIC_UMAMI_WEBSITE_ID: ${NEXT_PUBLIC_UMAMI_WEBSITE_ID:-}
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mirage}
+      POSTGRES_USER: ${POSTGRES_USER:-mirage}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.self-host}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-256mb}
+      - --maxmemory-policy
+      - noeviction
+    mem_limit: ${REDIS_MEMORY_LIMIT:-384m}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  jobs-redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - ${JOBS_REDIS_MAXMEMORY:-512mb}
+      - --maxmemory-policy
+      - noeviction
+    mem_limit: ${JOBS_REDIS_MEMORY_LIMIT:-640m}
+    volumes:
+      - jobs-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build:
+      <<: *app-build
+      target: migrator
+    env_file:
+      - ${MIRAGE_ENV_FILE:-.env.self-host}
+    environment:
+      <<: *app-environment
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build:
+      <<: *app-build
+      target: runner
+    restart: unless-stopped
+    init: true
+    env_file:
+      - ${MIRAGE_ENV_FILE:-.env.self-host}
+    environment:
+      <<: *app-environment
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+    ports:
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-3000}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      jobs-redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O - http://127.0.0.1:3000/api/health | grep -q '\"ok\":true'",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  worker:
+    build:
+      <<: *app-build
+      target: worker
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 35s
+    env_file:
+      - ${MIRAGE_ENV_FILE:-.env.self-host}
+    environment:
+      <<: *app-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      jobs-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pnpm", "jobs:health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  postgres-data:
+  redis-data:
+  jobs-redis-data:
