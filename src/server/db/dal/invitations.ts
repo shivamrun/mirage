@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gt, lte, or } from "drizzle-orm";
 
 import db, { type DBClient } from "@/server/db";
 import { paginateList, totalCount } from "@/server/db/helpers/paginate";
@@ -305,6 +305,21 @@ export async function revokeSessionsForUser(
   executor: DBClient = db,
 ) {
   return executor.delete(session).where(eq(session.userId, userId)).returning();
+}
+
+export function deleteInvitationsForUser(
+  { email, userId }: { email: string; userId: string },
+  executor: DBClient = db,
+) {
+  return executor
+    .delete(invitation)
+    .where(
+      or(
+        eq(invitation.invitedByUserId, userId),
+        eq(invitation.acceptedByUserId, userId),
+        eq(invitation.email, email),
+      ),
+    );
 }
 
 export async function deletePartialInvitationUser({

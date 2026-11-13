@@ -284,7 +284,6 @@ describe("current Elysia HTTP contract", () => {
       "GET /api/admin/metrics",
       "POST /api/account/data-export",
       "POST /api/account/deletion",
-      "POST /api/admin/schedules/trigger",
       ...mutationRoutes.map(({ method, path }) => `${method} ${path}`),
     ].sort();
     expect(

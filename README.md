@@ -8,7 +8,7 @@ schema, and shared-code ownership rules.
 
 For a production Docker deployment, see the
 [self-hosting guide](docs/SELF_HOSTING.md). It includes the web app, migrations,
-worker, PostgreSQL, and separate cache and durable-queue Redis services.
+PostgreSQL, and Redis services.
 
 ## Development
 

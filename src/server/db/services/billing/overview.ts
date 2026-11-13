@@ -1,7 +1,6 @@
 import {
   type BillingSubscriptionRecord,
   getBillingSubscriptionsByUserId,
-  listStripeSubscriptionsForReconciliation,
 } from "@/server/db/dal/billing";
 import { getCreditBalance } from "@/server/db/services/credits/ledger";
 
@@ -15,13 +14,6 @@ export async function getBillingOverview(userId: string) {
     getCreditBalance(userId),
   ]);
   return { creditBalance, subscriptions };
-}
-
-export function listBillingSubscriptionsForReconciliation(input: {
-  afterId?: string;
-  limit: number;
-}) {
-  return listStripeSubscriptionsForReconciliation(input);
 }
 
 export type { BillingSubscriptionRecord };

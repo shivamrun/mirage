@@ -1,9 +1,14 @@
 import { eq } from "drizzle-orm";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/adapters/uploads/storage", () => ({
+  createStorageProfiles: () => ({
+    s3: { deletePrefix: async () => undefined },
+  }),
+}));
 
 import db from "@/server/db";
 import {
-  account,
   accountDeletionRequests,
   session,
   user,
@@ -13,55 +18,31 @@ import {
   requestUserDataExport,
   startAccountDeletion,
 } from "@/server/db/services/account-deletion/lifecycle";
-import { setJobEnqueueHandlerForTests } from "@/server/jobs/enqueue";
 import { createTestActor } from "./infra/admin-actor";
 
-afterEach(() => {
-  setJobEnqueueHandlerForTests(null);
-});
-
 describe("account deletion lifecycle", () => {
-  it("durably blocks access before asynchronous provider cleanup", async () => {
+  it("completes provider cleanup and removes access", async () => {
     const actor = await createTestActor();
-    const jobs: { name: string; payload: unknown }[] = [];
-    setJobEnqueueHandlerForTests(async (name, payload) => {
-      jobs.push({ name, payload });
-      return { id: `test-${jobs.length}` };
-    });
 
     const result = await startAccountDeletion(actor.id);
 
     expect(result.deleted).toBe(true);
+    if (!result.deleted) throw new Error("Account deletion did not start.");
     expect(
       await db.select().from(session).where(eq(session.userId, actor.id)),
     ).toHaveLength(0);
-    expect(
-      await db.select().from(account).where(eq(account.userId, actor.id)),
-    ).not.toHaveLength(0);
-    const [blockedUser] = await db
-      .select({ banned: user.banned, banReason: user.banReason })
-      .from(user)
-      .where(eq(user.id, actor.id));
-    expect(blockedUser).toEqual({
-      banned: true,
-      banReason: "Account deletion in progress",
-    });
     const [deletion] = await db
       .select()
       .from(accountDeletionRequests)
-      .where(eq(accountDeletionRequests.userId, actor.id));
-    expect(deletion?.cleanupPhase).toBe("sessions_and_grants");
-    expect(jobs).toEqual([
-      {
-        name: "account.deletion.process.v1",
-        payload: { deletionId: deletion?.id },
-      },
-    ]);
+      .where(eq(accountDeletionRequests.id, result.auditId));
+    expect(deletion).toMatchObject({ state: "completed", userId: null });
+    expect(
+      await db.select().from(user).where(eq(user.id, actor.id)),
+    ).toHaveLength(0);
   });
 
   it("expires overdue exports before allowing a replacement request", async () => {
     const actor = await createTestActor();
-    setJobEnqueueHandlerForTests(async () => ({ id: "test-export" }));
     const [overdue] = await db
       .insert(userDataExports)
       .values({

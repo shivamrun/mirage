@@ -72,7 +72,7 @@ await notifyBestEffort(
 
 `notifyBestEffort()` calls `notify()`, logs failures, and returns `null` instead
 of throwing. Use it after critical state changes such as email changes, credit
-grants, welcome emails, and Stripe webhook reconciliation so a secondary
+grants, welcome emails, and Stripe webhook processing so a secondary
 notification failure does not roll back the user-visible outcome or cause
 webhook retries.
 

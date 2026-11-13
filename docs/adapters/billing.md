@@ -44,7 +44,7 @@ flowchart TD
   stripePayment[Stripe Checkout payment]
   webhook[/POST /api/auth/stripe/webhook/]
   onEvent[Better Auth Stripe onEvent]
-  inbox[Durable webhook inbox + worker]
+  inbox[Durable webhook inbox]
   grant[grantCreditTopUpForCheckoutSession]
   ledger[(credit ledger and account)]
 
@@ -52,8 +52,8 @@ flowchart TD
 ```
 
 Better Auth handles core subscription persistence. Its `onEvent` callback
-persists supported Mirage billing events to a durable inbox and queues a worker;
-the worker performs replay-safe top-up fulfillment and billing side effects.
+persists supported Mirage billing events to a durable inbox, then performs
+replay-safe top-up fulfillment and billing side effects in the webhook request.
 
 Top-up checkout requests include a client-generated UUID `requestId`. Mirage
 persists it in `billing_credit_purchases` and sends it as Stripe's idempotency
@@ -64,7 +64,7 @@ key, preventing duplicate Checkout Sessions when the browser retries.
 | Concern | Source of truth | Local representation |
 | --- | --- | --- |
 | Stripe customer | Stripe, with cached IDs in Better Auth/user records | `user.stripeCustomerId` and `subscription.stripeCustomerId` are remembered when checkout/webhooks expose a customer. |
-| Stripe subscription | Stripe | Better Auth writes the `subscription` table from its Stripe plugin; local reads use the webhook-backed projection and scheduled reconciliation. |
+| Stripe subscription | Stripe | Better Auth writes the `subscription` table from its Stripe plugin; local reads use the webhook-backed projection. |
 | Current application plan | Local `subscription.plan` for paid users; free fallback when no active paid subscription applies | Plans are normalized by `src/shared/billing.ts`. |
 | Billing interval | Stripe price recurring interval | Stored as `subscription.billingInterval` using Stripe values such as `month` or `year`. UI maps these to `monthly` or `annual`. |
 | Subscription status and period dates | Stripe subscription item and subscription status | Cached in `subscription.status`, `periodStart`, `periodEnd`, cancellation fields, seats, and schedule ID. |
@@ -105,7 +105,7 @@ Important symbols: `billingCatalog`, plan/interval types, normalization helpers,
 and `getBillingPlanByLookupKey`.
 
 Called by: Better Auth subscription plan config, top-up checkout, top-up
-webhook validation, subscription reconciliation.
+webhook validation, subscription updates.
 
 Notes: catalog intervals are `monthly`/`annual` for type keys, but Stripe
 recurring intervals are `month`/`year`.
@@ -129,7 +129,7 @@ Important symbols: `auth` and the Better Auth Stripe plugin registration.
 
 Called by: `/api/auth/[...all]`.
 
-Notes: Mirage subscription side effects are queued from `onEvent`; synchronous
+Notes: Mirage subscription side effects are processed from `onEvent`; inline
 Better Auth lifecycle callbacks are intentionally not used for those effects.
 
 `src/app/(backend)/api/auth/[...all]/route.ts`
@@ -169,7 +169,7 @@ Important symbols: `getCreditBalance`, `reconcileCreditGrantsForUser`,
 `grantCreditTopUp`, `adjustCredits`, `InsufficientCreditsError`,
 `CreditIdempotencyConflictError`.
 
-Called by: billing UI page, the durable Stripe event worker, credit sample API,
+Called by: billing UI page, Stripe webhook processing, credit sample API,
 and admin adjustment API.
 
 Notes: do not update `credit_accounts` directly. This service locks the account
@@ -241,17 +241,17 @@ Purpose: reads and updates local subscription rows.
 Important symbols: `getBillingSubscriptionsByUserId`,
 `updateBillingSubscription`, `BillingSubscriptionRecord`.
 
-Called by: billing application services and reconciliation jobs.
+Called by: billing application services.
 
 `src/server/db/services/billing/stripe-subscriptions.ts`
 
 Purpose: pricing-page subscription refresh and Stripe invoice/transaction
 helpers.
 
-Important symbols: `syncBillingSubscriptionsFromStripe`,
+Important symbols: `applySubscriptionStateFromStripeEvent`,
 `getBillingTransactions`, `BillingTransaction`.
 
-Called by: scheduled reconciliation. `getBillingTransactions` remains unused;
+Called by: billing UI services. `getBillingTransactions` remains unused;
 the current billing UI opens Stripe for transaction history instead of rendering
 these rows.
 
@@ -385,7 +385,7 @@ emitted today.
 9. Stripe sends subscription events to `/api/auth/stripe/webhook`.
 10. Better Auth updates the local `subscription` table and `onEvent` persists a
     durable inbox record.
-11. The billing worker maps the immutable Stripe event subscription snapshot to
+11. Webhook processing maps the immutable Stripe event subscription snapshot to
     the local row and calls `reconcileCreditGrantForSubscription(...)`.
 12. A create event emits `subscription_started` only if the credit grant was
     newly created.
@@ -405,14 +405,14 @@ Validation happens in multiple places:
 
 User starts Better Auth subscription checkout from pricing or checkout resume.
 Stripe completes checkout and sends Better Auth webhooks. Better Auth writes the
-local `subscription` row, then Mirage's durable worker maps the event snapshot
-and reconciles credits. Duplicate execution is safe because credit grants use
-period keys and ledger idempotency keys.
+local `subscription` row, then Mirage maps the event snapshot during webhook
+processing and reconciles credits. Duplicate execution is safe because credit
+grants use period keys and ledger idempotency keys.
 
 ### Renewal
 
-Renewals arrive as subscription updates through Better Auth. The durable event
-worker reconciles the subscription period. If the
+Renewals arrive as subscription updates through Better Auth. Webhook processing
+reconciles the subscription period. If the
 period dates changed, the period key changes and the new allowance can be
 granted. Previous non-carry-forward period credits are expired during
 reconciliation when the latest ledger period has ended before the new period.
@@ -568,8 +568,8 @@ Top-ups are independent of subscriptions.
    `checkout.session.async_payment_succeeded` to
    `/api/auth/stripe/webhook`.
 9. Better Auth verifies the Stripe signature with `STRIPE_WEBHOOK_SECRET`,
-   then Mirage stores the event in its durable inbox and queues a worker.
-10. The worker retrieves and verifies the Stripe event/session before
+   then Mirage stores the event in its durable inbox and processes it.
+10. Webhook processing retrieves and verifies the Stripe event/session before
     `grantCreditTopUpForCheckoutSession(...)` validates mode, paid status,
     metadata lookup key, metadata credits, user ID, amount, currency, and line
     item price lookup key.
@@ -617,7 +617,7 @@ The portal button is disabled unless the account has a Stripe customer ID from
 `user.stripeCustomerId` or the current local subscription row.
 
 Billing portal changes are expected to come back through Better Auth Stripe
-webhooks and the durable event worker.
+webhooks.
 
 ## Analytics
 
@@ -627,8 +627,8 @@ currently emits:
 | Event | Where | Meaning |
 | --- | --- | --- |
 | `subscription_checkout_started` | Browser pricing button | Checkout URL returned; intent only. |
-| `subscription_started` | Durable subscription-created worker | A new subscription period credit grant was created. |
-| `subscription_cancelled` | Durable subscription-updated worker | Stripe changed `cancel_at_period_end` from false to true. |
+| `subscription_started` | Subscription-created webhook processing | A new subscription period credit grant was created. |
+| `subscription_cancelled` | Subscription-updated webhook processing | Stripe changed `cancel_at_period_end` from false to true. |
 | `credit_top_up_checkout_started` | `/api/billing/checkout` | Top-up Checkout session created; intent only. |
 | `credits_purchased` | Top-up webhook after ledger insert | Paid top-up credits were durably granted. |
 | `credits_consumed` | Credit sample API | Sample spend succeeded. |
@@ -751,8 +751,6 @@ Debug a wrong subscription:
 
 - Check Stripe subscription/customer first.
 - Check local `subscription` rows by `referenceId` and `stripeSubscriptionId`.
-- Run the scheduled reconciliation job from a trusted context if local
-  period/status fields look stale.
 - Confirm the Stripe price lookup key maps through `billingCatalog`.
 - Confirm the Better Auth webhook endpoint and `STRIPE_WEBHOOK_SECRET`.
 

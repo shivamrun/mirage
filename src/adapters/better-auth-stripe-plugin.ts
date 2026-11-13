@@ -2,8 +2,7 @@ import { stripe } from "@better-auth/stripe";
 import type Stripe from "stripe";
 import { billingStripeClientProxy } from "@/adapters/stripe/client";
 import { subscriptionPlans } from "@/features/auth/better-auth/subscription-plans";
-import { handlePaymentFailedInvoice } from "@/server/db/services/billing/lifecycle-events";
-import { enqueueStripeWebhookJob } from "@/server/db/services/billing/stripe-webhook-jobs";
+import { processStripeWebhook } from "@/server/db/services/billing/stripe-webhooks";
 import { env } from "@/shared/env";
 
 const durableEventTypes = new Set<Stripe.Event.Type>([
@@ -28,17 +27,13 @@ export const authStripePlugin = stripe({
     if (durableEventTypes.has(event.type)) {
       const objectId = eventObjectId(event);
       if (!objectId) throw new Error("Stripe event object has no ID.");
-      await enqueueStripeWebhookJob({
+      await processStripeWebhook({
         eventId: event.id,
         eventType: event.type as Parameters<
-          typeof enqueueStripeWebhookJob
+          typeof processStripeWebhook
         >[0]["eventType"],
         objectId,
       });
-    }
-
-    if (event.type === "invoice.payment_failed") {
-      await handlePaymentFailedInvoice(event.data.object, event.id);
     }
   },
   subscription: {

@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 
-import { asc, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, lt, or, sql } from "drizzle-orm";
 
 import type { NotificationDeliveryInput } from "@/features/notifications/channels/types";
 import db from "@/server/db";
@@ -53,24 +53,29 @@ export async function getEmailDelivery(id: string) {
   return delivery ?? null;
 }
 
-export function listPendingEmailDeliveries(limit = 100) {
-  return db
-    .select()
-    .from(emailDeliveries)
-    .where(eq(emailDeliveries.status, "pending"))
-    .orderBy(asc(emailDeliveries.createdAt))
-    .limit(limit);
-}
-
 export async function markEmailDeliveryProcessing(id: string) {
-  await db
+  const staleBefore = new Date(Date.now() - 5 * 60_000);
+  const [delivery] = await db
     .update(emailDeliveries)
     .set({
       attemptCount: sql`${emailDeliveries.attemptCount} + 1`,
       lastErrorKind: null,
       status: "processing",
     })
-    .where(eq(emailDeliveries.id, id));
+    .where(
+      and(
+        eq(emailDeliveries.id, id),
+        or(
+          inArray(emailDeliveries.status, ["pending", "failed"]),
+          and(
+            eq(emailDeliveries.status, "processing"),
+            lt(emailDeliveries.updatedAt, staleBefore),
+          ),
+        ),
+      ),
+    )
+    .returning();
+  return delivery ?? null;
 }
 
 export async function markEmailDeliverySent(
@@ -80,13 +85,6 @@ export async function markEmailDeliverySent(
   await db
     .update(emailDeliveries)
     .set({ providerMessageId, sentAt: new Date(), status: "sent" })
-    .where(eq(emailDeliveries.id, id));
-}
-
-export async function markEmailDeliveryFailed(id: string, errorKind: string) {
-  await db
-    .update(emailDeliveries)
-    .set({ lastErrorKind: errorKind, status: "failed" })
     .where(eq(emailDeliveries.id, id));
 }
 

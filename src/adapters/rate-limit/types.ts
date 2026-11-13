@@ -20,7 +20,6 @@ export type RateLimitPolicyName =
   | "account-email-mutation"
   | "account-two-factor-mutation"
   | "admin-invitation-mutation"
-  | "admin-schedules-mutation"
   | "admin-security-mutation"
   | "billing-checkout"
   | "contact-submit"

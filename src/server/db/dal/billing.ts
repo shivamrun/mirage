@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, isNotNull, isNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
 
 import db from "@/server/db";
 import { subscription } from "@/server/db/schema";
@@ -23,36 +23,6 @@ export type BillingSubscriptionUpdate = Partial<
     | "stripeSubscriptionId"
   >
 >;
-
-export async function getBillingSubscriptionById(id: string) {
-  const [record] = await db
-    .select()
-    .from(subscription)
-    .where(eq(subscription.id, id))
-    .limit(1);
-
-  return record ?? null;
-}
-
-export async function listStripeSubscriptionsForReconciliation({
-  afterId,
-  limit,
-}: {
-  afterId?: string;
-  limit: number;
-}) {
-  return db
-    .select()
-    .from(subscription)
-    .where(
-      and(
-        isNotNull(subscription.stripeSubscriptionId),
-        afterId ? gt(subscription.id, afterId) : undefined,
-      ),
-    )
-    .orderBy(asc(subscription.id))
-    .limit(limit);
-}
 
 export async function getBillingSubscriptionsByUserId(userId: string) {
   return db

@@ -1,4 +1,3 @@
-import { getJobQueue } from "@/adapters/jobs/queues";
 import {
   type StripeCheckoutSession,
   type StripeSubscription,
@@ -9,7 +8,6 @@ import {
   claimStripeWebhookEvent,
   createOrGetStripeWebhookEvent,
   getStripeWebhookEvent,
-  listRecoverableStripeWebhookEvents,
   markStripeWebhookEventCompleted,
   markStripeWebhookEventFailed,
   markStripeWebhookEventRetrying,
@@ -23,27 +21,29 @@ import {
 } from "@/server/db/services/billing/lifecycle-events";
 import { applySubscriptionStateFromStripeEvent } from "@/server/db/services/billing/stripe-subscriptions";
 import { grantCreditTopUpForCheckoutSession } from "@/server/db/services/credits/top-up";
-import { enqueueJob } from "@/server/jobs/enqueue";
-import { type JobPayload, jobQueueNames } from "@/server/jobs/registry";
-
-type DurableStripeEventType =
-  JobPayload<"billing.stripe-event.process.v1">["eventType"];
+type StripeWebhookEventType =
+  | "checkout.session.completed"
+  | "checkout.session.async_payment_succeeded"
+  | "customer.subscription.created"
+  | "customer.subscription.updated"
+  | "customer.subscription.deleted"
+  | "invoice.payment_failed";
 
 function sanitizedError(error: unknown) {
   return {
     kind: error instanceof Error ? error.name : "UnknownError",
-    message: error instanceof Error ? error.message : "Unknown job failure.",
+    message: error instanceof Error ? error.message : "Unknown webhook failure.",
   };
 }
 
-class StripeWebhookJobError extends Error {
+class StripeWebhookProcessingError extends Error {
   constructor(
     message: string,
     readonly processingToken: string,
     options?: ErrorOptions,
   ) {
     super(message, options);
-    this.name = "StripeWebhookJobError";
+    this.name = "StripeWebhookProcessingError";
   }
 }
 
@@ -60,50 +60,13 @@ function isCancellationScheduledTransition(
   );
 }
 
-export async function recoverPendingStripeWebhookJobs() {
-  const events = await listRecoverableStripeWebhookEvents();
-  const results = await Promise.allSettled(
-    events.map((event) =>
-      enqueueJob(
-        "billing.stripe-event.process.v1",
-        {
-          eventId: event.stripeEventId,
-          eventType: event.eventType as DurableStripeEventType,
-          objectId: event.objectId,
-        },
-        { jobId: `stripe-${event.stripeEventId.replaceAll(":", "-")}` },
-      ),
-    ),
-  );
-  for (const result of results) {
-    if (result.status === "rejected") {
-      console.error(
-        JSON.stringify({
-          error:
-            result.reason instanceof Error
-              ? result.reason.name
-              : "UnknownError",
-          event: "stripe_webhook_job_recovery_failed",
-        }),
-      );
-    }
-  }
-  const failures = results.filter((result) => result.status === "rejected");
-  if (failures.length > 0) {
-    throw new AggregateError(
-      failures.map((result) => result.reason),
-      "Unable to recover one or more pending Stripe webhook jobs.",
-    );
-  }
-}
-
-export async function enqueueStripeWebhookJob({
+export async function processStripeWebhook({
   eventId,
   eventType,
   objectId,
 }: {
   eventId: string;
-  eventType: DurableStripeEventType;
+  eventType: StripeWebhookEventType;
   objectId: string;
 }) {
   const record = await createOrGetStripeWebhookEvent({
@@ -114,33 +77,35 @@ export async function enqueueStripeWebhookJob({
 
   if (record.status === "completed") return record;
 
-  const jobId = `stripe-${eventId.replaceAll(":", "-")}`;
-  if (record.status === "failed") {
-    const job = await getJobQueue(jobQueueNames.billing).getJob(jobId);
-    if (job && (await job.getState()) === "failed") {
-      await job.retry("failed", { resetAttemptsMade: true });
-      return record;
-    }
+  try {
+    return await processStoredStripeWebhook({ eventId, eventType, objectId });
+  } catch (error) {
+    await finalizeStripeWebhookFailure({
+      error:
+        error instanceof Error ? error : new Error("Stripe webhook failed."),
+      payload: { eventId, eventType, objectId },
+    });
+    throw error;
   }
-
-  await enqueueJob(
-    "billing.stripe-event.process.v1",
-    { eventId, eventType, objectId },
-    { jobId },
-  );
-
-  return record;
 }
 
-export async function processStripeWebhookJob(
-  payload: JobPayload<"billing.stripe-event.process.v1">,
+export async function processStoredStripeWebhook(
+  payload: {
+    eventId: string;
+    eventType: StripeWebhookEventType;
+    objectId: string;
+  },
 ) {
   const existing = await getStripeWebhookEvent(payload.eventId);
   if (!existing) throw new Error("Stripe webhook inbox record was not found.");
   if (existing.status === "completed") return { skipped: true };
 
   const claimed = await claimStripeWebhookEvent(payload.eventId);
-  if (!claimed) return { skipped: true };
+  if (!claimed) {
+    const current = await getStripeWebhookEvent(payload.eventId);
+    if (current?.status === "completed") return { skipped: true };
+    throw new Error("Stripe webhook event is already being processed.");
+  }
   const processingToken = claimed.processingToken;
   if (!processingToken) {
     throw new Error("Stripe webhook claim has no processing token.");
@@ -220,20 +185,24 @@ export async function processStripeWebhookJob(
       processingToken,
       stripeEventId: payload.eventId,
     });
-    throw new StripeWebhookJobError(failure.message, processingToken, {
+    throw new StripeWebhookProcessingError(failure.message, processingToken, {
       cause: error,
     });
   }
 }
 
-export async function finalizeStripeWebhookJobFailure({
+export async function finalizeStripeWebhookFailure({
   error,
   payload,
 }: {
   error: Error;
-  payload: JobPayload<"billing.stripe-event.process.v1">;
+  payload: {
+    eventId: string;
+    eventType: StripeWebhookEventType;
+    objectId: string;
+  };
 }) {
-  if (!(error instanceof StripeWebhookJobError)) return;
+  if (!(error instanceof StripeWebhookProcessingError)) return;
   await markStripeWebhookEventFailed({
     errorKind: error.name,
     errorMessage: error.message,

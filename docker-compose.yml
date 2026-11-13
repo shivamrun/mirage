@@ -50,32 +50,6 @@ services:
       timeout: 3s
       retries: 10
 
-  worker:
-    profiles: ["jobs"]
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: worker
-    restart: unless-stopped
-    stop_grace_period: 35s
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/mirage-db
-      JOBS_REDIS_URL: redis://redis:6379
-      NODE_ENV: development
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "pnpm", "jobs:health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
-
 volumes:
   postgres-data:
   redis-data:

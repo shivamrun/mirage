@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 
 import db from "@/server/db";
 import { stripeWebhookEvents } from "@/server/db/schema";
@@ -50,27 +50,6 @@ export async function getStripeWebhookEvent(stripeEventId: string) {
   return event ?? null;
 }
 
-export function listRecoverableStripeWebhookEvents(limit = 100) {
-  const staleBefore = new Date(Date.now() - 5 * 60_000);
-  return db
-    .select()
-    .from(stripeWebhookEvents)
-    .where(
-      or(
-        eq(stripeWebhookEvents.status, "pending"),
-        and(
-          eq(stripeWebhookEvents.status, "processing"),
-          or(
-            isNull(stripeWebhookEvents.processingStartedAt),
-            lt(stripeWebhookEvents.processingStartedAt, staleBefore),
-          ),
-        ),
-      ),
-    )
-    .orderBy(asc(stripeWebhookEvents.createdAt))
-    .limit(limit);
-}
-
 export async function claimStripeWebhookEvent(stripeEventId: string) {
   const staleBefore = new Date(Date.now() - 5 * 60_000);
   const processingToken = randomUUID();
@@ -89,6 +68,7 @@ export async function claimStripeWebhookEvent(stripeEventId: string) {
         eq(stripeWebhookEvents.stripeEventId, stripeEventId),
         or(
           eq(stripeWebhookEvents.status, "pending"),
+          eq(stripeWebhookEvents.status, "failed"),
           and(
             eq(stripeWebhookEvents.status, "processing"),
             or(

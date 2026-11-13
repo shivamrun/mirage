@@ -9,10 +9,7 @@ import {
 import {
   applyBillingSubscriptionStripeEvent,
   type BillingSubscriptionRecord,
-  getBillingSubscriptionById,
-  updateBillingSubscription,
 } from "@/server/db/dal/billing";
-import { reconcileCreditGrantForSubscription } from "@/server/db/services/credits/ledger";
 import {
   billingPlansMatch,
   getBillingPlanByLookupKey,
@@ -106,43 +103,6 @@ function fromStripeTimestamp(value?: null | number) {
   return value ? new Date(value * 1000) : null;
 }
 
-async function syncSubscriptionFromStripe(
-  subscription: BillingSubscriptionRecord,
-) {
-  if (!subscription.stripeSubscriptionId) {
-    return subscription;
-  }
-
-  const stripeSubscription = await stripeBillingProvider.retrieveSubscription(
-    subscription.stripeSubscriptionId,
-  );
-  const subscriptionItem = getPrimarySubscriptionItem(stripeSubscription);
-
-  if (!subscriptionItem) {
-    return subscription;
-  }
-
-  return (
-    (await updateBillingSubscription(subscription.id, {
-      billingInterval: subscriptionItem.price.recurring?.interval,
-      cancelAt: fromStripeTimestamp(stripeSubscription.cancel_at),
-      cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
-      canceledAt: fromStripeTimestamp(stripeSubscription.canceled_at),
-      endedAt: fromStripeTimestamp(stripeSubscription.ended_at),
-      periodEnd: fromStripeTimestamp(subscriptionItem.current_period_end),
-      periodStart: fromStripeTimestamp(subscriptionItem.current_period_start),
-      plan: resolvePlanName(subscriptionItem.price, subscription.plan),
-      seats: subscriptionItem.quantity,
-      status: stripeSubscription.status,
-      stripeScheduleId:
-        typeof stripeSubscription.schedule === "string"
-          ? stripeSubscription.schedule
-          : (stripeSubscription.schedule?.id ?? null),
-      stripeSubscriptionId: stripeSubscription.id,
-    })) ?? subscription
-  );
-}
-
 function stripeObjectId(value: unknown) {
   if (typeof value === "string") return value;
   if (value && typeof value === "object" && "id" in value) {
@@ -191,38 +151,6 @@ export async function applySubscriptionStateFromStripeEvent({
   });
 
   return { applied: Boolean(persisted), eventSubscription };
-}
-
-export async function reconcileBillingSubscription(subscriptionId: string) {
-  const subscription = await getBillingSubscriptionById(subscriptionId);
-  if (!subscription) return { skipped: true as const };
-
-  const synced = await syncSubscriptionFromStripe(subscription);
-  if (!activeStatuses.has(synced.status ?? "")) {
-    return { skipped: true as const };
-  }
-  await reconcileCreditGrantForSubscription(synced);
-  return { skipped: false as const };
-}
-
-export async function syncBillingSubscriptionsFromStripe(
-  subscriptions: BillingSubscriptionRecord[],
-) {
-  const syncedSubscriptions = [];
-
-  for (const subscription of subscriptions) {
-    try {
-      syncedSubscriptions.push(await syncSubscriptionFromStripe(subscription));
-    } catch (error) {
-      console.warn(
-        `Unable to sync Stripe subscription ${subscription.stripeSubscriptionId}:`,
-        error,
-      );
-      syncedSubscriptions.push(subscription);
-    }
-  }
-
-  return syncedSubscriptions;
 }
 
 function isSameSubscriptionPeriod(

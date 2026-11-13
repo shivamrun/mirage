@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { createStorageProfiles } from "@/adapters/uploads/storage";
 import db, { type DBTransaction } from "@/server/db";
 import { lockAccountDeletionUser } from "@/server/db/dal/account-deletion";
+import { deleteInvitationsForUser } from "@/server/db/dal/invitations";
 import {
   account,
   accountDeletionRequests,
@@ -9,9 +10,7 @@ import {
   creditLedgerEntries,
   emailContact,
   emailDeliveries,
-  invitation,
   notification,
-  session,
   subscription,
   user,
   userDataExports,
@@ -21,7 +20,6 @@ import {
   cancelBillingSubscriptions,
   deleteBillingCustomer,
 } from "@/server/db/services/billing/customer-lifecycle";
-import { enqueueJob } from "@/server/jobs/enqueue";
 import { deliverUserDataExport } from "./export";
 
 const EXPORT_DELIVERY_WINDOW_SQL = sql`clock_timestamp() + interval '24 hours'`;
@@ -65,18 +63,6 @@ export async function startAccountDeletion(userId: string) {
       .returning();
     if (!audit) throw new Error("Could not begin account deletion.");
 
-    await Promise.all([
-      tx.delete(session).where(eq(session.userId, userId)),
-      tx
-        .update(user)
-        .set({
-          banned: true,
-          banExpires: null,
-          banReason: "Account deletion in progress",
-        })
-        .where(eq(user.id, userId)),
-    ]);
-
     return {
       attemptCount: audit.attemptCount,
       auditId: audit.id,
@@ -85,7 +71,7 @@ export async function startAccountDeletion(userId: string) {
   });
 
   if (deletion.deleted) {
-    await enqueueDeletionBestEffort(deletion.auditId, deletion.attemptCount);
+    await processAccountDeletion(deletion.auditId);
   }
   return deletion;
 }
@@ -129,7 +115,7 @@ export async function processAccountDeletion(deletionId: string) {
         nextPhase,
       );
       if (advanced) {
-        await enqueueDeletionBestEffort(record.id, record.attemptCount);
+        await processAccountDeletion(record.id);
       }
     }
     return { outcome: "processed" as const };
@@ -278,15 +264,10 @@ async function deleteCrossUserData({
           eq(notification.subjectId, userId),
         ),
       );
-    await tx
-      .delete(invitation)
-      .where(
-        or(
-          eq(invitation.invitedByUserId, userId),
-          eq(invitation.acceptedByUserId, userId),
-          eq(invitation.email, existingUser.email),
-        ),
-      );
+    await deleteInvitationsForUser(
+      { email: existingUser.email, userId },
+      tx,
+    );
     await tx
       .delete(emailDeliveries)
       .where(
@@ -361,7 +342,7 @@ export async function requestUserDataExport(userId: string) {
     return existing;
   });
 
-  await enqueueExportBestEffort(exportRequest.id, exportRequest.attemptCount);
+  await prepareAccountDataExport(exportRequest.id);
   return exportRequest;
 }
 
@@ -373,24 +354,6 @@ export async function getUserDataExportStatus(userId: string) {
     .orderBy(sql`${userDataExports.createdAt} desc`)
     .limit(1);
   return record ?? null;
-}
-
-async function enqueueExportBestEffort(exportId: string, generation: number) {
-  try {
-    await enqueueJob(
-      "account.data-export.prepare.v1",
-      { exportId },
-      { jobId: `account-export-${exportId}-${generation}` },
-    );
-  } catch (error) {
-    console.warn(
-      JSON.stringify({
-        errorKind: error instanceof Error ? error.name : "UnknownError",
-        event: "account_export_enqueue_deferred",
-        exportId,
-      }),
-    );
-  }
 }
 
 export async function prepareAccountDataExport(exportId: string) {
@@ -415,7 +378,16 @@ export async function prepareAccountDataExport(exportId: string) {
     .where(
       and(
         eq(userDataExports.id, exportId),
-        inArray(userDataExports.status, ["pending", "failed"]),
+        or(
+          inArray(userDataExports.status, ["pending", "failed"]),
+          and(
+            eq(userDataExports.status, "processing"),
+            lt(
+              userDataExports.lastAttemptAt,
+              sql`clock_timestamp() - interval '15 minutes'`,
+            ),
+          ),
+        ),
         sql`${userDataExports.deliveryDueAt} > clock_timestamp()`,
       ),
     )
@@ -472,72 +444,6 @@ export async function prepareAccountDataExport(exportId: string) {
   }
 }
 
-export async function recoverAccountExportWork() {
-  await db
-    .update(userDataExports)
-    .set({ failureKind: "DeliveryWindowExpired", status: "expired" })
-    .where(
-      and(
-        inArray(userDataExports.status, ["pending", "processing", "failed"]),
-        sql`${userDataExports.deliveryDueAt} <= clock_timestamp()`,
-      ),
-    );
-  await db
-    .update(userDataExports)
-    .set({ failureKind: "WorkerInterruptedError", status: "failed" })
-    .where(
-      and(
-        eq(userDataExports.status, "processing"),
-        sql`${userDataExports.lastAttemptAt} < clock_timestamp() - interval '15 minutes'`,
-      ),
-    );
-  const records = await db
-    .select({
-      attemptCount: userDataExports.attemptCount,
-      id: userDataExports.id,
-    })
-    .from(userDataExports)
-    .where(
-      and(
-        inArray(userDataExports.status, ["pending", "failed"]),
-        sql`${userDataExports.deliveryDueAt} > clock_timestamp()`,
-      ),
-    )
-    .limit(500);
-  await Promise.all(
-    records.map(({ attemptCount, id }) =>
-      enqueueExportBestEffort(id, attemptCount),
-    ),
-  );
-}
-
-export async function recoverAccountDeletionWork() {
-  const records = await db
-    .select({
-      attemptCount: accountDeletionRequests.attemptCount,
-      id: accountDeletionRequests.id,
-    })
-    .from(accountDeletionRequests)
-    .where(
-      and(
-        eq(accountDeletionRequests.state, "deleting"),
-        or(
-          isNull(accountDeletionRequests.lastAttemptAt),
-          lt(
-            accountDeletionRequests.lastAttemptAt,
-            sql`clock_timestamp() - interval '15 minutes'`,
-          ),
-        ),
-      ),
-    )
-    .limit(500);
-  await Promise.all(
-    records.map(({ attemptCount, id }) =>
-      enqueueDeletionBestEffort(id, attemptCount),
-    ),
-  );
-}
-
 async function expireUserDataExports(tx: DBTransaction, userId: string) {
   await tx
     .update(userDataExports)
@@ -549,27 +455,6 @@ async function expireUserDataExports(tx: DBTransaction, userId: string) {
         sql`${userDataExports.deliveryDueAt} <= clock_timestamp()`,
       ),
     );
-}
-
-async function enqueueDeletionBestEffort(
-  deletionId: string,
-  generation: number,
-) {
-  try {
-    await enqueueJob(
-      "account.deletion.process.v1",
-      { deletionId },
-      { jobId: `account-deletion-${deletionId}-${generation}` },
-    );
-  } catch (error) {
-    console.warn(
-      JSON.stringify({
-        deletionId,
-        errorKind: error instanceof Error ? error.name : "UnknownError",
-        event: "account_deletion_enqueue_deferred",
-      }),
-    );
-  }
 }
 
 function sanitizeFailureKind(error: unknown) {

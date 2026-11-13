@@ -4,13 +4,10 @@ import { getNotificationDefinition } from "@/features/notifications/registry/reg
 import {
   createOrGetEmailDelivery,
   getEmailDelivery,
-  listPendingEmailDeliveries,
-  markEmailDeliveryFailed,
   markEmailDeliveryProcessing,
   markEmailDeliveryRetrying,
   markEmailDeliverySent,
 } from "@/server/db/dal/email-deliveries";
-import { enqueueJob } from "@/server/jobs/enqueue";
 
 export async function enqueueEmailDelivery(
   input: NotificationDeliveryInput & { idempotencyKey: string },
@@ -18,45 +15,8 @@ export async function enqueueEmailDelivery(
   const delivery = await createOrGetEmailDelivery(input);
   if (delivery.status === "sent") return delivery;
 
-  await enqueueJob(
-    "notification.email.send.v1",
-    { deliveryId: delivery.id },
-    { jobId: `email-${delivery.id}` },
-  );
+  await processEmailDelivery(delivery.id);
   return delivery;
-}
-
-export async function recoverPendingEmailDeliveries() {
-  const deliveries = await listPendingEmailDeliveries();
-  const results = await Promise.allSettled(
-    deliveries.map((delivery) =>
-      enqueueJob(
-        "notification.email.send.v1",
-        { deliveryId: delivery.id },
-        { jobId: `email-${delivery.id}` },
-      ),
-    ),
-  );
-  for (const result of results) {
-    if (result.status === "rejected") {
-      console.error(
-        JSON.stringify({
-          error:
-            result.reason instanceof Error
-              ? result.reason.name
-              : "UnknownError",
-          event: "email_delivery_recovery_failed",
-        }),
-      );
-    }
-  }
-  const failures = results.filter((result) => result.status === "rejected");
-  if (failures.length > 0) {
-    throw new AggregateError(
-      failures.map((result) => result.reason),
-      "Unable to recover one or more pending email deliveries.",
-    );
-  }
 }
 
 export async function processEmailDelivery(deliveryId: string) {
@@ -64,7 +24,8 @@ export async function processEmailDelivery(deliveryId: string) {
   if (!delivery) throw new Error("Email delivery record was not found.");
   if (delivery.status === "sent") return { skipped: true };
 
-  await markEmailDeliveryProcessing(delivery.id);
+  const claimed = await markEmailDeliveryProcessing(delivery.id);
+  if (!claimed) return { skipped: true };
   try {
     const result = await emailNotificationChannel.deliver({
       category: getNotificationDefinition(delivery.notificationType).category,
@@ -89,14 +50,4 @@ export async function processEmailDelivery(deliveryId: string) {
     );
     throw error instanceof Error ? error : new Error("Email delivery failed.");
   }
-}
-
-export async function finalizeEmailDeliveryFailure({
-  deliveryId,
-  error,
-}: {
-  deliveryId: string;
-  error: Error;
-}) {
-  await markEmailDeliveryFailed(deliveryId, error.name);
 }

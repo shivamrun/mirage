@@ -13,7 +13,6 @@ describe("operational observability", () => {
     expect(await response.json()).toEqual({
       checks: {
         database: "ok",
-        jobsRedis: "ok",
         redis: "not_configured",
       },
       ok: true,

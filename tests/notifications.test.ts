@@ -29,7 +29,10 @@ import {
   type NotificationRealtimeEvent,
   notificationRealtimeEventNames,
 } from "@/shared/schemas/notifications";
-import { testEmailOutbox } from "./infra/email-fake";
+import {
+  setTestEmailDeliveryHook,
+  testEmailOutbox,
+} from "./infra/email-fake";
 
 async function createUser(name: string) {
   const id = randomUUID();
@@ -490,6 +493,34 @@ describe("notifications", () => {
       to: "recipient@example.com",
     });
     expect(await db.select().from(notification)).toHaveLength(0);
+  });
+
+  it("claims durable inline email delivery only once", async () => {
+    let signalDeliveryStarted: (() => void) | undefined;
+    let releaseDelivery: (() => void) | undefined;
+    const deliveryStarted = new Promise<void>((resolve) => {
+      signalDeliveryStarted = resolve;
+    });
+    const deliveryReleased = new Promise<void>((resolve) => {
+      releaseDelivery = resolve;
+    });
+    setTestEmailDeliveryHook(async () => {
+      signalDeliveryStarted?.();
+      await deliveryReleased;
+    });
+    const input = {
+      data: { email: "welcome@example.com", name: "Welcome" },
+      idempotencyKey: `welcome:${randomUUID()}`,
+      type: "auth.welcome" as const,
+    };
+
+    const first = notify(input);
+    await deliveryStarted;
+    await notify(input);
+    releaseDelivery?.();
+    await first;
+
+    expect(testEmailOutbox).toHaveLength(1);
   });
 
   it("emits one created event for a fresh in-app notification", async () => {

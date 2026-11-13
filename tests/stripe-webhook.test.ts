@@ -20,11 +20,9 @@ import {
   subscription,
   user,
 } from "@/server/db/schema";
-import { processStripeWebhookJob } from "@/server/db/services/billing/stripe-webhook-jobs";
+import { processStoredStripeWebhook } from "@/server/db/services/billing/stripe-webhooks";
 import { getCreditBalance } from "@/server/db/services/credits/ledger";
 import { setCreditTopUpStripeClientForTests } from "@/server/db/services/credits/top-up";
-import { setJobEnqueueHandlerForTests } from "@/server/jobs/enqueue";
-import { createJobWorkers } from "@/server/jobs/worker";
 import { app } from "@/server/routes";
 import { createTestActor } from "./infra/admin-actor";
 
@@ -322,8 +320,7 @@ describe("Stripe webhook route", () => {
     );
   });
 
-  it("returns before a durable top-up worker fulfills the checkout", async () => {
-    setJobEnqueueHandlerForTests(null);
+  it("fulfills a top-up during webhook processing", async () => {
     const actor = await createTestActor();
     const purchase = await createTopUpPurchase(actor.id);
     setBetterAuthWebhookStripeClient({
@@ -335,20 +332,8 @@ describe("Stripe webhook route", () => {
     const response = await postBetterAuthStripeWebhook();
     expect(response.status, await response.clone().text()).toBe(200);
 
-    const beforeWorker = await getCreditBalance(actor.id);
-    expect(beforeWorker.account.availableCredits).toBe(10);
-
-    const workers = createJobWorkers();
-    try {
-      await expect
-        .poll(async () => {
-          const balance = await getCreditBalance(actor.id);
-          return balance.account.availableCredits;
-        })
-        .toBe(210);
-    } finally {
-      await Promise.all(workers.map((worker) => worker.close()));
-    }
+    const balance = await getCreditBalance(actor.id);
+    expect(balance.account.availableCredits).toBe(210);
   });
 
   it("creates subscription records and grants credits through Better Auth lifecycle hooks", async () => {
@@ -519,6 +504,47 @@ describe("Stripe webhook route", () => {
     ).resolves.toMatchObject({ status: "completed" });
   });
 
+  it("allows Stripe redelivery to retry a failed inline webhook", async () => {
+    const eventId = `evt_retry_${randomUUID()}`;
+    await createOrGetStripeWebhookEvent({
+      eventType: "invoice.payment_failed",
+      objectId: "in_retry_test",
+      stripeEventId: eventId,
+    });
+    const firstClaim = await claimStripeWebhookEvent(eventId);
+    expect(firstClaim?.processingToken).toBeTruthy();
+
+    await markStripeWebhookEventFailed({
+      errorKind: "TestError",
+      errorMessage: "retry me",
+      processingToken: firstClaim?.processingToken ?? "",
+      stripeEventId: eventId,
+    });
+
+    const retryClaim = await claimStripeWebhookEvent(eventId);
+    expect(retryClaim).toMatchObject({ status: "processing" });
+    expect(retryClaim?.processingToken).not.toBe(firstClaim?.processingToken);
+  });
+
+  it("does not acknowledge a redelivery while inline processing is active", async () => {
+    const eventId = `evt_processing_${randomUUID()}`;
+    const payload = {
+      eventId,
+      eventType: "invoice.payment_failed" as const,
+      objectId: "in_processing_test",
+    };
+    await createOrGetStripeWebhookEvent({
+      eventType: payload.eventType,
+      objectId: payload.objectId,
+      stripeEventId: eventId,
+    });
+    await claimStripeWebhookEvent(eventId);
+
+    await expect(processStoredStripeWebhook(payload)).rejects.toThrow(
+      "already being processed",
+    );
+  });
+
   it("persists event subscription state without regressing on stale events", async () => {
     const actor = await createTestActor();
     await db.insert(subscription).values({
@@ -590,7 +616,7 @@ describe("Stripe webhook route", () => {
         objectId: "sub_test",
         stripeEventId: eventId,
       });
-      await processStripeWebhookJob({
+      await processStoredStripeWebhook({
         eventId,
         eventType: "customer.subscription.updated",
         objectId: "sub_test",

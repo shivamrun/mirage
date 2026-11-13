@@ -3,7 +3,6 @@
 import {
   ArrowLeft,
   Bell,
-  CalendarClock,
   ChevronRight,
   Coins,
   CreditCard,
@@ -134,11 +133,6 @@ const adminData = {
       title: "Invitations",
       url: "/admin/invitations",
       icon: MailPlus,
-    },
-    {
-      title: "Schedules",
-      url: "/admin/schedules",
-      icon: CalendarClock,
     },
     {
       title: "Contact Submission",

@@ -1,19 +1,15 @@
 # Self-hosting Mirage
 
-The self-hosted stack runs five long-lived roles and one one-shot role:
+The self-hosted stack runs three long-lived roles and one one-shot role:
 
 | Service | Purpose | Persistent data |
 | --- | --- | --- |
 | `app` | Next.js web application and Elysia API | None |
-| `worker` | BullMQ background jobs and recurring schedule registration | None |
 | `db` | PostgreSQL application data | `postgres-data` |
 | `redis` | Cache, rate limits, and notification Pub/Sub | `redis-data` |
-| `jobs-redis` | Durable BullMQ queues and worker heartbeats | `jobs-redis-data` |
-| `migrate` | Applies Drizzle migrations before app/worker startup | None |
+| `migrate` | Applies Drizzle migrations before app startup | None |
 
-The two Redis services are intentionally separate. Queue Redis uses AOF and
-`noeviction`; cache or realtime traffic therefore cannot evict queued work.
-Postgres and both Redis services are internal-only. By default, the app is
+Postgres and Redis are internal-only. By default, the app is
 published only on `127.0.0.1:3000` for a host-level reverse proxy.
 
 ## Requirements
@@ -51,12 +47,12 @@ docker compose \
   up -d --build
 ```
 
-The `migrate` container runs first. The app and worker start only after it exits
+The `migrate` container runs first. The app starts only after it exits
 successfully. Inspect startup and health with:
 
 ```bash
 docker compose --env-file .env.self-host -f docker-compose.self-host.yml ps
-docker compose --env-file .env.self-host -f docker-compose.self-host.yml logs migrate app worker
+docker compose --env-file .env.self-host -f docker-compose.self-host.yml logs migrate app
 curl --fail http://127.0.0.1:3000/api/health
 ```
 
@@ -72,20 +68,12 @@ https://<your-domain>/api/auth/stripe/webhook
 
 Back up Postgres before an upgrade, pull the new source, then rerun the same
 `up -d --build` command. Compose recreates the one-shot migration container;
-successful migrations complete before the new app and worker start. After old
-workers have drained, prune obsolete recurring schedules with:
-
-```bash
-docker compose --env-file .env.self-host -f docker-compose.self-host.yml exec worker pnpm jobs:schedules:prune
-```
-
-Do not run schedule pruning while old and new worker versions are both active.
+successful migrations complete before the new app starts.
 
 ## Backups and shutdown
 
-Back up the PostgreSQL database and all three named volumes. PostgreSQL is the
-source of truth for business idempotency; the jobs Redis volume contains
-in-flight and retained background work. Test restoration before production.
+Back up the PostgreSQL database and Redis volume. Test restoration before
+production.
 
 Stop containers without deleting data:
 
@@ -99,11 +87,8 @@ must not be part of a normal shutdown or upgrade.
 ## Relationship to development Docker files
 
 `docker-compose.yml` remains the local-development stack used by `pnpm db:up`.
-Its optional `jobs` profile reuses the multi-stage `Dockerfile`'s worker target
-with development settings. `docker-compose.test.yml` is isolated test
-infrastructure. Production uses `docker-compose.self-host.yml` and the same
-Dockerfile, which prevents worker image drift between environments.
+`docker-compose.test.yml` is isolated test infrastructure. Production uses
+`docker-compose.self-host.yml` and the same Dockerfile.
 
 See also the production hardening items in
-[`PRODUCTION_CHECKLIST.md`](PRODUCTION_CHECKLIST.md) and worker behavior in
-[`jobs.md`](jobs.md).
+[`PRODUCTION_CHECKLIST.md`](PRODUCTION_CHECKLIST.md).

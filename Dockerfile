@@ -79,24 +79,6 @@ EXPOSE 3000
 
 CMD ["node", "server.js"]
 
-FROM base AS worker-dependencies
-
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml source.config.mjs ./
-COPY packages/better-auth-referral/package.json packages/better-auth-referral/package.json
-COPY packages/upload-sdk/package.json packages/upload-sdk/package.json
-COPY content ./content
-
-RUN pnpm install --prod --frozen-lockfile
-
-FROM worker-dependencies AS worker
-
-ENV NODE_ENV=production
-
-COPY --chown=node:node . .
-
-USER node
-CMD ["pnpm", "jobs:worker"]
-
 FROM dependencies AS migrator
 
 ENV NODE_ENV=production

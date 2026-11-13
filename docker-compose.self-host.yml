@@ -4,7 +4,6 @@ x-app-environment: &app-environment
   NODE_ENV: production
   DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env.self-host}
   REDIS_URL: redis://redis:6379
-  JOBS_REDIS_URL: redis://jobs-redis:6379
 
 x-app-build: &app-build
   context: .
@@ -61,28 +60,6 @@ services:
       timeout: 3s
       retries: 20
 
-  jobs-redis:
-    image: redis:8-alpine
-    restart: unless-stopped
-    command:
-      - redis-server
-      - --appendonly
-      - "yes"
-      - --appendfsync
-      - everysec
-      - --maxmemory
-      - ${JOBS_REDIS_MAXMEMORY:-512mb}
-      - --maxmemory-policy
-      - noeviction
-    mem_limit: ${JOBS_REDIS_MEMORY_LIMIT:-640m}
-    volumes:
-      - jobs-redis-data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-
   migrate:
     build:
       <<: *app-build
@@ -115,8 +92,6 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
-      jobs-redis:
-        condition: service_healthy
     healthcheck:
       test:
         [
@@ -128,30 +103,6 @@ services:
       retries: 5
       start_period: 30s
 
-  worker:
-    build:
-      <<: *app-build
-      target: worker
-    restart: unless-stopped
-    init: true
-    stop_grace_period: 35s
-    env_file:
-      - ${MIRAGE_ENV_FILE:-.env.self-host}
-    environment:
-      <<: *app-environment
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      jobs-redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "pnpm", "jobs:health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
 volumes:
   postgres-data:
   redis-data:
-  jobs-redis-data:
