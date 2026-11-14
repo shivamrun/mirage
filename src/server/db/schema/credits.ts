@@ -1,6 +1,6 @@
 import { relations } from "drizzle-orm";
-import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import {
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -51,14 +51,16 @@ export const creditLedgerEntries = createTable(
     operationFingerprint: text("operation_fingerprint"),
     source: text("source").notNull(),
     sourceId: text("source_id"),
-    reversesLedgerEntryId: uuid("reverses_ledger_entry_id").references(
-      (): AnyPgColumn => creditLedgerEntries.id,
-      { onDelete: "restrict" },
-    ),
+    reversesLedgerEntryId: uuid("reverses_ledger_entry_id"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
     ...auditTimestamps(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.reversesLedgerEntryId],
+      foreignColumns: [table.id],
+      name: "credit_ledger_entries_reversal_fk",
+    }).onDelete("restrict"),
     uniqueIndex("credit_ledger_entries_idempotency_key_unique").on(
       table.idempotencyKey,
     ),
