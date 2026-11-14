@@ -22,12 +22,18 @@ function AccountBillingFinalizer({
   snapshotKey: string;
 }) {
   const router = useRouter();
-  const startedSnapshotKey = React.useRef(readStartedBillingCheckoutSnapshot());
+  const [startedSnapshotKey, setStartedSnapshotKey] = React.useState<
+    string | null
+  >(null);
   const [attempts, setAttempts] = React.useState(0);
   const [state, setState] = React.useState<"complete" | "finalizing" | "slow">(
     "finalizing",
   );
   const shouldFinalize = checkoutStatus === "credit_top_up_success";
+
+  React.useEffect(() => {
+    setStartedSnapshotKey(readStartedBillingCheckoutSnapshot());
+  }, []);
 
   React.useEffect(() => {
     if (checkoutStatus && !shouldFinalize) {
@@ -41,8 +47,8 @@ function AccountBillingFinalizer({
     }
 
     if (
-      startedSnapshotKey.current &&
-      snapshotKey !== startedSnapshotKey.current
+      startedSnapshotKey &&
+      snapshotKey !== startedSnapshotKey
     ) {
       clearStartedBillingCheckoutSnapshot();
       setState("complete");
@@ -52,13 +58,13 @@ function AccountBillingFinalizer({
 
       return () => window.clearTimeout(timeout);
     }
-  }, [router, shouldFinalize, snapshotKey, state]);
+  }, [router, shouldFinalize, snapshotKey, startedSnapshotKey, state]);
 
   React.useEffect(() => {
     if (
       !shouldFinalize ||
       state !== "finalizing" ||
-      !startedSnapshotKey.current
+      !startedSnapshotKey
     ) {
       return;
     }
@@ -87,9 +93,9 @@ function AccountBillingFinalizer({
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [attempts, router, shouldFinalize, state]);
+  }, [attempts, router, shouldFinalize, startedSnapshotKey, state]);
 
-  if (!shouldFinalize || !startedSnapshotKey.current) {
+  if (!shouldFinalize || !startedSnapshotKey) {
     return null;
   }
 
