@@ -1,5 +1,6 @@
 import { hasAdminSessionAssurance } from "@/server/db/dal/admin-session-assurance";
 import type { CurrentUser } from "@/server/db/services/auth/current-user";
+import { env } from "@/shared/env";
 
 export const adminAccessMessages = {
   emailVerificationRequired: "Email verification required",
@@ -23,6 +24,13 @@ export type AuthPolicyDecision =
       reason: AuthPolicyReason;
       statusCode: 403 | 404;
     };
+
+export function isAdminSessionAssuranceRequired() {
+  return (
+    env.NODE_ENV !== "development" ||
+    env.DEV_REQUIRE_ADMIN_SESSION_ASSURANCE
+  );
+}
 
 export function evaluateAdminRole(
   user: CurrentUser | null,
@@ -99,6 +107,10 @@ export async function evaluateAdminSessionAssurance(
     };
   }
 
+  if (!isAdminSessionAssuranceRequired()) {
+    return { allowed: true };
+  }
+
   const hasAssurance = await hasAdminSessionAssurance({
     sessionId: user.session.id,
     userId: user.id,
@@ -119,11 +131,11 @@ export async function evaluateAdminSessionAssurance(
 export async function evaluateAdminAccess(
   user: CurrentUser | null,
 ): Promise<AuthPolicyDecision> {
-  const decisions = [
-    evaluateAdminRole(user),
-    evaluateVerifiedEmail(user),
-    evaluateTwoFactorEnabled(user),
-  ];
+  const decisions = [evaluateAdminRole(user), evaluateVerifiedEmail(user)];
+
+  if (isAdminSessionAssuranceRequired()) {
+    decisions.push(evaluateTwoFactorEnabled(user));
+  }
 
   for (const decision of decisions) {
     if (!decision.allowed) {

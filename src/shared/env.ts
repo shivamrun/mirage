@@ -67,6 +67,7 @@ export const env = createEnv({
     NODE_ENV: z.enum(["development", "production", "test"]),
     DATABASE_URL: z.string().min(1),
     DB_POOL_MAX: z.coerce.number().int().min(1).max(100).optional(),
+    DEV_REQUIRE_ADMIN_SESSION_ASSURANCE: _booleanFlagSchema(true),
     BETTER_AUTH_SECRET: z.string().min(32),
     BETTER_AUTH_URL: z.url(),
     EMAIL_FROM: optionalEnvString,
@@ -111,6 +112,8 @@ export const env = createEnv({
     NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
     DATABASE_URL: process.env.DATABASE_URL,
     DB_POOL_MAX: process.env.DB_POOL_MAX,
+    DEV_REQUIRE_ADMIN_SESSION_ASSURANCE:
+      process.env.DEV_REQUIRE_ADMIN_SESSION_ASSURANCE,
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     AWS_UPLOAD_ACCESS_KEY_ID: process.env.AWS_UPLOAD_ACCESS_KEY_ID,

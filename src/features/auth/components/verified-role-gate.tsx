@@ -15,7 +15,10 @@ import {
   getCurrentUser,
   type RequestHeaders,
 } from "@/server/db/services/auth/access";
-import { evaluateAdminAccess } from "@/server/db/services/auth/admin-access";
+import {
+  evaluateAdminAccess,
+  isAdminSessionAssuranceRequired,
+} from "@/server/db/services/auth/admin-access";
 
 const fallbackCallbackURLByRole: Record<AuthRole, string> = {
   admin: "/admin",
@@ -56,6 +59,7 @@ async function VerifiedRoleGate({
   const requestedPath = getRequestedPath(headers, requiredRole);
   const callbackURL = cleanCallbackURL(requestedPath);
   const user = await getCurrentUser({ headers });
+  const requireAdminSessionAssurance = isAdminSessionAssuranceRequired();
 
   if (!user) {
     redirect(getLoginRedirectPath(callbackURL));
@@ -79,7 +83,11 @@ async function VerifiedRoleGate({
     );
   }
 
-  if (gateTwoFactor && !user.twoFactorEnabled) {
+  if (
+    gateTwoFactor &&
+    requireAdminSessionAssurance &&
+    !user.twoFactorEnabled
+  ) {
     return (
       <AuthContainer
         authForm={
