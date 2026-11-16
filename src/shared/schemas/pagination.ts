@@ -1,30 +1,23 @@
+import {
+  type PaginationMetadata,
+  parseLimit,
+  parsePage,
+} from "@evensurface/paginate";
 import { z } from "zod";
 
-import {
-  DEFAULT_PAGE,
-  DEFAULT_PAGE_SIZE,
-  MAX_PAGE_SIZE,
-} from "@/shared/pagination";
-
-const positiveIntegerFromQuery = z.preprocess((value) => {
-  const firstValue = Array.isArray(value) ? value[0] : value;
-
-  if (firstValue === undefined || firstValue === "") {
-    return undefined;
-  }
-
-  return Number(firstValue);
-}, z.number().int().positive().optional());
+const paginationInputSchema = z.preprocess(
+  (value) => (Array.isArray(value) ? value[0] : value),
+  z.union([z.string(), z.number()]).optional().catch(undefined),
+);
 
 export const paginationQuerySchema = z.object({
-  limit: positiveIntegerFromQuery
-    .catch(DEFAULT_PAGE_SIZE)
-    .default(DEFAULT_PAGE_SIZE)
-    .transform((value) => Math.min(value, MAX_PAGE_SIZE)),
-  page: positiveIntegerFromQuery.catch(DEFAULT_PAGE).default(DEFAULT_PAGE),
+  limit: paginationInputSchema.transform((value) =>
+    parseLimit(value, { defaultLimit: 10 }),
+  ),
+  page: paginationInputSchema.transform((value) => parsePage(value)),
 });
 
-export const paginationMetaSchema = z.object({
+export const paginationMetaSchema: z.ZodType<PaginationMetadata> = z.object({
   firstItem: z.number().int().min(0),
   hasNextPage: z.boolean(),
   hasPreviousPage: z.boolean(),
@@ -33,7 +26,7 @@ export const paginationMetaSchema = z.object({
   offset: z.number().int().min(0),
   page: z.number().int().positive(),
   total: z.number().int().min(0),
-  totalPages: z.number().int().positive(),
+  totalPages: z.number().int().min(0),
 });
 
 export function paginatedResponseSchema<TItem extends z.ZodType>(
@@ -44,6 +37,3 @@ export function paginatedResponseSchema<TItem extends z.ZodType>(
     pagination: paginationMetaSchema,
   });
 }
-
-export type PaginationQuery = z.output<typeof paginationQuerySchema>;
-export type PaginationMetaValues = z.output<typeof paginationMetaSchema>;

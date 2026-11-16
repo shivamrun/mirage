@@ -8,3 +8,6 @@ allowBuilds:
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
+
+overrides:
+  '@better-auth/core@^1.7.5': 1.7.5

@@ -332,24 +332,36 @@ describe("admin invitation routes", () => {
 
     expect(response.status, await response.clone().text()).toBe(200);
     const body = await response.json();
-    expect(body).toMatchObject({
+    expect(Object.keys(body).sort()).toEqual(["items", "pagination"]);
+    expect(Object.keys(body.pagination).sort()).toEqual([
+      "firstItem",
+      "hasNextPage",
+      "hasPreviousPage",
+      "lastItem",
+      "limit",
+      "offset",
+      "page",
+      "total",
+      "totalPages",
+    ]);
+    expect(body.pagination).toMatchObject({
       firstItem: 1,
       hasNextPage: true,
       limit: 2,
       page: 1,
       total: 3,
     });
-    expect(body.invitations.map(({ id }: { id: string }) => id)).toEqual([
+    expect(body.items.map(({ id }: { id: string }) => id)).toEqual([
       newest.id,
       expired.id,
     ]);
-    expect(body.invitations[1]).toMatchObject({
+    expect(body.items[1]).toMatchObject({
       id: expired.id,
       effectiveStatus: "expired",
       status: "pending",
     });
-    expect(body.invitations[0].createdAt).toBe(newest.createdAt.toISOString());
-    expect(body.invitations[1].expiresAt).toBe(expired.expiresAt.toISOString());
+    expect(body.items[0].createdAt).toBe(newest.createdAt.toISOString());
+    expect(body.items[1].expiresAt).toBe(expired.expiresAt.toISOString());
     expect(JSON.stringify(body)).not.toContain("tokenHash");
     expect(JSON.stringify(body)).not.toContain(older.tokenHash);
     expect(JSON.stringify(body)).not.toContain(expired.tokenHash);
@@ -384,16 +396,16 @@ describe("admin invitation routes", () => {
       200,
     );
     const pendingBody = await pendingResponse.json();
-    expect(pendingBody).toMatchObject({
+    expect(pendingBody.pagination).toMatchObject({
       hasNextPage: true,
       limit: 1,
       page: 1,
       total: 2,
       totalPages: 2,
     });
-    expect(pendingBody.invitations.map(({ id }: { id: string }) => id)).toEqual(
-      [pendingNewest.id],
-    );
+    expect(pendingBody.items.map(({ id }: { id: string }) => id)).toEqual([
+      pendingNewest.id,
+    ]);
 
     const expiredResponse = await httpRequest(
       app,
@@ -404,15 +416,15 @@ describe("admin invitation routes", () => {
       200,
     );
     const expiredBody = await expiredResponse.json();
-    expect(expiredBody).toMatchObject({
+    expect(expiredBody.pagination).toMatchObject({
       hasNextPage: false,
       limit: 1,
       page: 1,
       total: 1,
       totalPages: 1,
     });
-    expect(expiredBody.invitations).toHaveLength(1);
-    expect(expiredBody.invitations[0]).toMatchObject({
+    expect(expiredBody.items).toHaveLength(1);
+    expect(expiredBody.items[0]).toMatchObject({
       effectiveStatus: "expired",
       id: expired.id,
     });
@@ -814,6 +826,6 @@ describe("admin invitation routes", () => {
     });
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.invitations[0]).not.toHaveProperty("tokenHash");
+    expect(body.items[0]).not.toHaveProperty("tokenHash");
   });
 });

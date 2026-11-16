@@ -1,7 +1,7 @@
+import { paginateDrizzle } from "@evensurface/paginate-drizzle";
 import { and, asc, desc, eq, gt, lte, or } from "drizzle-orm";
 
 import db, { type DBClient } from "@/server/db";
-import { paginateList, totalCount } from "@/server/db/helpers/paginate";
 import { invitation, session, user } from "@/server/db/schema";
 import type { InvitationEffectiveStatus } from "@/shared/schemas/invitations";
 
@@ -348,12 +348,12 @@ export async function listAdminInvitations({
   effectiveStatus,
   limit,
   now = new Date(),
-  offset,
+  page,
 }: {
   effectiveStatus?: InvitationEffectiveStatus;
   limit: number;
   now?: Date;
-  offset: number;
+  page: number;
 }) {
   const filter =
     effectiveStatus === "pending"
@@ -363,25 +363,16 @@ export async function listAdminInvitations({
         : effectiveStatus
           ? eq(invitation.status, effectiveStatus)
           : undefined;
-  const baseQuery = db
-    .select(adminInvitationSelection)
-    .from(invitation)
-    .$dynamic();
-  const countQuery = db
-    .select({ total: totalCount })
-    .from(invitation)
-    .$dynamic();
-
-  if (filter) {
-    baseQuery.where(filter);
-    countQuery.where(filter);
-  }
-
-  return paginateList({
+  return paginateDrizzle({
+    countQuery: db.$count(invitation, filter),
     limit,
-    offset,
-    query: baseQuery.orderBy(desc(invitation.createdAt), desc(invitation.id)),
-    countQuery,
+    page,
+    query: () =>
+      db
+        .select(adminInvitationSelection)
+        .from(invitation)
+        .where(filter)
+        .orderBy(desc(invitation.createdAt), desc(invitation.id)),
   });
 }
 

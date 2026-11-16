@@ -1,4 +1,8 @@
 import {
+  createPageWindow,
+  type PaginationMetadata,
+} from "@evensurface/paginate";
+import {
   ChevronLeftIcon,
   ChevronRightIcon,
   MoreHorizontalIcon,
@@ -7,15 +11,13 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
-import type { PaginationMeta } from "@/shared/pagination";
-import { getPaginationWindow } from "@/shared/pagination";
 
 type PageHref = (page: number) => string;
 
 type PaginationProps = {
   entityLabel: string;
   getPageHref: PageHref;
-  pagination: PaginationMeta;
+  pagination: PaginationMetadata;
 };
 
 function PaginationLinkButton({
@@ -86,7 +88,7 @@ function PaginationPageButton({
 }
 
 function Pagination({ entityLabel, getPageHref, pagination }: PaginationProps) {
-  const pages = getPaginationWindow({
+  const pages = createPageWindow({
     page: pagination.page,
     totalPages: pagination.totalPages,
   });

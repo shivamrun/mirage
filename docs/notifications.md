@@ -167,10 +167,10 @@ verify Redis availability before rollout.
 
 The account inbox uses the existing page/limit pagination stack:
 
-`query parser -> DAL limit/offset -> paginateList() -> resolvePaginatedView() -> page -> <Pagination />`
+`query parser -> paginateDrizzle() in the DAL -> service -> page -> <Pagination />`
 
 First-page URLs omit `?page=1`. Malformed pages normalize to page 1, and
-out-of-range pages resolve through the shared pagination service.
+out-of-range pages resolve through `@evensurface/paginate` metadata.
 
 ## Read State
 

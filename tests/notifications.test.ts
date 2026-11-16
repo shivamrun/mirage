@@ -29,10 +29,7 @@ import {
   type NotificationRealtimeEvent,
   notificationRealtimeEventNames,
 } from "@/shared/schemas/notifications";
-import {
-  setTestEmailDeliveryHook,
-  testEmailOutbox,
-} from "./infra/email-fake";
+import { setTestEmailDeliveryHook, testEmailOutbox } from "./infra/email-fake";
 
 async function createUser(name: string) {
   const id = randomUUID();
@@ -709,23 +706,22 @@ describe("notifications", () => {
       .map((row) => expectNotificationRecord(row.notification).id)
       .sort();
 
-    expect(result.total).toBe(13);
-    expect(result.totalPages).toBe(2);
-    expect(result.notifications.map((row) => row.id)).toEqual(
-      expectedIds.slice(10),
-    );
+    expect(Object.keys(result).sort()).toEqual(["items", "pagination"]);
+    expect(result.pagination.total).toBe(13);
+    expect(result.pagination.totalPages).toBe(2);
+    expect(result.items.map((row) => row.id)).toEqual(expectedIds.slice(10));
     expect(notificationsPageHref({ page: 1 })).toBe("/account/notifications");
     expect(notificationsPageHref({ page: 2 })).toBe(
       "/account/notifications?page=2",
     );
     expect(parseNotificationsSearchParams({ page: "bad" }).page).toBe(1);
 
-    const emptyPage = await listNotificationsView({
+    const resolvedPage = await listNotificationsView({
       limit: 10,
       page: 99,
       recipientId,
     });
-    expect(emptyPage.page).toBe(2);
-    expect(emptyPage.notifications).toHaveLength(0);
+    expect(resolvedPage.pagination.page).toBe(2);
+    expect(resolvedPage.items).toHaveLength(3);
   });
 });

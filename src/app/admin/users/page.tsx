@@ -48,10 +48,10 @@ export default async function AdminUsersPage({
     state: listState,
   });
 
-  if (page !== users.page) {
+  if (page !== users.pagination.page) {
     redirect(
       usersPageHref({
-        page: users.page,
+        page: users.pagination.page,
         ...listState,
       }),
     );
@@ -92,7 +92,7 @@ export default async function AdminUsersPage({
         hasFilter={filterStatus.hasFilter}
         hasFilters={filterStatus.hasFilters}
         query={listState.query}
-        users={users.users}
+        users={users.items}
       />
 
       <Pagination
@@ -103,7 +103,7 @@ export default async function AdminUsersPage({
             ...listState,
           })
         }
-        pagination={users}
+        pagination={users.pagination}
       />
     </div>
   );

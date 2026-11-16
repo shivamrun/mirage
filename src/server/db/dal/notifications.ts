@@ -1,13 +1,13 @@
+import { paginateDrizzle } from "@evensurface/paginate-drizzle";
 import { and, asc, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import type { NotificationRecord } from "@/features/notifications";
 import type { NotificationDeliveryInput } from "@/features/notifications/channels/types";
 import db from "@/server/db";
-import { paginateList, totalCount } from "@/server/db/helpers/paginate";
 import { notification } from "@/server/db/schema";
 
 type ListNotificationsOptions = {
   limit: number;
-  offset: number;
+  page: number;
   recipientId: string;
 };
 
@@ -101,31 +101,26 @@ export async function getNotificationForRecipient({
 
 export async function listNotificationsForRecipient({
   limit,
-  offset,
+  page,
   recipientId,
 }: ListNotificationsOptions) {
   const whereClause = eq(notification.recipientId, recipientId);
-  const result = await paginateList({
-    countQuery: db
-      .select({ total: totalCount })
-      .from(notification)
-      .where(whereClause),
+
+  const result = await paginateDrizzle({
+    countQuery: db.$count(notification, whereClause),
     limit,
-    offset,
-    query: db
-      .select(notificationSelection)
-      .from(notification)
-      .where(whereClause)
-      .orderBy(desc(notification.createdAt), asc(notification.id)),
+    page,
+    query: () =>
+      db
+        .select(notificationSelection)
+        .from(notification)
+        .where(whereClause)
+        .orderBy(desc(notification.createdAt), asc(notification.id)),
   });
 
   return {
-    limit,
-    notifications: result.items.map(
-      (item) => item satisfies NotificationRecord,
-    ),
-    offset,
-    total: result.total,
+    items: result.items.map((item) => item satisfies NotificationRecord),
+    pagination: result.pagination,
   };
 }
 
@@ -134,17 +129,10 @@ export async function countUnreadNotificationsForRecipient({
 }: {
   recipientId: string;
 }) {
-  const [row] = await db
-    .select({ total: totalCount })
-    .from(notification)
-    .where(
-      and(
-        eq(notification.recipientId, recipientId),
-        isNull(notification.readAt),
-      ),
-    );
-
-  return row?.total ?? 0;
+  return db.$count(
+    notification,
+    and(eq(notification.recipientId, recipientId), isNull(notification.readAt)),
+  );
 }
 
 export async function markNotificationRead({

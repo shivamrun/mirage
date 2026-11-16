@@ -1,3 +1,4 @@
+import { paginateDrizzle } from "@evensurface/paginate-drizzle";
 import {
   and,
   asc,
@@ -25,12 +26,11 @@ import type {
 } from "@/features/admin/query/users-query";
 import type { RoleValue } from "@/features/auth/roles";
 import db from "@/server/db";
-import { paginateList, totalCount } from "@/server/db/helpers/paginate";
 import { user as userTable } from "@/server/db/schema";
 
 type ListAdminUsersOptions = {
   limit: number;
-  offset: number;
+  page: number;
   state: AdminUsersQueryState;
 };
 
@@ -256,31 +256,26 @@ function getWhereClause(state: AdminUsersQueryState) {
 
 export async function listAdminUsers({
   limit,
-  offset,
+  page,
   state,
 }: ListAdminUsersOptions) {
   const whereClause = getWhereClause(state);
   const sortColumn = sortColumns[state.sortBy];
   const sortDirection = state.sortDirection === "asc" ? asc : desc;
-  let usersQuery = db.select(userListSelection).from(userTable).$dynamic();
-  let totalQuery = db.select({ total: totalCount }).from(userTable).$dynamic();
-
-  if (whereClause) {
-    usersQuery = usersQuery.where(whereClause);
-    totalQuery = totalQuery.where(whereClause);
-  }
-
-  const result = await paginateList({
-    countQuery: totalQuery,
+  const result = await paginateDrizzle({
+    countQuery: db.$count(userTable, whereClause),
     limit,
-    offset,
-    query: usersQuery.orderBy(sortDirection(sortColumn), asc(userTable.id)),
+    page,
+    query: () =>
+      db
+        .select(userListSelection)
+        .from(userTable)
+        .where(whereClause)
+        .orderBy(sortDirection(sortColumn), asc(userTable.id)),
   });
 
   return {
-    limit,
-    offset,
-    total: result.total,
-    users: result.items.map((user) => user satisfies AdminUserListItem),
+    items: result.items.map((user) => user satisfies AdminUserListItem),
+    pagination: result.pagination,
   };
 }

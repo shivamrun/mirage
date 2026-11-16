@@ -8,7 +8,6 @@ import {
   listContactSubmissions,
   updateContactSubmissionStatus,
 } from "@/server/db/dal/contact-submission";
-import { resolvePaginatedView } from "../pagination";
 
 export async function listAdminContactSubmissionsView({
   page,
@@ -17,27 +16,11 @@ export async function listAdminContactSubmissionsView({
   page: number;
   state: AdminContactSubmissionQueryState;
 }) {
-  const result = await resolvePaginatedView({
+  return listContactSubmissions({
     limit: ADMIN_CONTACT_SUBMISSION_PAGE_SIZE,
     page,
-    loadPage: async ({ limit, offset }) => {
-      const result = await listContactSubmissions({
-        limit,
-        offset,
-        state,
-      });
-
-      return {
-        items: result.submissions,
-        total: result.total,
-      };
-    },
+    state,
   });
-
-  return {
-    ...result.pagination,
-    submissions: result.items,
-  };
 }
 
 export async function updateAdminContactSubmissionStatus({

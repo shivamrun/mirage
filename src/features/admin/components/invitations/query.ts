@@ -1,3 +1,4 @@
+import { parsePage } from "@evensurface/paginate";
 import type { InvitationEffectiveStatus } from "@/shared/schemas";
 
 export const ADMIN_INVITATIONS_PAGE_PATH = "/admin/invitations";
@@ -18,12 +19,6 @@ function firstValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function parsePage(value: string | string[] | undefined) {
-  const parsed = Number(firstValue(value));
-
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
-}
-
 function parseEffectiveStatus(value: string | string[] | undefined) {
   const candidate = firstValue(value);
 
@@ -38,7 +33,7 @@ export function parseAdminInvitationsSearchParams(
 ) {
   return {
     effectiveStatus: parseEffectiveStatus(params.effectiveStatus),
-    page: parsePage(params.page),
+    page: parsePage(firstValue(params.page)),
   };
 }
 

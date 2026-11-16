@@ -1,8 +1,18 @@
 import { randomUUID } from "node:crypto";
-
-import { and, asc, desc, eq, gt, ilike, or, type SQL, sql } from "drizzle-orm";
+import { paginateDrizzle } from "@evensurface/paginate-drizzle";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  ilike,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import db, { type DBClient } from "@/server/db";
-import { paginateList, totalCount } from "@/server/db/helpers/paginate";
 import {
   emailContact,
   emailList,
@@ -287,59 +297,48 @@ export async function listEmailLists() {
 
 export async function listEmailSubscribers({
   limit,
-  offset,
+  page,
   state,
 }: {
   limit: number;
-  offset: number;
+  page: number;
   state: AdminEmailSubscriberQueryState;
 }) {
   const whereClause = getSubscriberWhereClause(state);
-  let subscribersQuery = db
-    .select({
-      createdAt: emailSubscription.createdAt,
-      email: emailContact.email,
-      id: emailContact.id,
-      listKey: emailSubscription.listKey,
-      listName: emailList.name,
-      metadata: emailSubscription.metadata,
-      source: emailSubscription.source,
-      status: emailSubscription.status,
-      subscriptionId: emailSubscription.id,
-      updatedAt: emailSubscription.updatedAt,
-    })
+  const countQuery = db
+    .select({ total: count() })
     .from(emailSubscription)
     .innerJoin(emailContact, eq(emailContact.id, emailSubscription.contactId))
     .innerJoin(emailList, eq(emailList.key, emailSubscription.listKey))
-    .$dynamic();
-  let totalQuery = db
-    .select({ total: totalCount })
-    .from(emailSubscription)
-    .innerJoin(emailContact, eq(emailContact.id, emailSubscription.contactId))
-    .innerJoin(emailList, eq(emailList.key, emailSubscription.listKey))
-    .$dynamic();
+    .where(whereClause);
 
-  if (whereClause) {
-    subscribersQuery = subscribersQuery.where(whereClause);
-    totalQuery = totalQuery.where(whereClause);
-  }
-
-  const result = await paginateList({
-    countQuery: totalQuery,
+  return paginateDrizzle({
+    countQuery,
     limit,
-    offset,
-    query: subscribersQuery.orderBy(
-      desc(emailSubscription.createdAt),
-      asc(emailSubscription.id),
-    ),
+    page,
+    query: () =>
+      db
+        .select({
+          createdAt: emailSubscription.createdAt,
+          email: emailContact.email,
+          id: emailContact.id,
+          listKey: emailSubscription.listKey,
+          listName: emailList.name,
+          metadata: emailSubscription.metadata,
+          source: emailSubscription.source,
+          status: emailSubscription.status,
+          subscriptionId: emailSubscription.id,
+          updatedAt: emailSubscription.updatedAt,
+        })
+        .from(emailSubscription)
+        .innerJoin(
+          emailContact,
+          eq(emailContact.id, emailSubscription.contactId),
+        )
+        .innerJoin(emailList, eq(emailList.key, emailSubscription.listKey))
+        .where(whereClause)
+        .orderBy(desc(emailSubscription.createdAt), asc(emailSubscription.id)),
   });
-
-  return {
-    limit,
-    offset,
-    subscribers: result.items,
-    total: result.total,
-  };
 }
 
 export async function listActiveEmailLists() {

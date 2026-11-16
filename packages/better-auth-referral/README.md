@@ -180,15 +180,14 @@ Get the users referred by the signed-in user:
 const result = await authClient.listReferrals({
   query: {
     limit: 20,
-    offset: 0,
+    page: 1,
   },
 });
 ```
 
 ```ts
 {
-  code: string;
-  referrals: Array<{
+  items: Array<{
     id: string;
     status: "pending" | "completed";
     completedAt: Date | null;
@@ -208,9 +207,17 @@ const result = await authClient.listReferrals({
       image: string | null;
     };
   }>;
-  total: number;
-  limit: number;
-  offset: number;
+  pagination: {
+    page: number;
+    limit: number;
+    offset: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+    firstItem: number;
+    lastItem: number;
+  };
 }
 ```
 
@@ -219,7 +226,7 @@ Pagination:
 | Parameter | Default | Range   |
 | --------- | ------: | ------- |
 | `limit`   |    `20` | `1-100` |
-| `offset`  |     `0` | `0+`    |
+| `page`    |     `1` | `1+`    |
 
 Results are sorted by `createdAt` in descending order.
 

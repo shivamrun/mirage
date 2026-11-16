@@ -11,7 +11,6 @@ import {
 import { listAdminInvitationsView } from "@/server/db/services/admin/invitations";
 import { requireAdmin } from "@/server/db/services/auth/access";
 import { getPageMetadata } from "@/shared/metadata";
-import { DEFAULT_PAGE_SIZE } from "@/shared/pagination";
 
 export const metadata = getPageMetadata("Invitations", {
   path: "/admin/invitations",
@@ -30,12 +29,17 @@ export default async function AdminInvitationsPage({
 
   const invitations = await listAdminInvitationsView({
     effectiveStatus,
-    limit: DEFAULT_PAGE_SIZE,
+    limit: 10,
     page,
   });
 
-  if (page !== invitations.page) {
-    redirect(invitationsPageHref({ effectiveStatus, page: invitations.page }));
+  if (page !== invitations.pagination.page) {
+    redirect(
+      invitationsPageHref({
+        effectiveStatus,
+        page: invitations.pagination.page,
+      }),
+    );
   }
 
   return (
@@ -48,14 +52,14 @@ export default async function AdminInvitationsPage({
       </header>
 
       <AdminInvitationsPanel
-        invitations={invitations.invitations}
+        invitations={invitations.items}
         status={effectiveStatus}
       />
 
       <Pagination
         entityLabel="invitations"
         getPageHref={(page) => invitationsPageHref({ effectiveStatus, page })}
-        pagination={invitations}
+        pagination={invitations.pagination}
       />
     </div>
   );

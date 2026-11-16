@@ -47,7 +47,7 @@
     "dist"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=22.18"
   },
   "scripts": {
     "build": "tsdown",
@@ -67,17 +67,18 @@
     "version": "changeset version"
   },
   "dependencies": {
+    "@evensurface/paginate-better-auth": "^1.0.2",
     "nanoid": "^5.1.16"
   },
   "peerDependencies": {
-    "better-auth": "^1.6.23",
+    "better-auth": ">=1.7.0 <1.8.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
     "@biomejs/biome": "2.5.3",
     "@changesets/cli": "^2.31.0",
-    "better-auth": "^1.6.23",
+    "better-auth": "^1.7.5",
     "publint": "^0.3.21",
     "tsdown": "^0.22.5",
     "typescript": "^6.0.0",

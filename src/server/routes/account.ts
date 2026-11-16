@@ -37,7 +37,6 @@ import { elysiaAuth } from "@/server/http/auth";
 import { requestPolicy } from "@/server/http/request-policy";
 import { accountErrorResponse } from "@/server/http/result-response";
 import { env } from "@/shared/env";
-import { DEFAULT_PAGE_SIZE } from "@/shared/pagination";
 import {
   accountDataExportRequestResponseSchema,
   accountDataExportStatusResponseSchema,
@@ -145,24 +144,14 @@ export const accountRoutes = new Elysia({ prefix: "/account" })
       });
 
       return {
-        items: result.notifications.map(toNotificationResponse),
-        pagination: {
-          firstItem: result.firstItem,
-          hasNextPage: result.hasNextPage,
-          hasPreviousPage: result.hasPreviousPage,
-          lastItem: result.lastItem,
-          limit: result.limit,
-          offset: result.offset,
-          page: result.page,
-          total: result.total,
-          totalPages: result.totalPages,
-        },
+        items: result.items.map(toNotificationResponse),
+        pagination: result.pagination,
       };
     },
     {
       auth: true,
       query: paginationQuerySchema.default({
-        limit: DEFAULT_PAGE_SIZE,
+        limit: 10,
         page: 1,
       }),
       response: {

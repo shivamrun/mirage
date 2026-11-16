@@ -1,3 +1,4 @@
+import type { PaginationMetadata } from "@evensurface/paginate";
 import { CheckCircle2, Fingerprint, XCircle } from "lucide-react";
 import Link from "next/link";
 
@@ -5,10 +6,10 @@ import { Pagination } from "@/components/ui/pagination";
 import type {
   AdminUserDetailAccount,
   AdminUserDetailCreditLedgerEntry,
+  AdminUserDetailReferralSummary,
   AdminUserDetailReferralsView,
   AdminUserDetailSession,
 } from "@/server/db/services/admin/user-detail";
-import type { PaginationMeta } from "@/shared/pagination";
 import { formatDate, formatValue, isFutureDate } from "../shared/formatters";
 import { UserAvatar } from "../shared/user-display";
 import { CopyableId } from "./copyable-id";
@@ -34,7 +35,7 @@ import {
 type AccountRecord = AdminUserDetailAccount;
 type CreditLedgerRecord = AdminUserDetailCreditLedgerEntry;
 type ReferralsView = AdminUserDetailReferralsView;
-type ReferralRecord = ReferralsView["referredUsers"][number];
+type ReferralRecord = ReferralsView["items"][number];
 type SessionRecord = AdminUserDetailSession;
 
 export function AdminUserAccountsTab({
@@ -99,7 +100,7 @@ export function AdminUserCreditLedgerTab({
   userId,
 }: {
   entries: CreditLedgerRecord[];
-  pagination: PaginationMeta;
+  pagination: PaginationMetadata;
   userId: string;
 }) {
   return (
@@ -133,20 +134,21 @@ export function AdminUserCreditLedgerTab({
 
 export function AdminUserReferralsTab({
   referrals,
+  summary,
   userId,
 }: {
   referrals: ReferralsView;
+  summary: AdminUserDetailReferralSummary;
   userId: string;
 }) {
+  const { items, pagination } = referrals;
   const {
     code,
     completedReferred,
-    pagination,
     pendingReferred,
     referredBy,
-    referredUsers,
     totalReferred,
-  } = referrals;
+  } = summary;
 
   return (
     <div className="grid min-w-0 gap-4">
@@ -217,8 +219,8 @@ export function AdminUserReferralsTab({
         description="Users whose signup was attributed to this user's referral code."
         title="Referred Users"
       >
-        {referredUsers.length > 0 ? (
-          <ReferralsTable referrals={referredUsers} />
+        {items.length > 0 ? (
+          <ReferralsTable referrals={items} />
         ) : (
           <EmptyState
             description="No users have joined from this user's referral link yet."

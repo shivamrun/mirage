@@ -1,5 +1,5 @@
+import { parsePage } from "@evensurface/paginate";
 import { authRoles } from "@/features/auth/roles";
-import { DEFAULT_PAGE_SIZE, parsePageParam } from "@/shared/pagination";
 import {
   firstParamValue,
   formString,
@@ -11,7 +11,7 @@ import {
 export type { SearchParamValue } from "./query-params";
 
 export const ADMIN_USERS_PAGE_PATH = "/admin/users";
-export const ADMIN_USERS_PAGE_SIZE = DEFAULT_PAGE_SIZE;
+export const ADMIN_USERS_PAGE_SIZE = 10;
 export const DEFAULT_SEARCH_FIELD = "auto";
 export const DEFAULT_SEARCH_OPERATOR = "contains";
 export const DEFAULT_FILTER_FIELD = "role";
@@ -369,7 +369,7 @@ export function parseAdminUsersSearchParams(
   );
 
   return {
-    page: parsePageParam(params.page),
+    page: parsePage(firstParamValue(params.page)),
     query: firstParamValue(params.q)?.trim() ?? "",
     searchField: parseSearchField(params.searchField),
     searchOperator: parseSearchOperator(params.searchOperator),

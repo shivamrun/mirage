@@ -1,5 +1,12 @@
 import { randomUUID } from "node:crypto";
 
+import {
+  createPageWindow,
+  createPaginationMetadata,
+  parseLimit,
+  parsePage,
+} from "@evensurface/paginate";
+import { paginateDrizzle } from "@evensurface/paginate-drizzle";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -15,7 +22,6 @@ import {
   usersPageHref,
 } from "@/features/admin/query/users-query";
 import db from "@/server/db";
-import { paginateList, totalCount } from "@/server/db/helpers/paginate";
 import {
   contactSubmission,
   emailContact,
@@ -26,23 +32,19 @@ import {
 import { listAdminContactSubmissionsView } from "@/server/db/services/admin/contact-submission";
 import { listAdminEmailSubscribersView } from "@/server/db/services/admin/email-list";
 import { listAdminUsersView } from "@/server/db/services/admin/users";
-import {
-  createPaginationMeta,
-  getPaginationWindow,
-  parseLimitParam,
-  parsePageParam,
-} from "@/shared/pagination";
 
-describe("pagination utilities", () => {
+describe("paginate library integration", () => {
   it("normalizes page and limit values", () => {
-    expect(parsePageParam(undefined)).toBe(1);
-    expect(parsePageParam("0")).toBe(1);
-    expect(parsePageParam("3")).toBe(3);
-    expect(parseLimitParam("500")).toBe(100);
+    expect(parsePage(undefined)).toBe(1);
+    expect(parsePage("0")).toBe(1);
+    expect(parsePage("3")).toBe(3);
+    expect(parseLimit("500", { defaultLimit: 10 })).toBe(100);
   });
 
   it("creates clamped pagination metadata and compact page windows", () => {
-    expect(createPaginationMeta({ limit: 10, page: 99, total: 23 })).toEqual({
+    expect(
+      createPaginationMetadata({ limit: 10, page: 99, total: 23 }),
+    ).toEqual({
       firstItem: 21,
       hasNextPage: false,
       hasPreviousPage: true,
@@ -53,7 +55,7 @@ describe("pagination utilities", () => {
       total: 23,
       totalPages: 3,
     });
-    expect(getPaginationWindow({ page: 5, totalPages: 10 })).toEqual([
+    expect(createPageWindow({ page: 5, totalPages: 10 })).toEqual([
       1,
       "ellipsis",
       4,
@@ -64,7 +66,24 @@ describe("pagination utilities", () => {
     ]);
   });
 
-  it("attaches limit and offset to a Drizzle query and extracts totals", async () => {
+  it("uses the library's empty-list metadata contract", () => {
+    expect(createPaginationMetadata({ limit: 10, page: 99, total: 0 })).toEqual(
+      {
+        firstItem: 0,
+        hasNextPage: false,
+        hasPreviousPage: false,
+        lastItem: 0,
+        limit: 10,
+        offset: 0,
+        page: 1,
+        total: 0,
+        totalPages: 0,
+      },
+    );
+    expect(createPageWindow({ page: 1, totalPages: 0 })).toEqual([]);
+  });
+
+  it("paginates a Drizzle query with the exact library result shape", async () => {
     await db.insert(contactSubmission).values(
       Array.from({ length: 12 }, (_, index) => ({
         email: `attach-${index}@example.com`,
@@ -73,21 +92,32 @@ describe("pagination utilities", () => {
       })),
     );
 
-    const result = await paginateList({
-      countQuery: db.select({ total: totalCount }).from(contactSubmission),
+    const result = await paginateDrizzle({
+      countQuery: db.$count(contactSubmission),
       limit: 5,
-      offset: 5,
-      query: db
-        .select({
-          id: contactSubmission.id,
-        })
-        .from(contactSubmission)
-        .orderBy(contactSubmission.createdAt),
+      page: 2,
+      query: () =>
+        db
+          .select({
+            id: contactSubmission.id,
+          })
+          .from(contactSubmission)
+          .orderBy(contactSubmission.createdAt, contactSubmission.id),
     });
 
-    expect(result.total).toBe(12);
     expect(result.items).toHaveLength(5);
     expect(result.items[0]).not.toHaveProperty("_total");
+    expect(result.pagination).toEqual({
+      firstItem: 6,
+      hasNextPage: true,
+      hasPreviousPage: true,
+      lastItem: 10,
+      limit: 5,
+      offset: 5,
+      page: 2,
+      total: 12,
+      totalPages: 3,
+    });
   });
 });
 
@@ -114,16 +144,16 @@ describe("paginated admin lists", () => {
     });
     const result = await listAdminUsersView({ page, state });
 
-    expect(result.total).toBe(11);
-    expect(result.totalPages).toBe(2);
-    expect(result.users).toHaveLength(1);
+    expect(result.pagination.total).toBe(11);
+    expect(result.pagination.totalPages).toBe(2);
+    expect(result.items).toHaveLength(1);
     expect(usersPageHref({ page: 2, ...state })).toBe(
       "/admin/users?page=2&q=matched",
     );
 
-    const emptyPage = await listAdminUsersView({ page: 99, state });
-    expect(emptyPage.page).toBe(2);
-    expect(emptyPage.users).toHaveLength(0);
+    const resolvedPage = await listAdminUsersView({ page: 99, state });
+    expect(resolvedPage.pagination.page).toBe(2);
+    expect(resolvedPage.items).toHaveLength(1);
   });
 
   it("paginates contact submissions while preserving query state in URLs", async () => {
@@ -148,9 +178,9 @@ describe("paginated admin lists", () => {
     });
     const result = await listAdminContactSubmissionsView({ page, state });
 
-    expect(result.total).toBe(13);
-    expect(result.totalPages).toBe(2);
-    expect(result.submissions).toHaveLength(3);
+    expect(result.pagination.total).toBe(13);
+    expect(result.pagination.totalPages).toBe(2);
+    expect(result.items).toHaveLength(3);
     expect(contactSubmissionsPageHref({ page: 2, ...state })).toBe(
       "/admin/contact-submission/all?page=2&q=Acme",
     );
@@ -186,9 +216,9 @@ describe("paginated admin lists", () => {
     });
     const result = await listAdminEmailSubscribersView({ page, state });
 
-    expect(result.total).toBe(12);
-    expect(result.totalPages).toBe(2);
-    expect(result.subscribers).toHaveLength(2);
+    expect(result.pagination.total).toBe(12);
+    expect(result.pagination.totalPages).toBe(2);
+    expect(result.items).toHaveLength(2);
     expect(emailListPageHref({ page: 2, ...state })).toBe(
       "/admin/email-list/submissions?page=2&listKey=waitlist&status=subscribed&q=launch",
     );

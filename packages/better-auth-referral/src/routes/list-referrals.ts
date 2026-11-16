@@ -1,10 +1,11 @@
+import { paginateBetterAuth } from "@evensurface/paginate-better-auth";
 import {
   APIError,
   createAuthEndpoint,
   getSessionFromCtx,
 } from "better-auth/api";
 import { z } from "zod";
-import { getOrCreateReferralCode, maskEmail } from "../helpers";
+import { maskEmail } from "../helpers";
 import {
   getReferralProgress,
   getRequiredReferralSteps,
@@ -17,37 +18,10 @@ import type {
   ReferralUser,
 } from "../types";
 
-const DEFAULT_REFERRALS_LIMIT = 20;
-const MAX_REFERRALS_LIMIT = 100;
-
 const listReferralsQuerySchema = z.object({
   limit: z.string().or(z.number()).optional(),
-  offset: z.string().or(z.number()).optional(),
+  page: z.string().or(z.number()).optional(),
 });
-
-function getPaginationValue(
-  value: number | string | undefined,
-  field: "limit" | "offset",
-) {
-  if (value === undefined) {
-    return field === "limit" ? DEFAULT_REFERRALS_LIMIT : 0;
-  }
-
-  const parsedValue = Number(value);
-  const minimumValue = field === "limit" ? 1 : 0;
-
-  if (!Number.isInteger(parsedValue) || parsedValue < minimumValue) {
-    throw new APIError("BAD_REQUEST", {
-      message: `${field} must be an integer greater than or equal to ${minimumValue}.`,
-    });
-  }
-
-  if (field === "limit") {
-    return Math.min(parsedValue, MAX_REFERRALS_LIMIT);
-  }
-
-  return parsedValue;
-}
 
 export function listReferralsRoute(options: BetterAuthReferralOptions) {
   return createAuthEndpoint(
@@ -67,8 +41,6 @@ export function listReferralsRoute(options: BetterAuthReferralOptions) {
 
       const dbAdapter = ctx.context.adapter;
 
-      const limit = getPaginationValue(ctx.query?.limit, "limit");
-      const offset = getPaginationValue(ctx.query?.offset, "offset");
       const where = [
         {
           field: "referrerUserId",
@@ -76,34 +48,22 @@ export function listReferralsRoute(options: BetterAuthReferralOptions) {
         },
       ];
 
-      const referralCode = await getOrCreateReferralCode(
-        dbAdapter,
-        session.user.id,
-      );
-
-      const [referrals, total] = await Promise.all([
-        dbAdapter.findMany({
-          model: "referrals",
-          where,
-          select: [
-            "id",
-            "referredUserId",
-            "status",
-            "completedAt",
-            "createdAt",
-          ],
-          limit,
-          offset,
-          sortBy: {
-            field: "createdAt",
-            direction: "desc",
-          },
-        }) as Promise<ReferralRecord[]>,
-        dbAdapter.count({
-          model: "referrals",
-          where,
-        }),
-      ]);
+      const referralResult = await paginateBetterAuth<ReferralRecord>({
+        adapter: dbAdapter,
+        limit: ctx.query?.limit,
+        model: "referrals",
+        page: ctx.query?.page,
+        pageSizeOptions: {
+          defaultLimit: 20,
+        },
+        select: ["id", "referredUserId", "status", "completedAt", "createdAt"],
+        sortBy: {
+          field: "createdAt",
+          direction: "desc",
+        },
+        where,
+      });
+      const referrals = referralResult.items;
 
       const referredUserIds = [
         ...new Set(referrals.map((referral) => referral.referredUserId)),
@@ -159,8 +119,7 @@ export function listReferralsRoute(options: BetterAuthReferralOptions) {
       }
 
       return ctx.json({
-        code: referralCode.code,
-        referrals: referrals.map((referral) => {
+        items: referrals.map((referral) => {
           const referredUser = referredUsersById.get(referral.referredUserId);
 
           if (!referredUser) {
@@ -188,9 +147,7 @@ export function listReferralsRoute(options: BetterAuthReferralOptions) {
             },
           };
         }),
-        total,
-        limit,
-        offset,
+        pagination: referralResult.pagination,
       });
     },
   );

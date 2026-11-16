@@ -1,15 +1,18 @@
+import { parsePage } from "@evensurface/paginate";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
 import { AdminUserDetailView } from "@/features/admin/components";
-import type { SearchParamValue } from "@/features/admin/query/query-params";
+import {
+  firstParamValue,
+  type SearchParamValue,
+} from "@/features/admin/query/query-params";
 import {
   getAdminUserCreditLedgerView,
   getAdminUserDetailView,
 } from "@/server/db/services/admin/user-detail";
 import { requireAdmin } from "@/server/db/services/auth/access";
 import { getPageMetadata } from "@/shared/metadata";
-import { parsePageParam } from "@/shared/pagination";
 
 export const metadata = getPageMetadata("User Credit Ledger", {
   path: "/admin/users",
@@ -36,7 +39,7 @@ export default async function AdminUserLedgerPage({
 }: AdminUserLedgerPageProps) {
   const requestHeaders = await headers();
   const [{ userId }, query] = await Promise.all([params, searchParams]);
-  const page = parsePageParam(query.page);
+  const page = parsePage(firstParamValue(query.page));
 
   const currentUser = await requireAdmin({
     headers: requestHeaders,

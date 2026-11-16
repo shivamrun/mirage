@@ -1,12 +1,12 @@
+import { parsePage } from "@evensurface/paginate";
 import {
   firstParamValue,
   rawHrefFromSearchParams,
   type SearchParamValue,
 } from "@/features/admin/query/query-params";
-import { DEFAULT_PAGE_SIZE, parsePageParam } from "@/shared/pagination";
 
 export const NOTIFICATIONS_PAGE_PATH = "/account/notifications";
-export const NOTIFICATIONS_PAGE_SIZE = DEFAULT_PAGE_SIZE;
+export const NOTIFICATIONS_PAGE_SIZE = 10;
 
 export type NotificationsPageSearchParams = {
   [key: string]: SearchParamValue;
@@ -17,7 +17,7 @@ export function parseNotificationsSearchParams(
   params: NotificationsPageSearchParams,
 ) {
   return {
-    page: parsePageParam(firstParamValue(params.page)),
+    page: parsePage(firstParamValue(params.page)),
   };
 }
 

@@ -1,3 +1,4 @@
+import type { PaginatedResult } from "@evensurface/paginate";
 import {
   ADMIN_USERS_PAGE_SIZE,
   type AdminUsersQueryState,
@@ -6,14 +7,10 @@ import {
   type AdminUserListItem,
   listAdminUsers,
 } from "@/server/db/dal/admin-users";
-import type { PaginationMeta } from "@/shared/pagination";
-import { resolvePaginatedView } from "../pagination";
 
 export type { AdminUserListItem };
 
-export type AdminUsersListView = PaginationMeta & {
-  users: AdminUserListItem[];
-};
+export type AdminUsersListView = PaginatedResult<AdminUserListItem>;
 
 export async function listAdminUsersView({
   page,
@@ -22,26 +19,9 @@ export async function listAdminUsersView({
   page: number;
   state: AdminUsersQueryState;
 }): Promise<AdminUsersListView> {
-  const limit = ADMIN_USERS_PAGE_SIZE;
-  const result = await resolvePaginatedView({
-    limit,
+  return listAdminUsers({
+    limit: ADMIN_USERS_PAGE_SIZE,
     page,
-    loadPage: async ({ limit, offset }) => {
-      const result = await listAdminUsers({
-        limit,
-        offset,
-        state,
-      });
-
-      return {
-        items: result.users,
-        total: result.total,
-      };
-    },
+    state,
   });
-
-  return {
-    ...result.pagination,
-    users: result.items,
-  };
 }

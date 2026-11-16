@@ -17,7 +17,6 @@ import {
 } from "@/server/db/dal/notifications";
 import { enqueueEmailDelivery } from "@/server/db/services/notifications/email-delivery";
 import { publish } from "@/server/db/services/notifications/realtime-broker";
-import { resolvePaginatedView } from "@/server/db/services/pagination";
 import { notificationRealtimeEventNames } from "@/shared/schemas/notifications";
 
 function optionalDateToISOString(value: Date | null) {
@@ -161,27 +160,11 @@ export async function listNotificationsView({
   page: number;
   recipientId: string;
 }) {
-  const result = await resolvePaginatedView({
+  return listNotificationsForRecipient({
     limit,
     page,
-    loadPage: async ({ limit, offset }) => {
-      const page = await listNotificationsForRecipient({
-        limit,
-        offset,
-        recipientId,
-      });
-
-      return {
-        items: page.notifications,
-        total: page.total,
-      };
-    },
+    recipientId,
   });
-
-  return {
-    ...result.pagination,
-    notifications: result.items,
-  };
 }
 
 export async function getUnreadNotificationCount({

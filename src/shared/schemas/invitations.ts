@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { authRoles } from "@/features/auth/roles";
 import { emailSchema } from "./helpers";
-import { paginationMetaSchema, paginationQuerySchema } from "./pagination";
+import { paginatedResponseSchema, paginationQuerySchema } from "./pagination";
 
 export const invitationStatusValues = [
   "pending",
@@ -47,9 +47,9 @@ export const adminCreateInvitationResponseSchema = z.object({
   status: z.literal(true),
 });
 
-export const adminInvitationsListResponseSchema = paginationMetaSchema.extend({
-  invitations: z.array(adminInvitationResponseSchema),
-});
+export const adminInvitationsListResponseSchema = paginatedResponseSchema(
+  adminInvitationResponseSchema,
+);
 
 export const publicInvitationValidationStatusSchema = z.enum([
   "valid",

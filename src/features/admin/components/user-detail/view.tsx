@@ -1,9 +1,9 @@
+import type { PaginationMetadata } from "@evensurface/paginate";
 import type {
   AdminUserDetailCreditLedgerEntry,
   AdminUserDetailReferralsView,
   AdminUserDetailViewModel,
 } from "@/server/db/services/admin/user-detail";
-import type { PaginationMeta } from "@/shared/pagination";
 import { isFutureDate } from "../shared/formatters";
 import {
   AdminUserAccountsTab,
@@ -32,7 +32,7 @@ export function AdminUserDetailView({
   detail: AdminUserDetailViewModel;
   ledger?: {
     entries: AdminUserDetailCreditLedgerEntry[];
-    pagination: PaginationMeta;
+    pagination: PaginationMetadata;
   };
   referrals?: AdminUserDetailReferralsView;
   section?: AdminUserDetailSection;
@@ -96,7 +96,11 @@ export function AdminUserDetailView({
         ) : null}
 
         {section === "referrals" && referrals ? (
-          <AdminUserReferralsTab referrals={referrals} userId={user.id} />
+          <AdminUserReferralsTab
+            referrals={referrals}
+            summary={referralSummary}
+            userId={user.id}
+          />
         ) : null}
       </div>
     </div>

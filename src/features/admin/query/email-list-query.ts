@@ -1,4 +1,4 @@
-import { DEFAULT_PAGE_SIZE, parsePageParam } from "@/shared/pagination";
+import { parsePage } from "@evensurface/paginate";
 import type { AdminEmailSubscriberQueryState } from "@/shared/schemas";
 import { adminEmailSubscriberSearchParamsSchema } from "@/shared/schemas";
 import {
@@ -11,7 +11,7 @@ export const ADMIN_EMAIL_LIST_PAGE_PATH = "/admin/email-list";
 export const ADMIN_EMAIL_LIST_ALL_PAGE_PATH = "/admin/email-list/all";
 export const ADMIN_EMAIL_LIST_SUBMISSIONS_PAGE_PATH =
   "/admin/email-list/submissions";
-export const ADMIN_EMAIL_SUBMISSIONS_PAGE_SIZE = DEFAULT_PAGE_SIZE;
+export const ADMIN_EMAIL_SUBMISSIONS_PAGE_SIZE = 10;
 
 export type AdminEmailListPageSearchParams = {
   [key: string]: SearchParamValue;
@@ -40,7 +40,7 @@ export function parseAdminEmailListSearchParams(
 
   return {
     ...parsed,
-    page: parsePageParam(params.page),
+    page: parsePage(firstParamValue(params.page)),
   };
 }
 

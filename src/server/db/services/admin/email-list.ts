@@ -17,7 +17,6 @@ import {
   defaultEmailLists,
 } from "@/server/db/services/email-list/config";
 import { EMAIL_LIST_VERIFICATION_PREFIX } from "@/server/db/services/email-list/verification";
-import { resolvePaginatedView } from "@/server/db/services/pagination";
 import type {
   AdminCreateEmailListValues,
   EmailListStatus,
@@ -52,27 +51,11 @@ export async function listAdminEmailSubscribersView({
   page: number;
   state: AdminEmailSubscriberQueryState;
 }) {
-  const result = await resolvePaginatedView({
+  return listEmailSubscribers({
     limit: ADMIN_EMAIL_SUBMISSIONS_PAGE_SIZE,
     page,
-    loadPage: async ({ limit, offset }) => {
-      const result = await listEmailSubscribers({
-        limit,
-        offset,
-        state,
-      });
-
-      return {
-        items: result.subscribers,
-        total: result.total,
-      };
-    },
+    state,
   });
-
-  return {
-    ...result.pagination,
-    subscribers: result.items,
-  };
 }
 
 export async function createAdminEmailList(values: AdminCreateEmailListValues) {

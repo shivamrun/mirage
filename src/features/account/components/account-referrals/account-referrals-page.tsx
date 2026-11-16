@@ -65,7 +65,7 @@ function AccountReferralsPage() {
   const [referralList, setReferralList] = React.useState<ReferralList | null>(
     null,
   );
-  const [offset, setOffset] = React.useState(0);
+  const [page, setPage] = React.useState(1);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string>();
   const [copyStatus, setCopyStatus] = React.useState<CopyStatus>("idle");
@@ -80,7 +80,7 @@ function AccountReferralsPage() {
         authClient.referrals.listReferrals({
           query: {
             limit: REFERRALS_LIMIT,
-            offset,
+            page,
           },
         }),
       ]);
@@ -102,7 +102,7 @@ function AccountReferralsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [offset]);
+  }, [page]);
 
   React.useEffect(() => {
     void loadReferrals();
@@ -110,9 +110,11 @@ function AccountReferralsPage() {
 
   const referralLink = dashboard ? getReferralLink(dashboard.code) : "";
   const hasNextPage = referralList
-    ? referralList.offset + referralList.limit < referralList.total
+    ? referralList.pagination.hasNextPage
     : false;
-  const hasPreviousPage = offset > 0;
+  const hasPreviousPage = referralList
+    ? referralList.pagination.hasPreviousPage
+    : false;
 
   async function copyReferralLink() {
     if (!referralLink) {
@@ -125,11 +127,11 @@ function AccountReferralsPage() {
   }
 
   function goToPreviousPage() {
-    setOffset((currentOffset) => Math.max(0, currentOffset - REFERRALS_LIMIT));
+    setPage((currentPage) => Math.max(1, currentPage - 1));
   }
 
   function goToNextPage() {
-    setOffset((currentOffset) => currentOffset + REFERRALS_LIMIT);
+    setPage((currentPage) => currentPage + 1);
   }
 
   return (

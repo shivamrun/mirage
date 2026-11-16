@@ -1,16 +1,16 @@
+import { paginateDrizzle } from "@evensurface/paginate-drizzle";
 import { and, asc, desc, eq, ilike, ne, or, type SQL } from "drizzle-orm";
 import type {
   AdminContactSubmissionQueryState,
   ContactSubmissionStatus,
 } from "@/features/admin/query/contact-submission-query";
 import db from "@/server/db";
-import { paginateList, totalCount } from "@/server/db/helpers/paginate";
 import { contactSubmission } from "@/server/db/schema";
 import type { ContactSubmissionValues } from "@/shared/schemas";
 
 type ListContactSubmissionsOptions = {
   limit: number;
-  offset: number;
+  page: number;
   state: AdminContactSubmissionQueryState;
 };
 
@@ -78,48 +78,30 @@ export async function createContactSubmission(values: ContactSubmissionValues) {
 
 export async function listContactSubmissions({
   limit,
-  offset,
+  page,
   state,
 }: ListContactSubmissionsOptions) {
   const whereClause = getWhereClause(state);
-  let submissionsQuery = db
-    .select({
-      company: contactSubmission.company,
-      createdAt: contactSubmission.createdAt,
-      email: contactSubmission.email,
-      id: contactSubmission.id,
-      message: contactSubmission.message,
-      name: contactSubmission.name,
-      status: contactSubmission.status,
-    })
-    .from(contactSubmission)
-    .$dynamic();
-  let totalQuery = db
-    .select({ total: totalCount })
-    .from(contactSubmission)
-    .$dynamic();
 
-  if (whereClause) {
-    submissionsQuery = submissionsQuery.where(whereClause);
-    totalQuery = totalQuery.where(whereClause);
-  }
-
-  const result = await paginateList({
-    countQuery: totalQuery,
+  return paginateDrizzle({
+    countQuery: db.$count(contactSubmission, whereClause),
     limit,
-    offset,
-    query: submissionsQuery.orderBy(
-      desc(contactSubmission.createdAt),
-      asc(contactSubmission.id),
-    ),
+    page,
+    query: () =>
+      db
+        .select({
+          company: contactSubmission.company,
+          createdAt: contactSubmission.createdAt,
+          email: contactSubmission.email,
+          id: contactSubmission.id,
+          message: contactSubmission.message,
+          name: contactSubmission.name,
+          status: contactSubmission.status,
+        })
+        .from(contactSubmission)
+        .where(whereClause)
+        .orderBy(desc(contactSubmission.createdAt), asc(contactSubmission.id)),
   });
-
-  return {
-    limit,
-    offset,
-    submissions: result.items,
-    total: result.total,
-  };
 }
 
 export async function updateContactSubmissionStatus({

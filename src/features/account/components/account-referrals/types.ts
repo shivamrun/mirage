@@ -1,3 +1,5 @@
+import type { PaginatedResult } from "@evensurface/paginate";
+
 type CopyStatus = "idle" | "copied" | "failed";
 
 type ReferralDashboard = {
@@ -23,11 +25,6 @@ type ReferralListItem = {
   };
 };
 
-type ReferralList = {
-  referrals: ReferralListItem[];
-  total: number;
-  limit: number;
-  offset: number;
-};
+type ReferralList = PaginatedResult<ReferralListItem>;
 
 export type { CopyStatus, ReferralDashboard, ReferralList, ReferralListItem };

@@ -55,10 +55,10 @@ export default async function AdminContactSubmissionAllPage({
     state,
   });
 
-  if (page !== submissions.page) {
+  if (page !== submissions.pagination.page) {
     redirect(
       contactSubmissionsPageHref({
-        page: submissions.page,
+        page: submissions.pagination.page,
         ...state,
       }),
     );
@@ -79,7 +79,7 @@ export default async function AdminContactSubmissionAllPage({
       <AdminContactSubmissionToolbar
         bulkAction={bulkUpdateContactSubmissionStatusAction}
         clearSearchHref={clearSearchHref}
-        hasSubmissions={submissions.submissions.length > 0}
+        hasSubmissions={submissions.items.length > 0}
         state={state}
       />
 
@@ -88,7 +88,7 @@ export default async function AdminContactSubmissionAllPage({
         hasSearch={Boolean(state.query)}
         query={state.query}
         rowAction={updateContactSubmissionStatusAction}
-        submissions={submissions.submissions}
+        submissions={submissions.items}
       />
 
       <Pagination
@@ -99,7 +99,7 @@ export default async function AdminContactSubmissionAllPage({
             ...state,
           })
         }
-        pagination={submissions}
+        pagination={submissions.pagination}
       />
     </div>
   );

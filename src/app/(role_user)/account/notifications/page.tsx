@@ -55,8 +55,8 @@ export default async function NotificationsPage({
     recipientId: user.id,
   });
 
-  if (page !== result.page) {
-    redirect(notificationsPageHref({ page: result.page }));
+  if (page !== result.pagination.page) {
+    redirect(notificationsPageHref({ page: result.pagination.page }));
   }
 
   return (
@@ -90,13 +90,13 @@ export default async function NotificationsPage({
       <NotificationList
         markReadAction={markNotificationReadAction}
         markUnreadAction={markNotificationUnreadAction}
-        notifications={result.notifications}
+        notifications={result.items}
       />
 
       <Pagination
         entityLabel="notifications"
         getPageHref={(page) => notificationsPageHref({ page })}
-        pagination={result}
+        pagination={result.pagination}
       />
     </div>
   );

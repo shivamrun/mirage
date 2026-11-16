@@ -46,10 +46,10 @@ export default async function AdminEmailListSubmissionsPage({
     listAdminEmailSubscribersView({ page, state }),
   ]);
 
-  if (page !== subscribers.page) {
+  if (page !== subscribers.pagination.page) {
     redirect(
       emailListPageHref({
-        page: subscribers.page,
+        page: subscribers.pagination.page,
         ...state,
       }),
     );
@@ -69,7 +69,7 @@ export default async function AdminEmailListSubmissionsPage({
       <AdminEmailSubmissionsPanel
         lists={lists}
         state={state}
-        subscribers={subscribers.subscribers}
+        subscribers={subscribers.items}
       />
 
       <Pagination
@@ -80,7 +80,7 @@ export default async function AdminEmailListSubmissionsPage({
             ...state,
           })
         }
-        pagination={subscribers}
+        pagination={subscribers.pagination}
       />
     </div>
   );

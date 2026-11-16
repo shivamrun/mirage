@@ -1,21 +1,17 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import db from "@/server/db";
-import { getAdminUserDetail } from "@/server/db/dal/admin-user-detail";
-import { findAcceptedInvitationForUser } from "@/server/db/dal/invitations";
-import { paginateList, totalCount } from "@/server/db/helpers/paginate";
 import {
-  creditLedgerEntries,
-  referralCode,
-  referrals,
-  user,
-} from "@/server/db/schema";
-import { resolvePaginatedView } from "@/server/db/services/pagination";
-import { DEFAULT_PAGE_SIZE } from "@/shared/pagination";
+  getAdminUserDetail,
+  listAdminUserCreditLedger,
+  listAdminUserReferrals,
+} from "@/server/db/dal/admin-user-detail";
+import { findAcceptedInvitationForUser } from "@/server/db/dal/invitations";
+import { referralCode, referrals, user } from "@/server/db/schema";
 import { getCreditBalance } from "../credits/ledger";
 
 const referrerUser = alias(user, "referrer_user");
-const referredUser = alias(user, "referred_user");
+const ADMIN_USER_DETAIL_PAGE_SIZE = 10;
 
 export async function getAdminUserDetailView(userId: string) {
   const detail = await getAdminUserDetail(userId);
@@ -71,36 +67,29 @@ export async function getAdminUserReferralSummaryView(userId: string) {
       .innerJoin(referralCode, eq(referrals.referralCodeId, referralCode.id))
       .where(eq(referrals.referredUserId, userId))
       .limit(1),
-    db
-      .select({ total: totalCount })
-      .from(referrals)
-      .where(eq(referrals.referrerUserId, userId)),
-    db
-      .select({ total: totalCount })
-      .from(referrals)
-      .where(
-        and(
-          eq(referrals.referrerUserId, userId),
-          eq(referrals.status, "completed"),
-        ),
+    db.$count(referrals, eq(referrals.referrerUserId, userId)),
+    db.$count(
+      referrals,
+      and(
+        eq(referrals.referrerUserId, userId),
+        eq(referrals.status, "completed"),
       ),
-    db
-      .select({ total: totalCount })
-      .from(referrals)
-      .where(
-        and(
-          eq(referrals.referrerUserId, userId),
-          eq(referrals.status, "pending"),
-        ),
+    ),
+    db.$count(
+      referrals,
+      and(
+        eq(referrals.referrerUserId, userId),
+        eq(referrals.status, "pending"),
       ),
+    ),
   ]);
 
   return {
     code: code[0] ?? null,
-    completedReferred: completed[0]?.total ?? 0,
-    pendingReferred: pending[0]?.total ?? 0,
+    completedReferred: completed,
+    pendingReferred: pending,
     referredBy: referredBy[0] ?? null,
-    totalReferred: total[0]?.total ?? 0,
+    totalReferred: total,
   };
 }
 
@@ -111,46 +100,11 @@ export async function getAdminUserReferralsView({
   page: number;
   userId: string;
 }) {
-  const summary = await getAdminUserReferralSummaryView(userId);
-  const result = await resolvePaginatedView({
-    limit: DEFAULT_PAGE_SIZE,
+  return listAdminUserReferrals({
+    limit: ADMIN_USER_DETAIL_PAGE_SIZE,
     page,
-    loadPage: ({ limit, offset }) =>
-      paginateList({
-        countQuery: db
-          .select({ total: totalCount })
-          .from(referrals)
-          .where(eq(referrals.referrerUserId, userId)),
-        limit,
-        offset,
-        query: db
-          .select({
-            completedAt: referrals.completedAt,
-            createdAt: referrals.createdAt,
-            id: referrals.id,
-            status: referrals.status,
-            user: {
-              email: referredUser.email,
-              id: referredUser.id,
-              image: referredUser.image,
-              name: referredUser.name,
-            },
-          })
-          .from(referrals)
-          .innerJoin(
-            referredUser,
-            eq(referrals.referredUserId, referredUser.id),
-          )
-          .where(eq(referrals.referrerUserId, userId))
-          .orderBy(desc(referrals.createdAt)),
-      }),
+    userId,
   });
-
-  return {
-    ...summary,
-    pagination: result.pagination,
-    referredUsers: result.items,
-  };
 }
 
 export async function getAdminUserCreditLedgerView({
@@ -160,23 +114,10 @@ export async function getAdminUserCreditLedgerView({
   page: number;
   userId: string;
 }) {
-  return resolvePaginatedView({
-    limit: DEFAULT_PAGE_SIZE,
+  return listAdminUserCreditLedger({
+    limit: ADMIN_USER_DETAIL_PAGE_SIZE,
     page,
-    loadPage: ({ limit, offset }) =>
-      paginateList({
-        countQuery: db
-          .select({ total: totalCount })
-          .from(creditLedgerEntries)
-          .where(eq(creditLedgerEntries.userId, userId)),
-        limit,
-        offset,
-        query: db
-          .select()
-          .from(creditLedgerEntries)
-          .where(eq(creditLedgerEntries.userId, userId))
-          .orderBy(desc(creditLedgerEntries.createdAt)),
-      }),
+    userId,
   });
 }
 

@@ -143,18 +143,18 @@ function ReferralHistorySection({
       description="Pending referrals complete once the referred user verifies their email."
       title="Referral history"
     >
-      {referralList.referrals.length === 0 ? (
+      {referralList.items.length === 0 ? (
         <ReferralHistoryEmpty />
       ) : (
         <div className="grid gap-4">
-          <ReferralHistoryTable referrals={referralList.referrals} />
+          <ReferralHistoryTable referrals={referralList.items} />
           <ReferralPagination
             hasNextPage={hasNextPage}
             hasPreviousPage={hasPreviousPage}
             isLoading={isLoading}
             onNextPage={onNextPage}
             onPreviousPage={onPreviousPage}
-            total={referralList.total}
+            total={referralList.pagination.total}
           />
         </div>
       )}

@@ -7,7 +7,6 @@ import {
   getEffectiveInvitationStatus,
   type InvitationCreateResult,
 } from "@/server/db/services/invitations/service";
-import { resolvePaginatedView } from "@/server/db/services/pagination";
 import type {
   AdminInvitationResponse,
   InvitationEffectiveStatus,
@@ -66,28 +65,17 @@ export async function listAdminInvitationsView({
   page: number;
 }) {
   const now = new Date();
-  const result = await resolvePaginatedView({
+  const result = await listAdminInvitations({
+    effectiveStatus,
     limit,
+    now,
     page,
-    loadPage: async ({ limit, offset }) => {
-      const result = await listAdminInvitations({
-        effectiveStatus,
-        limit,
-        now,
-        offset,
-      });
-
-      return {
-        items: result.items.map((invitation) =>
-          toAdminInvitationResponse(invitation, now),
-        ),
-        total: result.total,
-      };
-    },
   });
 
   return {
-    ...result.pagination,
-    invitations: result.items,
+    items: result.items.map((invitation) =>
+      toAdminInvitationResponse(invitation, now),
+    ),
+    pagination: result.pagination,
   };
 }

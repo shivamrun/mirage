@@ -1,4 +1,4 @@
-import { DEFAULT_PAGE_SIZE, parsePageParam } from "@/shared/pagination";
+import { parsePage } from "@evensurface/paginate";
 import {
   adminContactSubmissionSearchParamsSchema,
   type ContactSubmissionStatus,
@@ -13,7 +13,7 @@ export type { ContactSubmissionStatus };
 
 export const ADMIN_CONTACT_SUBMISSION_PAGE_PATH =
   "/admin/contact-submission/all";
-export const ADMIN_CONTACT_SUBMISSION_PAGE_SIZE = DEFAULT_PAGE_SIZE;
+export const ADMIN_CONTACT_SUBMISSION_PAGE_SIZE = 10;
 
 export type ContactSubmissionSearchParamValue = SearchParamValue;
 
@@ -68,7 +68,7 @@ export function parseAdminContactSubmissionSearchParams(
   return {
     filterField: "status",
     filterValue: parsed.filterField === "status" ? parsed.filterValue : "",
-    page: parsePageParam(params.page),
+    page: parsePage(firstParamValue(params.page)),
     query: parsed.q,
   };
 }
