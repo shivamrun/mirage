@@ -36,7 +36,6 @@
     "@evensurface/paginate": "^3.1.0",
     "@evensurface/paginate-drizzle": "^3.1.0",
     "@hookform/resolvers": "^5.6.0",
-    "@marinedotsh/better-auth-referral": "workspace:*",
     "@marinedotsh/upload-sdk": "workspace:*",
     "@marsidev/react-turnstile": "^1.6.1",
     "@react-email/render": "^2.1.0",

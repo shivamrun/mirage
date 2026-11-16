@@ -18,8 +18,6 @@ import {
   emailSubscription,
   invitation,
   notification,
-  referralCode,
-  referrals,
   subscription,
   user,
 } from "@/server/db/schema";
@@ -66,8 +64,6 @@ export async function createUserDataExport(userId: string) {
         creditLedger,
         creditGrants,
         notifications,
-        codes,
-        referralHistory,
         invitations,
         contacts,
         submissions,
@@ -111,16 +107,6 @@ export async function createUserDataExport(userId: string) {
           })
           .from(notification)
           .where(eq(notification.recipientId, userId)),
-        tx.select().from(referralCode).where(eq(referralCode.userId, userId)),
-        tx
-          .select()
-          .from(referrals)
-          .where(
-            or(
-              eq(referrals.referrerUserId, userId),
-              eq(referrals.referredUserId, userId),
-            ),
-          ),
         tx
           .select({
             acceptedAt: invitation.acceptedAt,
@@ -173,7 +159,6 @@ export async function createUserDataExport(userId: string) {
           ledger: creditLedger,
         },
         notifications,
-        referrals: { codes, history: referralHistory },
         invitations,
         emailLists: contacts,
         contactSubmissions: submissions,

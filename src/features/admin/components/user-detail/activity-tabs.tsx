@@ -6,8 +6,6 @@ import { Pagination } from "@/components/ui/pagination";
 import type {
   AdminUserDetailAccount,
   AdminUserDetailCreditLedgerEntry,
-  AdminUserDetailReferralSummary,
-  AdminUserDetailReferralsView,
   AdminUserDetailSession,
 } from "@/server/db/services/admin/user-detail";
 import { formatDate, formatValue, isFutureDate } from "../shared/formatters";
@@ -34,8 +32,6 @@ import {
 
 type AccountRecord = AdminUserDetailAccount;
 type CreditLedgerRecord = AdminUserDetailCreditLedgerEntry;
-type ReferralsView = AdminUserDetailReferralsView;
-type ReferralRecord = ReferralsView["items"][number];
 type SessionRecord = AdminUserDetailSession;
 
 export function AdminUserAccountsTab({
@@ -125,116 +121,6 @@ export function AdminUserCreditLedgerTab({
           page > 1
             ? `/admin/users/${userId}/ledger?page=${page}`
             : `/admin/users/${userId}/ledger`
-        }
-        pagination={pagination}
-      />
-    </div>
-  );
-}
-
-export function AdminUserReferralsTab({
-  referrals,
-  summary,
-  userId,
-}: {
-  referrals: ReferralsView;
-  summary: AdminUserDetailReferralSummary;
-  userId: string;
-}) {
-  const { items, pagination } = referrals;
-  const {
-    code,
-    completedReferred,
-    pendingReferred,
-    referredBy,
-    totalReferred,
-  } = summary;
-
-  return (
-    <div className="grid min-w-0 gap-4">
-      <DetailPanel
-        description="Referral code, inviter, and users who joined through this account."
-        title="Referral Summary"
-      >
-        <DetailRow label="Users referred">
-          <RecordGrid compact>
-            <RecordField label="Total">
-              <span className="font-medium">{totalReferred}</span>
-            </RecordField>
-            <RecordField label="Completed">
-              <span className="font-medium">{completedReferred}</span>
-            </RecordField>
-            <RecordField label="Pending">
-              <span className="font-medium">{pendingReferred}</span>
-            </RecordField>
-          </RecordGrid>
-        </DetailRow>
-
-        <DetailRow label="Referral code">
-          {code ? (
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <span className="font-mono text-xs">{code.code}</span>
-              <span className="text-muted-foreground text-xs">
-                created {formatDate(code.createdAt)}
-              </span>
-            </div>
-          ) : (
-            <span className="text-muted-foreground">No referral code</span>
-          )}
-        </DetailRow>
-
-        <DetailRow label="Referred by">
-          {referredBy ? (
-            <ReferralUserLink user={referredBy.user} />
-          ) : (
-            <span className="text-muted-foreground">
-              This user was not referred by another user.
-            </span>
-          )}
-        </DetailRow>
-
-        {referredBy ? (
-          <DetailRow label="Inbound referral">
-            <RecordGrid compact>
-              <RecordField label="Status">
-                <ReferralStatusBadge status={referredBy.status} />
-              </RecordField>
-              <RecordField label="Referral code">
-                <span className="font-mono text-xs">
-                  {referredBy.referralCode}
-                </span>
-              </RecordField>
-              <RecordField label="Created">
-                {formatDate(referredBy.createdAt)}
-              </RecordField>
-              <RecordField label="Completed">
-                {formatDate(referredBy.completedAt)}
-              </RecordField>
-            </RecordGrid>
-          </DetailRow>
-        ) : null}
-      </DetailPanel>
-
-      <DetailPanel
-        description="Users whose signup was attributed to this user's referral code."
-        title="Referred Users"
-      >
-        {items.length > 0 ? (
-          <ReferralsTable referrals={items} />
-        ) : (
-          <EmptyState
-            description="No users have joined from this user's referral link yet."
-            title="No referred users"
-          />
-        )}
-      </DetailPanel>
-
-      <Pagination
-        entityLabel="referred users"
-        getPageHref={(page) =>
-          page > 1
-            ? `/admin/users/${userId}/referrals?page=${page}`
-            : `/admin/users/${userId}/referrals`
         }
         pagination={pagination}
       />
@@ -469,85 +355,6 @@ function CreditLedgerTable({ entries }: { entries: CreditLedgerRecord[] }) {
   );
 }
 
-function ReferralsTable({ referrals }: { referrals: ReferralRecord[] }) {
-  return (
-    <div className="min-w-0 overflow-hidden bg-card">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] text-left text-sm">
-          <thead className="border-b bg-muted/40">
-            <tr className="text-muted-foreground">
-              <TableHeader>User</TableHeader>
-              <TableHeader>Status</TableHeader>
-              <TableHeader>Created</TableHeader>
-              <TableHeader>Completed</TableHeader>
-              <TableHeader>Referral ID</TableHeader>
-            </tr>
-          </thead>
-
-          <tbody className="divide-y">
-            {referrals.map((referral) => (
-              <ReferralRow key={referral.id} referral={referral} />
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function ReferralRow({ referral }: { referral: ReferralRecord }) {
-  return (
-    <tr className="align-top transition-colors hover:bg-muted/20">
-      <TableCell>
-        <ReferralUserLink user={referral.user} />
-      </TableCell>
-      <TableCell>
-        <ReferralStatusBadge status={referral.status} />
-      </TableCell>
-      <TableCell>
-        <span className="whitespace-nowrap">
-          {formatDate(referral.createdAt)}
-        </span>
-      </TableCell>
-      <TableCell>
-        <span className="whitespace-nowrap">
-          {formatDate(referral.completedAt)}
-        </span>
-      </TableCell>
-      <TableCell>
-        <CopyableId maxLength={10} value={referral.id} />
-      </TableCell>
-    </tr>
-  );
-}
-
-function ReferralUserLink({ user }: { user: ReferralRecord["user"] }) {
-  return (
-    <Link
-      className="group flex min-w-0 items-center gap-3"
-      href={`/admin/users/${user.id}`}
-    >
-      <UserAvatar image={user.image} name={user.name} />
-      <span className="min-w-0">
-        <span className="block truncate font-medium text-sm underline-offset-4 group-hover:underline">
-          {user.name}
-        </span>
-        <span className="block truncate text-muted-foreground text-xs">
-          {user.email}
-        </span>
-      </span>
-    </Link>
-  );
-}
-
-function ReferralStatusBadge({ status }: { status: string }) {
-  return (
-    <StatusBadge tone={status === "completed" ? "good" : "warning"}>
-      {formatReferralStatus(status)}
-    </StatusBadge>
-  );
-}
-
 function CreditLedgerRow({ entry }: { entry: CreditLedgerRecord }) {
   return (
     <tr className="align-top transition-colors hover:bg-muted/20">
@@ -698,12 +505,6 @@ function formatLedgerType(value: string) {
     .join(" ");
 }
 
-function formatReferralStatus(value: string) {
-  return value
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
 
 function IdentifierField({ label, value }: { label: string; value: string }) {
   return (

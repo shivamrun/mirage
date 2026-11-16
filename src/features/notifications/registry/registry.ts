@@ -79,16 +79,6 @@ export const notificationRegistry = {
     channels: ["email"],
     payloadSchema: notificationPayloadSchemas["email_list.verification"],
   },
-  "referrals.completed": {
-    category: "product",
-    channels: ["email"],
-    payloadSchema: notificationPayloadSchemas["referrals.completed"],
-  },
-  "referrals.signup_recorded": {
-    category: "product",
-    channels: ["in_app"],
-    payloadSchema: notificationPayloadSchemas["referrals.signup_recorded"],
-  },
   "security.account_alert": {
     category: "security",
     channels: ["in_app"],
@@ -106,8 +96,6 @@ const legacyNotificationTypeMap = {
   BILLING_SUBSCRIPTION_STARTED: "billing.subscription_started",
   BILLING_SUBSCRIPTION_UPDATED: "billing.subscription_updated",
   CREDITS_LOW_BALANCE: "credits.low_balance",
-  REFERRALS_COMPLETED: "referrals.completed",
-  REFERRALS_SIGNUP_RECORDED: "referrals.signup_recorded",
 } as const satisfies Record<string, keyof typeof notificationRegistry>;
 
 export function normalizeNotificationType(type: string) {

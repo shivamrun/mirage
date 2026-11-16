@@ -13,7 +13,6 @@ type GoogleAuthButtonProps = {
   redirectTo: string;
   disabled?: boolean;
   onBeforeSignIn?: () => boolean | Promise<boolean>;
-  referralCode?: string;
 };
 
 function GoogleIcon() {
@@ -43,7 +42,6 @@ function GoogleAuthButton({
   redirectTo,
   disabled = false,
   onBeforeSignIn,
-  referralCode,
 }: GoogleAuthButtonProps) {
   const [error, setError] = React.useState<string>();
   const [isPending, setIsPending] = React.useState(false);
@@ -63,14 +61,6 @@ function GoogleAuthButton({
       const result = await authClient.signIn.social({
         provider: "google",
         callbackURL: redirectTo,
-        ...(referralCode
-          ? {
-              requestSignUp: true,
-              additionalData: {
-                "x-referral-code": referralCode,
-              },
-            }
-          : {}),
       });
 
       if (result.error) {

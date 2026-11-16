@@ -11,7 +11,6 @@ WORKDIR /app
 FROM base AS dependencies
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml source.config.mjs ./
-COPY packages/better-auth-referral/package.json packages/better-auth-referral/package.json
 COPY packages/upload-sdk/package.json packages/upload-sdk/package.json
 COPY content ./content
 

@@ -66,17 +66,6 @@ export const notificationPayloadSchemas = {
     listName: z.string().trim().min(1),
     verificationUrl: z.string().url(),
   }),
-  "referrals.completed": z.object({
-    creditAmount: z.number().int().positive(),
-    referredUserEmail: z.string().email(),
-    referredUserName: z.string().trim().nullable().optional(),
-    referrerEmail: z.string().email(),
-    referrerName: z.string().trim().nullable().optional(),
-  }),
-  "referrals.signup_recorded": z.object({
-    referredUserEmail: z.string().email(),
-    referredUserName: z.string().trim().nullable().optional(),
-  }),
   "security.account_alert": z.object({
     action: z.string().trim().min(1),
     ipAddress: z.string().trim().optional(),

@@ -18,8 +18,7 @@ type EmailNotificationType =
   | "auth.invitation"
   | "auth.password_reset"
   | "auth.welcome"
-  | "email_list.verification"
-  | "referrals.completed";
+  | "email_list.verification";
 
 function assertNever(type: never): never {
   throw new Error(`Unsupported email notification type: ${type}`);
@@ -221,45 +220,6 @@ export const emailNotificationChannel = {
               `Confirm signup: ${data.verificationUrl}`,
             ].join("\n\n"),
             to: data.email,
-          }),
-        };
-      }
-      case "referrals.completed": {
-        const data =
-          input.data as NotificationPayloadMap["referrals.completed"];
-        const referredDisplay = data.referredUserName || data.referredUserEmail;
-
-        return {
-          email: await sendNotificationEmail({
-            react: (
-              <EmailLayout
-                previewText={`${data.creditAmount} referral credits were added to your Mirage account.`}
-                title="Your referral reward is ready"
-              >
-                <EmailText>Hi {data.referrerName || "there"},</EmailText>
-                <EmailText>
-                  {referredDisplay} verified their email, so your referral is
-                  complete.
-                </EmailText>
-                <EmailText>
-                  We added <strong>{data.creditAmount} credits</strong> to your
-                  Mirage account.
-                </EmailText>
-              </EmailLayout>
-            ),
-            subject: "Your Mirage referral reward is ready",
-            tags: [
-              {
-                name: "category",
-                value: "referral-completed",
-              },
-            ],
-            text: [
-              `Hi ${data.referrerName || "there"},`,
-              `${referredDisplay} verified their email, so your referral is complete.`,
-              `We added ${data.creditAmount} credits to your Mirage account.`,
-            ].join("\n\n"),
-            to: data.referrerEmail,
           }),
         };
       }

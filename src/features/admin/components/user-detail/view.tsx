@@ -1,14 +1,12 @@
 import type { PaginationMetadata } from "@evensurface/paginate";
 import type {
   AdminUserDetailCreditLedgerEntry,
-  AdminUserDetailReferralsView,
   AdminUserDetailViewModel,
 } from "@/server/db/services/admin/user-detail";
 import { isFutureDate } from "../shared/formatters";
 import {
   AdminUserAccountsTab,
   AdminUserCreditLedgerTab,
-  AdminUserReferralsTab,
   AdminUserSessionsTab,
 } from "./activity-tabs";
 import { AdminUserDetailHeader } from "./header";
@@ -18,14 +16,12 @@ export type AdminUserDetailSection =
   | "accounts"
   | "ledger"
   | "overview"
-  | "referrals"
   | "sessions";
 
 export function AdminUserDetailView({
   currentUserId,
   detail,
   ledger,
-  referrals,
   section = "overview",
 }: {
   currentUserId: string;
@@ -34,14 +30,12 @@ export function AdminUserDetailView({
     entries: AdminUserDetailCreditLedgerEntry[];
     pagination: PaginationMetadata;
   };
-  referrals?: AdminUserDetailReferralsView;
   section?: AdminUserDetailSection;
 }) {
   const {
     acceptedInvitation,
     accounts,
     creditBalance,
-    referralSummary,
     sessions,
     user,
   } = detail;
@@ -58,7 +52,6 @@ export function AdminUserDetailView({
         activeSection={section}
         hasActiveBan={hasActiveBan}
         isBanned={isBanned}
-        referralsLength={referralSummary.totalReferred}
         sessionsLength={sessions.length}
         user={user}
       />
@@ -95,13 +88,6 @@ export function AdminUserDetailView({
           />
         ) : null}
 
-        {section === "referrals" && referrals ? (
-          <AdminUserReferralsTab
-            referrals={referrals}
-            summary={referralSummary}
-            userId={user.id}
-          />
-        ) : null}
       </div>
     </div>
   );

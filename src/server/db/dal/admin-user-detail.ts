@@ -1,17 +1,13 @@
 import { paginateDrizzle } from "@evensurface/paginate-drizzle";
 import { and, count, desc, eq, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
 
 import db from "@/server/db";
 import {
   account as accountTable,
   creditLedgerEntries,
-  referrals,
   session as sessionTable,
   user as userTable,
 } from "@/server/db/schema";
-
-const referredUser = alias(userTable, "referred_user");
 
 export async function getAdminUserDetail(userId: string) {
   const [record] = await db
@@ -71,42 +67,6 @@ export async function getAdminUserDetail(userId: string) {
 export type AdminUserDetail = NonNullable<
   Awaited<ReturnType<typeof getAdminUserDetail>>
 >;
-
-export function listAdminUserReferrals({
-  limit,
-  page,
-  userId,
-}: {
-  limit: number;
-  page: number;
-  userId: string;
-}) {
-  const whereClause = eq(referrals.referrerUserId, userId);
-
-  return paginateDrizzle({
-    countQuery: db.$count(referrals, whereClause),
-    limit,
-    page,
-    query: () =>
-      db
-        .select({
-          completedAt: referrals.completedAt,
-          createdAt: referrals.createdAt,
-          id: referrals.id,
-          status: referrals.status,
-          user: {
-            email: referredUser.email,
-            id: referredUser.id,
-            image: referredUser.image,
-            name: referredUser.name,
-          },
-        })
-        .from(referrals)
-        .innerJoin(referredUser, eq(referrals.referredUserId, referredUser.id))
-        .where(whereClause)
-        .orderBy(desc(referrals.createdAt), desc(referrals.id)),
-  });
-}
 
 export function listAdminUserCreditLedger({
   limit,

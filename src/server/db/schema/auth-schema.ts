@@ -3,7 +3,6 @@ import {
   boolean,
   index,
   integer,
-  jsonb,
   pgTable,
   text,
   uniqueIndex,
@@ -169,103 +168,12 @@ export const subscription = pgTable(
   ],
 );
 
-export const referralCode = pgTable(
-  "referral_code",
-  {
-    id: text("id").primaryKey(),
-
-    userId: text("user_id")
-      .notNull()
-      .unique()
-      .references(() => user.id, {
-        onDelete: "cascade",
-      }),
-
-    code: text("code").notNull().unique(),
-
-    createdAt: requiredTimestamp("created_at").defaultNow(),
-  },
-  (table) => [
-    index("referral_code_user_id_idx").on(table.userId),
-    index("referral_code_code_idx").on(table.code),
-  ],
-);
-
-export const referrals = pgTable(
-  "referrals",
-  {
-    id: text("id").primaryKey(),
-
-    referrerUserId: text("referrer_user_id")
-      .notNull()
-      .references(() => user.id, {
-        onDelete: "cascade",
-      }),
-
-    referredUserId: text("referred_user_id")
-      .notNull()
-      .unique()
-      .references(() => user.id, {
-        onDelete: "cascade",
-      }),
-
-    referralCodeId: text("referral_code_id")
-      .notNull()
-      .references(() => referralCode.id, {
-        onDelete: "cascade",
-      }),
-
-    status: text("status", { enum: ["pending", "completed"] })
-      .default("completed")
-      .notNull(),
-
-    completedAt: eventTimestamp("completed_at"),
-
-    createdAt: requiredTimestamp("created_at").defaultNow(),
-  },
-  (table) => [
-    index("referrals_referrer_user_id_idx").on(table.referrerUserId),
-    index("referrals_referred_user_id_idx").on(table.referredUserId),
-    index("referrals_referral_code_id_idx").on(table.referralCodeId),
-    index("referrals_status_idx").on(table.status),
-    index("referrals_created_at_idx").on(table.createdAt),
-  ],
-);
-
-export const referralStepCompletion = pgTable(
-  "referral_step_completion",
-  {
-    id: text("id").primaryKey(),
-
-    referralId: text("referral_id")
-      .notNull()
-      .references(() => referrals.id, {
-        onDelete: "cascade",
-      }),
-
-    step: text("step").notNull(),
-    completionKey: text("completion_key").notNull().unique(),
-    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
-
-    completedAt: requiredTimestamp("completed_at").defaultNow(),
-  },
-  (table) => [
-    index("referral_step_completion_referral_id_idx").on(table.referralId),
-    index("referral_step_completion_completion_key_idx").on(
-      table.completionKey,
-    ),
-  ],
-);
-
 // RELATIONS
 
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
   twoFactors: many(twoFactor),
-  referralCodes: many(referralCode),
-  referralsMade: many(referrals, { relationName: "referrerUser" }),
-  referralsReceived: many(referrals, { relationName: "referredUser" }),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -288,42 +196,3 @@ export const twoFactorRelations = relations(twoFactor, ({ one }) => ({
     references: [user.id],
   }),
 }));
-
-export const referralCodeRelations = relations(
-  referralCode,
-  ({ many, one }) => ({
-    referrals: many(referrals),
-    user: one(user, {
-      fields: [referralCode.userId],
-      references: [user.id],
-    }),
-  }),
-);
-
-export const referralsRelations = relations(referrals, ({ many, one }) => ({
-  referralCode: one(referralCode, {
-    fields: [referrals.referralCodeId],
-    references: [referralCode.id],
-  }),
-  referredUser: one(user, {
-    fields: [referrals.referredUserId],
-    references: [user.id],
-    relationName: "referredUser",
-  }),
-  referrerUser: one(user, {
-    fields: [referrals.referrerUserId],
-    references: [user.id],
-    relationName: "referrerUser",
-  }),
-  stepCompletions: many(referralStepCompletion),
-}));
-
-export const referralStepCompletionRelations = relations(
-  referralStepCompletion,
-  ({ one }) => ({
-    referral: one(referrals, {
-      fields: [referralStepCompletion.referralId],
-      references: [referrals.id],
-    }),
-  }),
-);

@@ -46,7 +46,6 @@ type NotifyResult = {
 
 const durableEmailTypes = new Set<NotifyInput["type"]>([
   "auth.welcome",
-  "referrals.completed",
 ]);
 
 export async function notify<Type extends NotifyInput["type"]>(

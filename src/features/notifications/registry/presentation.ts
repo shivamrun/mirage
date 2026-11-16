@@ -100,16 +100,6 @@ const notificationPresenters = {
     description: `A verification email was sent for ${notification.data.listName}.`,
     title: "Email list verification",
   }),
-  "referrals.completed": (notification) => ({
-    description: `${notification.data.creditAmount} referral reward credits were added to your account.`,
-    href: "/account/referrals",
-    title: "Referral complete",
-  }),
-  "referrals.signup_recorded": (notification) => ({
-    description: `${notification.data.referredUserName || notification.data.referredUserEmail} signed up with your referral link.`,
-    href: "/account/referrals",
-    title: "Referral signup",
-  }),
   "security.account_alert": (notification) => ({
     description: notification.data.ipAddress
       ? `${notification.data.action} from ${notification.data.ipAddress}.`

@@ -1,4 +1,3 @@
-import { betterAuthReferral } from "@marinedotsh/better-auth-referral";
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { admin, captcha, twoFactor } from "better-auth/plugins";
@@ -8,15 +7,12 @@ import { logEmailDeliveryFailure } from "@/adapters/email";
 import { authHooks } from "@/features/auth/better-auth/hooks";
 import { authAccessControl, authRolePermissions } from "@/features/auth/roles";
 import { createAuthDatabaseAdapter } from "@/server/db/dal/auth";
-import { grantCreditTopUps } from "@/server/db/services/credits/ledger";
 import {
   notify,
   notifyBestEffort,
 } from "@/server/db/services/notifications/service";
 import { env } from "@/shared/env";
 import { siteConfig } from "@/shared/metadata";
-
-const referralRewardCredits = 50;
 
 export const isGoogleAuthConfigured = Boolean(
   env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET,
@@ -128,18 +124,6 @@ export const auth = betterAuth({
         throw error;
       }
     },
-    async afterEmailVerification(user) {
-      try {
-        await auth.api.markReferralStepComplete({
-          body: {
-            referredUserId: user.id,
-            step: "email_verified",
-          },
-        });
-      } catch {
-        // Not every verified user was referred.
-      }
-    },
   },
   hooks: authHooks,
   database: createAuthDatabaseAdapter(),
@@ -151,91 +135,6 @@ export const auth = betterAuth({
     }),
     twoFactor({
       issuer: siteConfig.name,
-    }),
-    betterAuthReferral({
-      steps: ["email_verified"],
-      maskReferredUserEmail: true,
-      async afterSuccessfulSignUp(referrerUser, referredUser) {
-        await notifyBestEffort(
-          {
-            data: {
-              referredUserEmail: referredUser.email,
-              referredUserName: referredUser.name,
-            },
-            idempotencyKey: `referral:signup:${referredUser.id}`,
-            recipientId: referrerUser.id,
-            subject: {
-              id: referredUser.id,
-              type: "user",
-            },
-            type: "referrals.signup_recorded",
-          },
-          "referrals.signup_recorded",
-        );
-
-        if (!referredUser.emailVerified) {
-          return;
-        }
-
-        try {
-          await auth.api.markReferralStepComplete({
-            body: {
-              referredUserId: referredUser.id,
-              step: "email_verified",
-            },
-          });
-        } catch {
-          // Best-effort completion for trusted OAuth signups.
-        }
-      },
-      async afterReferralCompleted({ referredUser, referral, referrerUser }) {
-        await grantCreditTopUps([
-          {
-            amount: referralRewardCredits,
-            idempotencyKey: `referral:reward:${referral.id}:referrer`,
-            metadata: {
-              referredUserId: referredUser.id,
-              referralId: referral.id,
-              rewardRole: "referrer",
-            },
-            source: "referral_reward",
-            sourceId: referral.id,
-            userId: referrerUser.id,
-          },
-          {
-            amount: referralRewardCredits,
-            idempotencyKey: `referral:reward:${referral.id}:referred`,
-            metadata: {
-              referralId: referral.id,
-              referrerUserId: referrerUser.id,
-              rewardRole: "referred",
-            },
-            source: "referral_reward",
-            sourceId: referral.id,
-            userId: referredUser.id,
-          },
-        ]);
-
-        await notifyBestEffort(
-          {
-            data: {
-              creditAmount: referralRewardCredits,
-              referredUserEmail: referredUser.email,
-              referredUserName: referredUser.name,
-              referrerEmail: referrerUser.email,
-              referrerName: referrerUser.name,
-            },
-            idempotencyKey: `referral:completed:${referral.id}`,
-            recipientId: referrerUser.id,
-            subject: {
-              id: referral.id,
-              type: "referral",
-            },
-            type: "referrals.completed",
-          },
-          "referrals.completed",
-        );
-      },
     }),
     ...authCaptchaPlugins,
     authStripePlugin,
