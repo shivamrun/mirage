@@ -1,16 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { getAnalyticsAttribution } from "@/adapters/analytics/attribution";
 import type {
   AnalyticsTrack,
-  ClientAnalyticsEventMap,
   ServerAuthoritativeEventMap,
   ServerBestEffortEventMap,
 } from "@/adapters/analytics/events";
-import { isValidDistinctId } from "@/adapters/analytics/events";
+import {
+  analyticsAttributionFromMetadata,
+  analyticsAttributionToMetadata,
+  isValidDistinctId,
+} from "@/adapters/analytics/events";
 
-const clientTrack = (() => undefined) as AnalyticsTrack<
-  ClientAnalyticsEventMap,
-  void
->;
 const serverTrack = (() => undefined) as AnalyticsTrack<
   ServerBestEffortEventMap,
   void,
@@ -23,6 +23,36 @@ const authoritativeTrack = (() => undefined) as AnalyticsTrack<
 >;
 
 describe("analytics event types", () => {
+  it("keeps the first campaign snapshot when a later URL has other UTM fields", () => {
+    const data = new Map<string, string>();
+    const browser = {
+      location: new URL("https://mirage.test/?utm_source=youtube"),
+      sessionStorage: {
+        getItem: (key: string) => data.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          data.set(key, value);
+        },
+      },
+    };
+    vi.stubGlobal("window", browser);
+    vi.stubGlobal("document", { referrer: "" });
+    try {
+      expect(getAnalyticsAttribution()).toEqual({
+        landingPath: "/",
+        utmSource: "youtube",
+      });
+      browser.location = new URL(
+        "https://mirage.test/register?utm_campaign=launch",
+      );
+      expect(getAnalyticsAttribution()).toEqual({
+        landingPath: "/",
+        utmSource: "youtube",
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("validates distinct IDs at runtime", () => {
     expect(isValidDistinctId("user_123")).toBe(true);
     expect(isValidDistinctId("")).toBe(false);
@@ -30,13 +60,12 @@ describe("analytics event types", () => {
   });
 
   it("accepts valid event shapes", () => {
-    clientTrack("login_completed");
-    clientTrack("subscription_checkout_started", {
+    serverTrack("login_completed");
+    serverTrack("subscription_checkout_started", {
       billingInterval: "monthly",
       plan: "pro",
-      scheduleAtPeriodEnd: false,
     });
-    serverTrack("signup_completed");
+    serverTrack("signup_completed", { attribution: { utmSource: "youtube" } });
     authoritativeTrack("credits_purchased", {
       credits: 200,
       currency: "USD",
@@ -54,24 +83,33 @@ describe("analytics event types", () => {
     });
   });
 
-  it("keeps invalid examples type-only", () => {
-    // @ts-expect-error server-only event cannot be emitted by the client source.
-    clientTrack("signup_completed");
+  it("carries campaign fields through Stripe metadata", () => {
+    const metadata = analyticsAttributionToMetadata({
+      creator: "demo",
+      utmSource: " youtube ",
+    });
+    expect(metadata).toEqual({
+      analytics_creator: "demo",
+      analytics_utm_source: "youtube",
+    });
+    expect(
+      analyticsAttributionFromMetadata({ ...metadata, userId: "internal" }),
+    ).toEqual({ creator: "demo", utmSource: "youtube" });
+  });
 
+  it("keeps invalid examples type-only", () => {
     // @ts-expect-error login_completed does not accept properties.
-    clientTrack("login_completed", {});
+    serverTrack("login_completed", { plan: "pro" });
 
     // @ts-expect-error missing required property.
-    clientTrack("subscription_checkout_started", {
+    serverTrack("subscription_checkout_started", {
       billingInterval: "monthly",
-      plan: "pro",
     });
 
     // @ts-expect-error free is not a checkout plan.
-    clientTrack("subscription_checkout_started", {
+    serverTrack("subscription_checkout_started", {
       billingInterval: "monthly",
       plan: "free",
-      scheduleAtPeriodEnd: false,
     });
 
     // @ts-expect-error inline extra fields are rejected.

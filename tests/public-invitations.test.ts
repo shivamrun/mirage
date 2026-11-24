@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { analytics } from "@/adapters/analytics/server";
 import { rateLimitStore } from "@/adapters/rate-limit/store";
 import { auth } from "@/features/auth/better-auth/server";
 import db from "@/server/db";
@@ -190,10 +191,12 @@ describe("public invitation routes", () => {
   it("accepts an invitation signup, grants role, marks accepted, and forwards auth cookies", async () => {
     const created = await createInvite();
     const signup = vi.spyOn(auth.api, "signUpEmail");
+    const track = vi.spyOn(analytics, "track");
 
     const response = await httpRequest(app, "/api/invitations/accept-signup", {
       body: JSON.stringify({
         agreeToTerms: true,
+        attribution: { utmSource: "youtube" },
         callbackURL: "/admin",
         email: created.invitation.email,
         password: "TestPassword123!",
@@ -238,6 +241,12 @@ describe("public invitation routes", () => {
       id: accepted?.acceptedByUserId,
       role: "user,admin",
     });
+    expect(track).toHaveBeenCalledWith(
+      "signup_completed",
+      { attribution: { utmSource: "youtube" } },
+      { context: { distinctId: acceptedUser?.id } },
+    );
+    track.mockRestore();
   });
 
   it("requires same-origin validation and acceptance requests", async () => {

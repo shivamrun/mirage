@@ -1,9 +1,13 @@
+import { analyticsAttributionFromMetadata } from "@/adapters/analytics/events";
 import {
   type StripeCheckoutSession,
   type StripeSubscription,
   stripeBillingProvider,
 } from "@/adapters/stripe/billing-provider";
-import { getBillingSubscriptionByStripeSubscriptionId } from "@/server/db/dal/billing";
+import {
+  getBillingSubscriptionById,
+  getBillingSubscriptionByStripeSubscriptionId,
+} from "@/server/db/dal/billing";
 import {
   claimStripeWebhookEvent,
   createOrGetStripeWebhookEvent,
@@ -18,21 +22,26 @@ import {
   handleSubscriptionCanceled,
   handleSubscriptionStarted,
   handleSubscriptionUpdated,
+  invoiceSubscriptionId,
 } from "@/server/db/services/billing/lifecycle-events";
 import { applySubscriptionStateFromStripeEvent } from "@/server/db/services/billing/stripe-subscriptions";
 import { grantCreditTopUpForCheckoutSession } from "@/server/db/services/credits/top-up";
+import { getBillingPlanByLookupKey } from "@/shared/billing";
+
 type StripeWebhookEventType =
   | "checkout.session.completed"
   | "checkout.session.async_payment_succeeded"
   | "customer.subscription.created"
   | "customer.subscription.updated"
   | "customer.subscription.deleted"
+  | "invoice.paid"
   | "invoice.payment_failed";
 
 function sanitizedError(error: unknown) {
   return {
     kind: error instanceof Error ? error.name : "UnknownError",
-    message: error instanceof Error ? error.message : "Unknown webhook failure.",
+    message:
+      error instanceof Error ? error.message : "Unknown webhook failure.",
   };
 }
 
@@ -57,6 +66,66 @@ function isCancellationScheduledTransition(
   return (
     previous?.cancel_at_period_end === false &&
     stripeSubscription.cancel_at_period_end === true
+  );
+}
+
+async function processPaidSubscriptionInvoice(
+  invoiceId: string,
+  eventCreatedAt: number,
+) {
+  const invoice = await stripeBillingProvider.retrieveInvoice(invoiceId);
+  if (
+    invoice.billing_reason !== "subscription_create" ||
+    invoice.status !== "paid" ||
+    invoice.amount_paid <= 0
+  )
+    return;
+
+  const subscriptionId = invoiceSubscriptionId(invoice);
+  if (!subscriptionId) return;
+
+  const stripeSubscription =
+    await stripeBillingProvider.retrieveSubscription(subscriptionId);
+  let localSubscription =
+    await getBillingSubscriptionByStripeSubscriptionId(subscriptionId);
+  const localId = stripeSubscription.metadata?.subscriptionId;
+  if (!localSubscription && localId) {
+    const record = await getBillingSubscriptionById(localId);
+    const customerId =
+      typeof stripeSubscription.customer === "string"
+        ? stripeSubscription.customer
+        : stripeSubscription.customer.id;
+    if (
+      record?.stripeCustomerId === customerId &&
+      !record.stripeSubscriptionId
+    ) {
+      localSubscription = record;
+    }
+  }
+  if (!localSubscription) {
+    const isMirageSubscription = stripeSubscription.items.data.some((item) =>
+      getBillingPlanByLookupKey(item.price.lookup_key),
+    );
+    if (!isMirageSubscription) return;
+    throw new Error("Billing subscription record was not found.");
+  }
+
+  const { eventSubscription } = await applySubscriptionStateFromStripeEvent({
+    eventCreatedAt,
+    localSubscription,
+    stripeSubscription,
+  });
+  if (eventSubscription.status === "active") {
+    await handleSubscriptionUpdated(eventSubscription);
+  }
+  await handleSubscriptionStarted(
+    eventSubscription,
+    invoice,
+    new Date((invoice.status_transitions?.paid_at ?? eventCreatedAt) * 1000),
+    analyticsAttributionFromMetadata(
+      invoice.parent?.subscription_details?.metadata ??
+        stripeSubscription.metadata,
+    ),
   );
 }
 
@@ -89,13 +158,11 @@ export async function processStripeWebhook({
   }
 }
 
-export async function processStoredStripeWebhook(
-  payload: {
-    eventId: string;
-    eventType: StripeWebhookEventType;
-    objectId: string;
-  },
-) {
+export async function processStoredStripeWebhook(payload: {
+  eventId: string;
+  eventType: StripeWebhookEventType;
+  objectId: string;
+}) {
   const existing = await getStripeWebhookEvent(payload.eventId);
   if (!existing) throw new Error("Stripe webhook inbox record was not found.");
   if (existing.status === "completed") return { skipped: true };
@@ -135,6 +202,12 @@ export async function processStoredStripeWebhook(
       );
       await grantCreditTopUpForCheckoutSession(
         session as StripeCheckoutSession,
+        new Date(stripeEvent.created * 1000),
+      );
+    } else if (payload.eventType === "invoice.paid") {
+      await processPaidSubscriptionInvoice(
+        payload.objectId,
+        stripeEvent.created,
       );
     } else if (payload.eventType === "invoice.payment_failed") {
       const invoice = await stripeBillingProvider.retrieveInvoice(
@@ -154,22 +227,22 @@ export async function processStoredStripeWebhook(
           localSubscription,
           stripeSubscription,
         });
-      if (payload.eventType === "customer.subscription.created") {
-        if (applied) await handleSubscriptionStarted(eventSubscription);
-      } else if (applied) {
+      if (applied) {
         await handleSubscriptionUpdated(eventSubscription);
       }
       if (
         payload.eventType === "customer.subscription.updated" &&
         isCancellationScheduledTransition(stripeEvent, stripeSubscription)
       ) {
-        const recorded = await recordStripeWebhookLifecycleTransition({
+        await handleSubscriptionCanceled(
+          eventSubscription,
+          payload.eventId,
+          new Date(stripeEvent.created * 1000),
+        );
+        await recordStripeWebhookLifecycleTransition({
           processingToken,
           stripeEventId: payload.eventId,
         });
-        if (recorded) {
-          await handleSubscriptionCanceled(eventSubscription);
-        }
       }
     }
     const completed = await markStripeWebhookEventCompleted({

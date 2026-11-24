@@ -1,9 +1,10 @@
-import { analytics } from "@/adapters/analytics/server";
+import type { AnalyticsAttribution } from "@/adapters/analytics/events";
 import type { StripeInvoice } from "@/adapters/stripe/billing-provider";
 import {
   getBillingSubscriptionByStripeCustomerId,
   getBillingSubscriptionByStripeSubscriptionId,
 } from "@/server/db/dal/billing";
+import { queueBillingAnalytics } from "@/server/db/services/billing/analytics";
 import { reconcileCreditGrantForSubscription } from "@/server/db/services/credits/ledger";
 import { notifyBestEffort } from "@/server/db/services/notifications/service";
 import {
@@ -20,7 +21,7 @@ function stripeObjectId(value: unknown) {
   return null;
 }
 
-function invoiceSubscriptionId(invoice: StripeInvoice) {
+export function invoiceSubscriptionId(invoice: StripeInvoice) {
   const value = invoice as StripeInvoice & {
     parent?: { subscription_details?: { subscription?: unknown } };
     subscription?: unknown;
@@ -36,15 +37,15 @@ function displayPlan(plan: string) {
   return key ? billingCatalog.plans[key].displayName : plan;
 }
 
-export async function handleSubscriptionStarted(subscription: {
-  billingInterval?: null | string;
-  id: string;
-  plan: string;
-  referenceId: string;
-  stripeSubscriptionId?: null | string;
-}) {
-  const result = await reconcileCreditGrantForSubscription(subscription);
-  if (!result?.grantCreated) return result;
+export async function handleSubscriptionStarted(
+  subscription: Parameters<typeof reconcileCreditGrantForSubscription>[0] & {
+    billingInterval?: null | string;
+    stripeSubscriptionId: string;
+  },
+  invoice: StripeInvoice,
+  occurredAt: Date,
+  attribution?: AnalyticsAttribution,
+) {
   const plan = normalizeBillingPlan(subscription.plan);
   const interval = normalizeBillingInterval(subscription.billingInterval);
   await notifyBestEffort(
@@ -64,32 +65,52 @@ export async function handleSubscriptionStarted(subscription: {
     "billing.subscription_started",
   );
   if (plan && plan !== "free" && interval) {
-    await analytics.trackAuthoritative(
-      "subscription_started",
+    const properties = {
+      attribution,
+      billingInterval: interval === "annual" ? "yearly" : "monthly",
+      plan,
+    } as const;
+    await queueBillingAnalytics(
+      `subscription_started:${subscription.stripeSubscriptionId}`,
       {
-        billingInterval: interval === "annual" ? "yearly" : "monthly",
-        plan,
+        event: "subscription_started",
+        properties:
+          invoice.currency === "usd"
+            ? {
+                ...properties,
+                currency: "USD",
+                revenue: invoice.amount_paid / 100,
+              }
+            : properties,
+        context: { distinctId: subscription.referenceId },
       },
-      { context: { distinctId: subscription.referenceId } },
+      occurredAt,
     );
   }
-  return result;
 }
 
 export async function handleSubscriptionUpdated(
-  subscription: Parameters<typeof reconcileCreditGrantForSubscription>[0],
+  subscription: Parameters<typeof reconcileCreditGrantForSubscription>[0] & {
+    status: string | null;
+  },
 ) {
+  if (subscription.status !== "active" && subscription.status !== "trialing")
+    return null;
   return reconcileCreditGrantForSubscription(subscription);
 }
 
-export async function handleSubscriptionCanceled(subscription: {
-  billingInterval?: null | string;
-  cancelAtPeriodEnd?: boolean | null;
-  id: string;
-  plan: string;
-  referenceId: string;
-  stripeSubscriptionId?: null | string;
-}) {
+export async function handleSubscriptionCanceled(
+  subscription: {
+    billingInterval?: null | string;
+    cancelAtPeriodEnd?: boolean | null;
+    id: string;
+    plan: string;
+    referenceId: string;
+    stripeSubscriptionId?: null | string;
+  },
+  stripeEventId: string,
+  occurredAt: Date,
+) {
   const plan = normalizeBillingPlan(subscription.plan);
   const interval = normalizeBillingInterval(subscription.billingInterval);
   await notifyBestEffort(
@@ -109,14 +130,18 @@ export async function handleSubscriptionCanceled(subscription: {
     "billing.subscription_canceled",
   );
   if (plan && plan !== "free" && interval) {
-    await analytics.trackAuthoritative(
-      "subscription_cancelled",
+    await queueBillingAnalytics(
+      `subscription_cancelled:${stripeEventId}`,
       {
-        billingInterval: interval === "annual" ? "yearly" : "monthly",
-        cancelAtPeriodEnd: Boolean(subscription.cancelAtPeriodEnd),
-        plan,
+        event: "subscription_cancelled",
+        properties: {
+          billingInterval: interval === "annual" ? "yearly" : "monthly",
+          cancelAtPeriodEnd: Boolean(subscription.cancelAtPeriodEnd),
+          plan,
+        },
+        context: { distinctId: subscription.referenceId },
       },
-      { context: { distinctId: subscription.referenceId } },
+      occurredAt,
     );
   }
 }

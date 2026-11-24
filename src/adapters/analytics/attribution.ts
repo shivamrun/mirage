@@ -1,6 +1,10 @@
 "use client";
 
-import type { AnalyticsAttribution } from "@/adapters/analytics/events";
+import {
+  type AnalyticsAttribution,
+  signupAttributionCookie,
+} from "@/adapters/analytics/events";
+import { analyticsAttributionSchema } from "@/shared/schemas/analytics";
 
 const attributionStorageKey = "mirage.analytics.attribution";
 const attributionValueMaxLength = 120;
@@ -44,13 +48,11 @@ function readStoredAttribution() {
   try {
     const value = window.sessionStorage.getItem(attributionStorageKey);
 
-    if (!value) {
-      return {};
-    }
-
-    return removeEmptyValues(JSON.parse(value) as AnalyticsAttribution);
+    if (!value) return undefined;
+    const parsed = analyticsAttributionSchema.safeParse(JSON.parse(value));
+    return parsed.success ? parsed.data : undefined;
   } catch {
-    return {};
+    return undefined;
   }
 }
 
@@ -93,18 +95,12 @@ export function captureAnalyticsAttribution() {
     return {};
   }
 
-  const current = currentPageAttribution();
   const stored = readStoredAttribution();
-  const nextAttribution = removeEmptyValues({
-    ...current,
-    ...stored,
-    landingPath: stored.landingPath ?? current.landingPath,
-    referrerDomain: stored.referrerDomain ?? current.referrerDomain,
-  });
+  if (stored && Object.keys(stored).length > 0) return stored;
 
-  writeStoredAttribution(nextAttribution);
-
-  return nextAttribution;
+  const attribution = currentPageAttribution();
+  writeStoredAttribution(attribution);
+  return attribution;
 }
 
 export function getAnalyticsAttribution() {
@@ -115,4 +111,18 @@ export function getAnalyticsAttribution() {
   const attribution = captureAnalyticsAttribution();
 
   return Object.keys(attribution).length > 0 ? attribution : undefined;
+}
+
+export function saveSignupAttribution() {
+  try {
+    const attribution = getAnalyticsAttribution();
+    if (!attribution) return;
+
+    const value = encodeURIComponent(JSON.stringify(attribution));
+    const secure = window.location.protocol === "https:" ? "; Secure" : "";
+    // biome-ignore lint/suspicious/noDocumentCookie: The auth request needs the cookie to be available synchronously across browsers.
+    document.cookie = `${signupAttributionCookie}=${value}; Path=/api/auth; Max-Age=600; SameSite=Lax${secure}`;
+  } catch {
+    // Continue with signup when browser storage is unavailable.
+  }
 }

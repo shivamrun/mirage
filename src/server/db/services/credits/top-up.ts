@@ -2,7 +2,6 @@ import {
   analyticsAttributionFromMetadata,
   normalizeAnalyticsCurrency,
 } from "@/adapters/analytics/events";
-import { analytics } from "@/adapters/analytics/server";
 import {
   type StripeCheckoutSession,
   type StripeMetadata,
@@ -13,6 +12,7 @@ import {
   markCreditPurchaseFulfilled,
   markCreditPurchasePaid,
 } from "@/server/db/dal/billing-purchases";
+import { queueBillingAnalytics } from "@/server/db/services/billing/analytics";
 import {
   type BillingStripeClient,
   setBillingStripeClientForTests,
@@ -57,6 +57,7 @@ async function assertCheckoutSessionUsesTopUpPrice(sessionId: string) {
 
 export async function grantCreditTopUpForCheckoutSession(
   session: StripeCheckoutSession,
+  occurredAt: Date,
 ) {
   if (session.mode !== "payment" || session.payment_status !== "paid") {
     return null;
@@ -127,20 +128,20 @@ export async function grantCreditTopUpForCheckoutSession(
     "billing.credit_top_up_completed",
   );
 
-  if (result.created) {
-    await analytics.trackAuthoritative(
-      "credits_purchased",
-      {
+  await queueBillingAnalytics(
+    `credits_purchased:${session.id}`,
+    {
+      event: "credits_purchased",
+      properties: {
         attribution: analyticsAttributionFromMetadata(session.metadata),
         credits: creditTopUpProduct.credits,
         currency: normalizeAnalyticsCurrency(creditTopUpProduct.currency),
         revenue: creditTopUpProduct.amount / 100,
       },
-      {
-        context: { distinctId: userId, url: "/billing" },
-      },
-    );
-  }
+      context: { distinctId: userId, url: "/billing" },
+    },
+    occurredAt,
+  );
 
   return result;
 }

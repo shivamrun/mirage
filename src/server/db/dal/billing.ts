@@ -57,6 +57,15 @@ export async function getBillingSubscriptionByStripeSubscriptionId(
   return record ?? null;
 }
 
+export async function getBillingSubscriptionById(id: string) {
+  const [record] = await db
+    .select()
+    .from(subscription)
+    .where(eq(subscription.id, id))
+    .limit(1);
+  return record ?? null;
+}
+
 export async function updateBillingSubscription(
   id: string,
   values: BillingSubscriptionUpdate,

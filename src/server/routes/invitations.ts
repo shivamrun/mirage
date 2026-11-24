@@ -1,4 +1,5 @@
 import { Elysia } from "elysia";
+import { signupAttributionHeader } from "@/adapters/analytics/events";
 import {
   acceptInvitationSignup,
   validateInvitationToken,
@@ -59,10 +60,19 @@ export const invitationRoutes = new Elysia()
   .post(
     "/invitations/accept-signup",
     async ({ body, request, set, status }) => {
+      const headers = new Headers(request.headers);
+      if (body.attribution) {
+        headers.set(
+          signupAttributionHeader,
+          encodeURIComponent(JSON.stringify(body.attribution)),
+        );
+      } else {
+        headers.delete(signupAttributionHeader);
+      }
       const result = await acceptInvitationSignup({
         callbackURL: body.callbackURL,
         email: body.email,
-        headers: request.headers,
+        headers,
         password: body.password,
         token: body.token,
       });

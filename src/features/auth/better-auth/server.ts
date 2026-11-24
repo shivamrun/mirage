@@ -1,10 +1,18 @@
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { admin, captcha, twoFactor } from "better-auth/plugins";
+import {
+  type AnalyticsAttribution,
+  signupAttributionCookie,
+  signupAttributionHeader,
+} from "@/adapters/analytics/events";
 import { analytics } from "@/adapters/analytics/server";
 import { authStripePlugin } from "@/adapters/better-auth-stripe-plugin";
 import { logEmailDeliveryFailure } from "@/adapters/email";
-import { authHooks } from "@/features/auth/better-auth/hooks";
+import {
+  authAnalyticsPlugin,
+  authHooks,
+} from "@/features/auth/better-auth/hooks";
 import { authAccessControl, authRolePermissions } from "@/features/auth/roles";
 import { createAuthDatabaseAdapter } from "@/server/db/dal/auth";
 import {
@@ -13,6 +21,7 @@ import {
 } from "@/server/db/services/notifications/service";
 import { env } from "@/shared/env";
 import { siteConfig } from "@/shared/metadata";
+import { analyticsAttributionSchema } from "@/shared/schemas/analytics";
 
 export const isGoogleAuthConfigured = Boolean(
   env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET,
@@ -66,10 +75,34 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
-        async after(user, _context) {
-          void analytics.track("signup_completed", {
-            context: { distinctId: user.id },
-          });
+        async after(user, context) {
+          if (
+            context?.path === "/sign-up/email" ||
+            context?.path === "/callback/:id"
+          ) {
+            let attribution: AnalyticsAttribution | undefined;
+            try {
+              const header = context.headers?.get(signupAttributionHeader);
+              const attributionJson = header
+                ? decodeURIComponent(header)
+                : context.getCookie(signupAttributionCookie);
+              if (attributionJson) {
+                const parsed = analyticsAttributionSchema.safeParse(
+                  JSON.parse(attributionJson),
+                );
+                if (parsed.success) attribution = parsed.data;
+              }
+            } catch {
+              // Ignore malformed campaign data.
+            }
+            void analytics.track(
+              "signup_completed",
+              { attribution },
+              {
+                context: { distinctId: user.id },
+              },
+            );
+          }
           void notifyBestEffort(
             {
               data: {
@@ -138,6 +171,7 @@ export const auth = betterAuth({
     }),
     ...authCaptchaPlugins,
     authStripePlugin,
+    authAnalyticsPlugin,
     nextCookies(),
   ],
 });

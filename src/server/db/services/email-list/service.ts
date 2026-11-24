@@ -1,3 +1,5 @@
+import { compactAnalyticsAttribution } from "@/adapters/analytics/events";
+import { analytics } from "@/adapters/analytics/server";
 import { consumePublicWriteLimit } from "@/adapters/rate-limit";
 import {
   confirmEmailListVerificationTransaction,
@@ -17,6 +19,7 @@ import {
 import { notify } from "@/server/db/services/notifications/service";
 import { env } from "@/shared/env";
 import type { EmailSubscriptionValues } from "@/shared/schemas";
+import { emailSubscriptionSchema } from "@/shared/schemas";
 
 type SubscribeToEmailListResult =
   | {
@@ -48,6 +51,50 @@ type ConfirmEmailListVerificationResult =
   | {
       status: "invalid";
     };
+
+function referrerDomain(value: null | string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    return new URL(value).hostname.toLowerCase();
+  } catch {
+    return undefined;
+  }
+}
+
+function attributionFromEmailListMetadata(
+  metadata: EmailSubscriptionValues["metadata"],
+) {
+  return compactAnalyticsAttribution({
+    creator: metadata?.creator,
+    landingPath: metadata?.landing_path,
+    referrerDomain: referrerDomain(metadata?.referrer),
+    utmCampaign: metadata?.utm_campaign,
+    utmContent: metadata?.utm_content,
+    utmMedium: metadata?.utm_medium,
+    utmSource: metadata?.utm_source,
+    utmTerm: metadata?.utm_term,
+  });
+}
+
+function trackEmailListSignup(
+  subscription: { listKey: string; metadata: unknown; source: string | null },
+  verificationRequired: boolean,
+) {
+  const metadata = emailSubscriptionSchema.shape.metadata.safeParse(
+    subscription.metadata,
+  );
+  void analytics.track("email_list_signup_completed", {
+    attribution: attributionFromEmailListMetadata(
+      metadata.success ? metadata.data : null,
+    ),
+    listKey: subscription.listKey,
+    source: subscription.source,
+    verificationRequired,
+  });
+}
 
 function createEmailListVerificationUrl(token: string) {
   const url = new URL("/api/email-list/verify", env.NEXT_PUBLIC_BASE_URL);
@@ -104,6 +151,9 @@ export async function subscribeToEmailList(
   const verificationRequired = subscription.subscription.status === "pending";
 
   if (!verificationRequired) {
+    if (subscription.activated) {
+      trackEmailListSignup(values, false);
+    }
     return {
       status: "subscribed",
     };
@@ -166,6 +216,8 @@ export async function confirmEmailListVerification(
   if (result.status === "invalid") {
     return { status: "invalid" };
   }
+
+  trackEmailListSignup(result.subscription, true);
 
   return {
     email: result.payload.email,

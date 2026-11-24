@@ -8,9 +8,9 @@ The adapter is intentionally small:
 
 - Umami owns automatic page views and client-side route changes.
 - Mirage emits only named product events.
-- Browser events and server events use separate event maps.
-- Revenue and lifecycle events are awaited with a short timeout, but analytics
-  failures never block the business action.
+- Named product events use typed server event maps.
+- Billing webhooks queue revenue and lifecycle events in Postgres. A worker
+  delivers them to Umami and retries failed sends.
 - Distinct IDs are internal user IDs only. Do not send email, name, raw URLs,
   tokens, request bodies, or user-authored message text.
 
@@ -19,7 +19,7 @@ The adapter is intentionally small:
 | File | Purpose |
 | --- | --- |
 | `events.ts` | Event maps, exact-property track type, currency helper, and Distinct ID validation. |
-| `client.ts` | Browser-safe `analytics.track(...)` and `analytics.identify(userId)`. |
+| `client.ts` | Browser-safe `analytics.identify(userId)`. |
 | `server.ts` | Server-only direct Umami `/api/send` transport. |
 | `script.tsx` | Server component that renders the Umami tracker script. |
 | `auth-identifier.tsx` | Tiny client component that identifies the signed-in user once per user ID. |
@@ -47,7 +47,9 @@ origin. Next.js forwards both requests to Umami Cloud.
 
 Server analytics requires `NEXT_PUBLIC_UMAMI_WEBSITE_ID` and `UMAMI_HOST_URL`.
 Set `UMAMI_HOST_URL=https://gateway.umami.is` for direct server events on
-Umami Cloud.
+Umami Cloud. Login and subscription checkout now require this server setting,
+including deployments that previously tracked these events in the browser.
+Startup logs a warning if browser analytics is enabled without a server host.
 
 If you already collect browser analytics, set the browser opt-in before
 redeploying the proxy. For server-only analytics, leave the browser opt-in unset.
@@ -87,23 +89,25 @@ https://example.com/?utm_source=youtube&utm_medium=creator&utm_campaign=launch&c
 
 Attribution is attached to key marketing events when available:
 
+- `signup_completed`
 - `subscription_checkout_started`
+- `subscription_started`
 - `credit_top_up_checkout_started`
 - `credits_purchased`
 - `email_list_signup_completed`
 - `contact_submitted`
 
-`signup_completed` is currently emitted from the Better Auth server hook and
-does not receive browser attribution in v1.
+Email and Google signup pass campaign fields to the user creation hook in a
+short-lived cookie scoped to the auth API. Invitation signup sends the same
+validated attribution in its request body. Subscription checkout carries
+the same fields in Stripe metadata so they are available on subscription start.
 
 ## Event Maps
 
-Events are split by source in `events.ts`:
+Server events are defined in two maps in `events.ts`:
 
-- `ClientAnalyticsEventMap`: browser-only events.
 - `ServerBestEffortEventMap`: server telemetry that can be fire-and-forget.
-- `ServerAuthoritativeEventMap`: conversion and lifecycle events that should be
-  awaited with a short timeout.
+- `ServerAuthoritativeEventMap`: billing events delivered by the Postgres queue.
 
 The exported `AnalyticsTrack<EventMap, Return, Options>` overload keeps usage
 type-safe:
@@ -111,25 +115,9 @@ type-safe:
 - events with no properties do not accept a properties object;
 - events with properties require the correct shape;
 - extra fields are rejected, including on typed variables;
-- client code cannot emit server-only events;
 - revenue events enforce `revenue` and `currency` together.
 
 ## Client Usage
-
-Use the client adapter only from client components.
-
-```ts
-import { analytics } from "@/adapters/analytics/client";
-
-analytics.track("login_completed");
-
-analytics.track("subscription_checkout_started", {
-  attribution: getAnalyticsAttribution(),
-  billingInterval: "monthly",
-  plan: "pro",
-  scheduleAtPeriodEnd: false,
-});
-```
 
 For authenticated browser sessions, do not call `identify` in every feature.
 `AnalyticsAuthIdentifier` is rendered once in `AppProvider` and calls:
@@ -163,28 +151,9 @@ void analytics.track(
 );
 ```
 
-Authoritative events should be awaited:
-
-```ts
-await analytics.trackAuthoritative(
-  "credits_purchased",
-  {
-    attribution: {
-      utmSource: "youtube",
-      utmMedium: "creator",
-      utmCampaign: "launch",
-      utmContent: "creator-slug",
-      creator: "creator-slug",
-    },
-    credits: 200,
-    revenue: 50,
-    currency: "USD",
-  },
-  {
-    context: { distinctId: userId, url: "/billing" },
-  },
-);
-```
+Authoritative billing events use `queueBillingAnalytics` with a stable key
+and the occurrence time from Stripe. The queue worker sends the event and
+retries delivery independently of Stripe webhook processing.
 
 The server adapter sends:
 
@@ -217,13 +186,13 @@ properties.
 
 | Event | Source | Trigger |
 | --- | --- | --- |
-| `signup_completed` | server best-effort | Better Auth user creation. |
-| `login_completed` | client | Email/password login or login-mode 2FA success. |
-| `email_list_signup_completed` | server best-effort | Email list signup accepted. |
+| `signup_completed` | server best-effort | Email or OAuth account created. |
+| `login_completed` | server best-effort | Session issued after password login, OAuth callback, or login-mode 2FA. |
+| `email_list_signup_completed` | server best-effort | Email-list subscription newly active, immediately or after verification. |
 | `contact_submitted` | server best-effort | Contact form submission saved. |
-| `subscription_checkout_started` | client | Stripe subscription checkout URL returned. |
-| `subscription_started` | server authoritative | Paid subscription credit grant newly applied. |
-| `subscription_cancelled` | server authoritative | Better Auth subscription pending-cancel transition. |
+| `subscription_checkout_started` | server best-effort | Stripe subscription Checkout Session returned with a URL, including resumed checkout. |
+| `subscription_started` | server authoritative | Stripe confirms a positive payment on the initial subscription invoice. |
+| `subscription_cancelled` | server authoritative | Stripe webhook records a pending-cancel transition. |
 | `credit_top_up_checkout_started` | server best-effort | Credit top-up checkout session created. |
 | `credits_purchased` | server authoritative | Paid top-up ledger entry newly created. |
 | `credits_consumed` | server best-effort | Credit Lab spend succeeds. |
@@ -235,17 +204,26 @@ events. Add a small Stripe processed-event marker before emitting them.
 
 ## Idempotency
 
-Do not add a generic analytics outbox by default. Prefer existing durable
-business transitions:
+Stripe webhook replay can enqueue the same billing event safely. The queue
+deduplicates purchases by Checkout Session, starts by Stripe subscription,
+and scheduled cancellations by Stripe event. Failed sends stay queued with
+backoff. Successful sends retain the deduplication key and clear the payload.
 
-- `credits_purchased` emits only when `grantCreditTopUp(...)` reports
-  `created: true`.
-- `subscription_started` emits only when subscription credit reconciliation
-  reports `grantCreated: true`.
-- `subscription_cancelled` relies on Better Auth's transition callback.
+Run the Drizzle migration before starting the web app. The queue worker runs
+inside the long-lived Next.js Node process used by the standalone deployment.
+Subscribe the Stripe endpoint to `invoice.paid` to record paid subscription
+starts. If Umami accepts a request but its response is lost, retrying the
+event may count it twice. Stripe and the credit ledger provide exact totals.
 
-Best-effort events may be duplicated by retries, browser blockers, or user
-actions. Do not use them as financial records.
+## Staging verification
+
+Use a staging Umami website ID and Stripe test mode. Open a campaign URL in
+a fresh browser session, sign up, and complete a paid subscription through the
+post-signup checkout flow. In Umami, confirm that `signup_completed`,
+`subscription_checkout_started`, and `subscription_started` each appear once
+with the same campaign fields and Distinct ID. Repeat with direct checkout and
+Google sign-in. Confirm that an email-list submission requiring verification
+appears only after the confirmation link is used.
 
 ## Privacy Rules
 
@@ -282,9 +260,8 @@ Use the smallest source that matches the event:
 
 | Source | Use for | API |
 | --- | --- | --- |
-| Client | Browser-only interactions after a successful UI action. | `analytics.track(...)` from `@/adapters/analytics/client` |
 | Server best-effort | Non-financial server telemetry that can be fire-and-forget. | `void analytics.track(...)` from `@/adapters/analytics/server` |
-| Server authoritative | Revenue, purchase, subscription, or lifecycle events. | `await analytics.trackAuthoritative(...)` from `@/adapters/analytics/server` |
+| Server authoritative | Revenue, purchase, subscription, or lifecycle events. | `await queueBillingAnalytics(...)` from the billing analytics service |
 
 Prefer the durable business transition over a broad UI trigger. For example,
 emit a purchase event from the webhook or ledger write that proves the purchase
@@ -297,7 +274,7 @@ Add the event to exactly one map in `src/adapters/analytics/events.ts`.
 Use `undefined` for events with no properties:
 
 ```ts
-export type ClientAnalyticsEventMap = {
+export type ServerBestEffortEventMap = {
   login_completed: undefined;
 };
 ```
@@ -341,31 +318,6 @@ Reuse existing domain types whenever possible, such as `PricingPlanKey`,
 
 ### 3. Emit The Event
 
-Client events must be emitted only from client components:
-
-```ts
-"use client";
-
-import { analytics } from "@/adapters/analytics/client";
-
-analytics.track("login_completed");
-```
-
-Client events with attribution should read attribution at the moment the action
-succeeds:
-
-```ts
-import { getAnalyticsAttribution } from "@/adapters/analytics/attribution";
-import { analytics } from "@/adapters/analytics/client";
-
-analytics.track("subscription_checkout_started", {
-  attribution: getAnalyticsAttribution(),
-  billingInterval: interval,
-  plan,
-  scheduleAtPeriodEnd: false,
-});
-```
-
 Server best-effort events should not block the request:
 
 ```ts
@@ -384,28 +336,10 @@ void analytics.track(
 );
 ```
 
-Server authoritative events should be awaited:
-
-```ts
-import { analytics } from "@/adapters/analytics/server";
-
-await analytics.trackAuthoritative(
-  "credits_purchased",
-  {
-    attribution: analyticsAttributionFromMetadata(session.metadata),
-    credits: creditTopUpProduct.credits,
-    currency: normalizeAnalyticsCurrency(creditTopUpProduct.currency),
-    revenue: creditTopUpProduct.amount / 100,
-  },
-  {
-    context: { distinctId: userId, url: "/billing" },
-  },
-);
-```
-
-Put the user ID in `options.context.distinctId`, not in event properties. Use a
-pathname for `options.context.url`; the server adapter discards query strings,
-but call sites should still pass clean pathnames.
+Queue billing events from the webhook with a stable business key so webhook
+replay can recover an interrupted enqueue. Pass the Stripe event time and
+set the internal user ID in `context.distinctId`. Use a pathname for
+`context.url`.
 
 ### 4. Add Type Coverage
 

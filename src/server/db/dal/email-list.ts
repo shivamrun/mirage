@@ -131,6 +131,17 @@ export async function subscribeEmailToList(values: EmailSubscriptionValues) {
       throw new Error("Email contact could not be created.");
     }
 
+    const [existing] = await tx
+      .select({ status: emailSubscription.status })
+      .from(emailSubscription)
+      .where(
+        and(
+          eq(emailSubscription.contactId, contact.id),
+          eq(emailSubscription.listKey, values.listKey),
+        ),
+      )
+      .for("update");
+
     const [subscription] = await tx
       .insert(emailSubscription)
       .values({
@@ -160,6 +171,9 @@ export async function subscribeEmailToList(values: EmailSubscriptionValues) {
     }
 
     return {
+      activated:
+        subscription.status === "subscribed" &&
+        existing?.status !== "subscribed",
       contact,
       list,
       subscription,
@@ -441,7 +455,11 @@ export async function confirmEmailListVerificationTransaction<
           eq(emailSubscription.status, "pending"),
         ),
       )
-      .returning({ id: emailSubscription.id });
+      .returning({
+        listKey: emailSubscription.listKey,
+        metadata: emailSubscription.metadata,
+        source: emailSubscription.source,
+      });
 
     if (!updated) {
       return { status: "invalid" as const };
@@ -449,6 +467,7 @@ export async function confirmEmailListVerificationTransaction<
 
     return {
       payload,
+      subscription: updated,
       status: "success" as const,
     };
   });

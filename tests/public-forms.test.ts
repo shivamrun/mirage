@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { analytics } from "@/adapters/analytics/server";
 import {
   consumePublicWriteLimit,
   getPublicClientIdentifier,
@@ -95,6 +96,8 @@ async function subscriptionFor(address: string) {
 }
 
 describe("public contact and email signup", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   beforeEach(async () => {
     await seedDefaultEmailLists();
   });
@@ -344,11 +347,13 @@ describe("public contact and email signup", () => {
   });
 
   it("consumes a verification token once, including simultaneous requests", async () => {
+    const track = vi.spyOn(analytics, "track");
     const firstEmail = email();
     expect(
       (await formRequest("/email-list/", signupBody(firstEmail))).status,
     ).toBe(200);
     const firstToken = latestSignupToken(firstEmail);
+    expect(track).not.toHaveBeenCalled();
     expect(await verify(firstToken)).toBe("success");
     expect(await verify(firstToken)).toBe("invalid");
     expect((await subscriptionFor(firstEmail))?.status).toBe("subscribed");
@@ -362,6 +367,38 @@ describe("public contact and email signup", () => {
       (await Promise.all([verify(secondToken), verify(secondToken)])).sort(),
     ).toEqual(["invalid", "success"]);
     expect((await subscriptionFor(secondEmail))?.status).toBe("subscribed");
+    expect(track).toHaveBeenCalledTimes(2);
+    expect(track).toHaveBeenCalledWith(
+      "email_list_signup_completed",
+      expect.objectContaining({
+        listKey: "waitlist",
+        verificationRequired: true,
+      }),
+    );
+  });
+
+  it("counts immediate activation once across repeat submissions", async () => {
+    const track = vi.spyOn(analytics, "track");
+    await db
+      .update(emailList)
+      .set({ emailVerificationRequired: false })
+      .where(eq(emailList.key, "waitlist"));
+    const body = {
+      ...signupBody(email()),
+      metadata: { utm_source: "youtube" },
+    };
+
+    expect((await formRequest("/email-list/", body)).status).toBe(200);
+    expect((await formRequest("/email-list/", body)).status).toBe(200);
+    expect(track).toHaveBeenCalledExactlyOnceWith(
+      "email_list_signup_completed",
+      {
+        attribution: { utmSource: "youtube" },
+        listKey: "waitlist",
+        source: null,
+        verificationRequired: false,
+      },
+    );
   });
 
   it("keeps a pending signup after failed delivery so retry can succeed", async () => {

@@ -12,6 +12,7 @@ const durableEventTypes = new Set<Stripe.Event.Type>([
   "customer.subscription.updated",
   "customer.subscription.deleted",
   "invoice.payment_failed",
+  "invoice.paid",
 ]);
 
 function eventObjectId(event: Stripe.Event) {

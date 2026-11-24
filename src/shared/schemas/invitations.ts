@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { authRoles } from "@/features/auth/roles";
+import { analyticsAttributionSchema } from "./analytics";
 import { emailSchema } from "./helpers";
 import { paginatedResponseSchema, paginationQuerySchema } from "./pagination";
 
@@ -72,6 +73,7 @@ export const publicInvitationValidateResponseSchema = z.object({
 });
 
 export const acceptInvitationSignupSchema = z.object({
+  attribution: analyticsAttributionSchema,
   token: z.string().trim().min(1),
   email: emailSchema,
   password: z.string().min(8).max(128),

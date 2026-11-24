@@ -6,6 +6,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { Controller, useForm } from "react-hook-form";
+import {
+  getAnalyticsAttribution,
+  saveSignupAttribution,
+} from "@/adapters/analytics/attribution";
 import { TurnstileField } from "@/components/turnstile-field";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -76,6 +80,7 @@ function RegisterForm({
         ].post(
           {
             ...values,
+            attribution: getAnalyticsAttribution(),
             callbackURL: redirectTo,
             email: invitedEmail,
             token: invitationToken,
@@ -99,6 +104,7 @@ function RegisterForm({
         return;
       }
 
+      saveSignupAttribution();
       const result = await authClient.signUp.email({
         ...values,
         name: "",

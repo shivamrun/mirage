@@ -1,5 +1,5 @@
 import type { AnalyticsAttribution } from "@/adapters/analytics/events";
-import { compactAnalyticsAttribution } from "@/adapters/analytics/events";
+import { analyticsAttributionToMetadata } from "@/adapters/analytics/events";
 import { stripeBillingProvider } from "@/adapters/stripe/billing-provider";
 import {
   createOrGetCreditPurchase,
@@ -45,27 +45,6 @@ async function resolvePrice({
   return price;
 }
 
-function attributionMetadata(attribution: AnalyticsAttribution | undefined) {
-  const compacted = compactAnalyticsAttribution(attribution);
-
-  if (!compacted) {
-    return {};
-  }
-
-  return Object.fromEntries(
-    Object.entries({
-      analytics_creator: compacted.creator,
-      analytics_landing_path: compacted.landingPath,
-      analytics_referrer_domain: compacted.referrerDomain,
-      analytics_utm_campaign: compacted.utmCampaign,
-      analytics_utm_content: compacted.utmContent,
-      analytics_utm_medium: compacted.utmMedium,
-      analytics_utm_source: compacted.utmSource,
-      analytics_utm_term: compacted.utmTerm,
-    }).filter(([, value]) => Boolean(value)),
-  ) as Record<string, string>;
-}
-
 export async function createBillingCheckoutSession(
   input: CreateBillingCheckoutSessionInput,
 ) {
@@ -97,7 +76,7 @@ export async function createBillingCheckoutSession(
     purchaseType: "credit_top_up",
     purchaseId: purchase.id,
     userId: input.userId,
-    ...attributionMetadata(input.attribution),
+    ...analyticsAttributionToMetadata(input.attribution),
   };
 
   const session = await stripeBillingProvider.createCreditCheckout({

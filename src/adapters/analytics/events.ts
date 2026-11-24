@@ -1,4 +1,3 @@
-import type { BillingInterval, PricingPlanKey } from "@/features/pricing/plans";
 import type {
   BillingCheckoutInterval,
   BillingCheckoutPlan,
@@ -7,6 +6,8 @@ import type { CreditSampleItemKey } from "@/shared/credit-sample-catalog";
 
 const distinctIdMaxLength = 50;
 const analyticsAttributionValueMaxLength = 120;
+export const signupAttributionCookie = "mirage_signup_attribution";
+export const signupAttributionHeader = "x-mirage-signup-attribution";
 
 export type AnalyticsCurrency = "USD";
 
@@ -35,15 +36,6 @@ export type AnalyticsRevenue =
       revenue?: never;
     };
 
-export type ClientAnalyticsEventMap = {
-  login_completed: undefined;
-  subscription_checkout_started: {
-    billingInterval: BillingInterval;
-    plan: Exclude<PricingPlanKey, "free">;
-    scheduleAtPeriodEnd: boolean;
-  } & AnalyticsAttributionProperties;
-};
-
 export type ServerBestEffortEventMap = {
   contact_submitted: {
     hasCompany: boolean;
@@ -69,7 +61,12 @@ export type ServerBestEffortEventMap = {
     source: null | string;
     verificationRequired: boolean;
   } & AnalyticsAttributionProperties;
-  signup_completed: undefined;
+  login_completed: undefined;
+  signup_completed: AnalyticsAttributionProperties;
+  subscription_checkout_started: {
+    billingInterval: BillingCheckoutInterval;
+    plan: BillingCheckoutPlan;
+  } & AnalyticsAttributionProperties;
 };
 
 export type ServerAuthoritativeEventMap = {
@@ -96,8 +93,17 @@ export type ServerAuthoritativeEventMap = {
   subscription_started: {
     billingInterval: BillingCheckoutInterval;
     plan: BillingCheckoutPlan;
-  } & AnalyticsRevenue;
+  } & AnalyticsRevenue &
+    AnalyticsAttributionProperties;
 };
+
+export type BillingAnalyticsEvent = {
+  [Name in keyof ServerAuthoritativeEventMap]: {
+    event: Name;
+    properties: ServerAuthoritativeEventMap[Name];
+    context?: { distinctId?: string; url?: string };
+  };
+}[keyof ServerAuthoritativeEventMap];
 
 export type ExactProperties<Expected, Actual extends Expected> = Actual &
   Record<Exclude<keyof Actual, keyof Expected>, never>;
@@ -184,4 +190,23 @@ export function analyticsAttributionFromMetadata(
     utmSource: metadata.analytics_utm_source ?? undefined,
     utmTerm: metadata.analytics_utm_term ?? undefined,
   });
+}
+
+export function analyticsAttributionToMetadata(
+  attribution: AnalyticsAttribution | undefined,
+) {
+  const compacted = compactAnalyticsAttribution(attribution);
+
+  return Object.fromEntries(
+    Object.entries({
+      analytics_creator: compacted?.creator,
+      analytics_landing_path: compacted?.landingPath,
+      analytics_referrer_domain: compacted?.referrerDomain,
+      analytics_utm_campaign: compacted?.utmCampaign,
+      analytics_utm_content: compacted?.utmContent,
+      analytics_utm_medium: compacted?.utmMedium,
+      analytics_utm_source: compacted?.utmSource,
+      analytics_utm_term: compacted?.utmTerm,
+    }).filter((entry): entry is [string, string] => Boolean(entry[1])),
+  );
 }

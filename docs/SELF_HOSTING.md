@@ -78,6 +78,10 @@ website ID. Leave the browser opt-in unset for server-only deployments.
 See [analytics configuration](adapters/analytics.md#configuration) for the
 direct server event setting.
 
+To collect paid subscription conversions, add `invoice.paid` to the existing
+Stripe webhook endpoint. The upgrade migration creates the billing analytics
+queue, and the app process retries failed deliveries while it is running.
+
 ## Backups and shutdown
 
 Back up the PostgreSQL database and Redis volume. Test restoration before

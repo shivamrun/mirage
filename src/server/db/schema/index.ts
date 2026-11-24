@@ -2,6 +2,7 @@ export * from "./account-deletion";
 export * from "./admin-session-assurance";
 export * from "./auth-schema";
 export * from "./billing";
+export * from "./billing-analytics";
 export * from "./contact-submission";
 export * from "./credits";
 export * from "./email-deliveries";

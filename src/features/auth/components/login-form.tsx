@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { useForm } from "react-hook-form";
-import { analytics } from "@/adapters/analytics/client";
 import { TurnstileField } from "@/components/turnstile-field";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
@@ -94,7 +93,6 @@ function LoginForm({
       }
 
       setIsRedirecting(true);
-      analytics.track("login_completed");
       router.push(result.data?.url ?? redirectTo);
       router.refresh();
     } catch (reason) {

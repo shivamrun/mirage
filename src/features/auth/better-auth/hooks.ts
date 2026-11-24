@@ -1,5 +1,10 @@
+import type { BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
+import { z } from "zod";
 
+import { analyticsAttributionFromMetadata } from "@/adapters/analytics/events";
+import { analytics } from "@/adapters/analytics/server";
+import { normalizeBillingPlan } from "@/shared/billing";
 import {
   authResetPasswordSchema,
   changeEmailSchema,
@@ -11,6 +16,77 @@ import {
   verifyEmailSchema,
 } from "@/shared/schemas";
 import { emailSchema } from "@/shared/schemas/helpers";
+
+const loginPaths = new Set([
+  "/sign-in/email",
+  "/callback/:id",
+  "/two-factor/verify-totp",
+  "/two-factor/verify-otp",
+  "/two-factor/verify-backup-code",
+]);
+const trackedCheckoutSchema = z.object({
+  client_reference_id: z.string().nullish(),
+  metadata: z.record(z.string(), z.string()).nullish(),
+  mode: z.literal("subscription"),
+  object: z.literal("checkout.session"),
+  url: z.string().min(1),
+});
+
+export const authAnalyticsPlugin = {
+  id: "mirage-analytics",
+  hooks: {
+    after: [
+      {
+        matcher: ({ path }) => Boolean(path && loginPaths.has(path)),
+        handler: createAuthMiddleware(async (ctx) => {
+          const userId = ctx.context.newSession?.user.id;
+          const result = ctx.context.returned;
+
+          const requiresTwoFactor =
+            result &&
+            typeof result === "object" &&
+            "twoFactorRedirect" in result &&
+            result.twoFactorRedirect === true;
+
+          if (userId && !requiresTwoFactor) {
+            void analytics.track("login_completed", {
+              context: { distinctId: userId },
+            });
+          }
+        }),
+      },
+      {
+        matcher: ({ path }) => path === "/subscription/upgrade",
+        handler: createAuthMiddleware(async (ctx) => {
+          const checkout = trackedCheckoutSchema.safeParse(
+            ctx.context.returned,
+          );
+          if (!checkout.success) return;
+
+          const plan = normalizeBillingPlan(ctx.body?.plan);
+          if (!plan || plan === "free") return;
+
+          void analytics.track(
+            "subscription_checkout_started",
+            {
+              attribution: analyticsAttributionFromMetadata(
+                checkout.data.metadata,
+              ),
+              billingInterval: ctx.body?.annual ? "yearly" : "monthly",
+              plan,
+            },
+            {
+              context: {
+                distinctId: checkout.data.client_reference_id ?? undefined,
+                url: "/checkout",
+              },
+            },
+          );
+        }),
+      },
+    ],
+  },
+} satisfies BetterAuthPlugin;
 
 const authInputSchemas = {
   "/sign-in/email": loginSchema,

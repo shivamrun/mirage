@@ -1,10 +1,5 @@
 import { Elysia } from "elysia";
 import {
-  type AnalyticsAttribution,
-  compactAnalyticsAttribution,
-} from "@/adapters/analytics/events";
-import { analytics } from "@/adapters/analytics/server";
-import {
   confirmEmailListVerification,
   subscribeToEmailList,
 } from "@/server/db/services/email-list/service";
@@ -22,42 +17,6 @@ function createEmailListRedirectUrl(status: "invalid" | "success") {
   url.searchParams.set("emailListVerification", status);
 
   return url.toString();
-}
-
-function referrerDomain(value: null | string | undefined) {
-  if (!value) {
-    return undefined;
-  }
-
-  try {
-    return new URL(value).hostname.toLowerCase();
-  } catch {
-    return undefined;
-  }
-}
-
-function attributionFromEmailListMetadata(
-  metadata: null | {
-    creator?: string;
-    landing_path?: string;
-    referrer?: string;
-    utm_campaign?: string;
-    utm_content?: string;
-    utm_medium?: string;
-    utm_source?: string;
-    utm_term?: string;
-  },
-) {
-  return compactAnalyticsAttribution({
-    creator: metadata?.creator,
-    landingPath: metadata?.landing_path,
-    referrerDomain: referrerDomain(metadata?.referrer),
-    utmCampaign: metadata?.utm_campaign,
-    utmContent: metadata?.utm_content,
-    utmMedium: metadata?.utm_medium,
-    utmSource: metadata?.utm_source,
-    utmTerm: metadata?.utm_term,
-  } satisfies AnalyticsAttribution);
 }
 
 export const emailListRoutes = new Elysia({ prefix: "/email-list" })
@@ -88,17 +47,6 @@ export const emailListRoutes = new Elysia({ prefix: "/email-list" })
             "Verification email could not be sent. Please try signing up again.",
         });
       }
-
-      void analytics.track(
-        "email_list_signup_completed",
-        {
-          attribution: attributionFromEmailListMetadata(body.metadata),
-          listKey: body.listKey,
-          source: body.source,
-          verificationRequired: result.status === "pending-verification",
-        },
-        { context: { url: "/" } },
-      );
 
       return {
         status: true as const,

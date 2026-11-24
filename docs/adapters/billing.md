@@ -378,17 +378,17 @@ emitted today.
    lookup key. Monthly checkout uses the monthly lookup key.
 6. Better Auth creates the Stripe Checkout session using
    `subscriptionPlans`.
-7. When a checkout URL is returned, the browser emits
-   `subscription_checkout_started` and redirects to Stripe.
+7. When Stripe returns a Checkout Session with a URL, the shared server
+   endpoint emits `subscription_checkout_started` and the browser redirects.
 8. If checkout is abandoned, no local subscription or credit grant is created by
    this app. The user lands back on `cancelUrl` only if Stripe redirects them.
 9. Stripe sends subscription events to `/api/auth/stripe/webhook`.
 10. Better Auth updates the local `subscription` table and `onEvent` persists a
     durable inbox record.
-11. Webhook processing maps the immutable Stripe event subscription snapshot to
-    the local row and calls `reconcileCreditGrantForSubscription(...)`.
-12. A create event emits `subscription_started` only if the credit grant was
-    newly created.
+11. Webhook processing maps Stripe subscription state to the local row and
+    reconciles credit grants for active or trialing subscriptions.
+12. A positive payment on the initial subscription invoice queues
+    `subscription_started` once per Stripe subscription.
 
 Validation happens in multiple places:
 
@@ -626,8 +626,8 @@ currently emits:
 
 | Event | Where | Meaning |
 | --- | --- | --- |
-| `subscription_checkout_started` | Browser pricing button | Checkout URL returned; intent only. |
-| `subscription_started` | Subscription-created webhook processing | A new subscription period credit grant was created. |
+| `subscription_checkout_started` | Shared checkout endpoint | Stripe Checkout Session returned with a URL. |
+| `subscription_started` | `invoice.paid` webhook processing | Initial subscription payment confirmed. |
 | `subscription_cancelled` | Subscription-updated webhook processing | Stripe changed `cancel_at_period_end` from false to true. |
 | `credit_top_up_checkout_started` | `/api/billing/checkout` | Top-up Checkout session created; intent only. |
 | `credits_purchased` | Top-up webhook after ledger insert | Paid top-up credits were durably granted. |

@@ -47,4 +47,21 @@ describe("analytics enablement", () => {
     expect(getAnalyticsConfig().enabled).toBe(false);
     expect(getServerAnalyticsConfig().enabled).toBe(false);
   });
+
+  it("warns at startup when browser-only config omits the server host", async () => {
+    analyticsEnv.NEXT_PUBLIC_UMAMI_BROWSER_ENABLED = true;
+    analyticsEnv.UMAMI_HOST_URL = "";
+    vi.stubEnv("NEXT_RUNTIME", "nodejs");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { register } = await import("@/instrumentation");
+      await register();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("UMAMI_HOST_URL is missing"),
+      );
+    } finally {
+      warn.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
 });

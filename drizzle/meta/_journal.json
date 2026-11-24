@@ -253,6 +253,13 @@
       "when": 1794850907793,
       "tag": "0035_flowery_rockslide",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1795547456329,
+      "tag": "0036_billing_analytics",
+      "breakpoints": true
     }
   ]
 }

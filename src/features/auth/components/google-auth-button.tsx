@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { saveSignupAttribution } from "@/adapters/analytics/attribution";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/features/auth/better-auth/client";
 import {
@@ -57,6 +58,7 @@ function GoogleAuthButton({
       }
 
       setIsPending(true);
+      saveSignupAttribution();
 
       const result = await authClient.signIn.social({
         provider: "google",

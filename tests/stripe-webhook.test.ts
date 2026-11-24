@@ -1,7 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import type Stripe from "stripe";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import * as analyticsConfig from "@/adapters/analytics/config";
+import { analytics } from "@/adapters/analytics/server";
+import {
+  getBillingStripeClient,
+  setBillingStripeClientForTests,
+} from "@/adapters/stripe/client";
 import db from "@/server/db";
 import {
   createOrGetCreditPurchase,
@@ -15,15 +22,18 @@ import {
   markStripeWebhookEventRetrying,
 } from "@/server/db/dal/stripe-webhook-events";
 import {
+  billingAnalytics,
   notification,
   stripeWebhookEvents,
   subscription,
   user,
 } from "@/server/db/schema";
+import { drainBillingAnalytics } from "@/server/db/services/billing/analytics";
 import { processStoredStripeWebhook } from "@/server/db/services/billing/stripe-webhooks";
 import { getCreditBalance } from "@/server/db/services/credits/ledger";
 import { setCreditTopUpStripeClientForTests } from "@/server/db/services/credits/top-up";
 import { app } from "@/server/routes";
+import { billingCatalog } from "@/shared/billing";
 import { createTestActor } from "./infra/admin-actor";
 
 const topUpSession = (userId: string, purchaseId?: string) => ({
@@ -41,6 +51,61 @@ const topUpSession = (userId: string, purchaseId?: string) => ({
   mode: "payment",
   object: "checkout.session",
   payment_status: "paid",
+});
+
+describe("Stripe subscription checkout analytics", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("counts a subscription Checkout Session returned by the shared endpoint", async () => {
+    const actor = await createTestActor({ emailVerified: true });
+    const track = vi.spyOn(analytics, "track");
+    const createSession = vi.fn(
+      async (params: Stripe.Checkout.SessionCreateParams) => ({
+        client_reference_id: params.client_reference_id,
+        id: "cs_test_subscription",
+        metadata: params.metadata,
+        mode: params.mode,
+        object: "checkout.session",
+        url: "https://checkout.stripe.test/session",
+      }),
+    );
+    const fakeStripe = getBillingStripeClient();
+    setBillingStripeClientForTests({
+      ...fakeStripe,
+      checkout: { sessions: { create: createSession } },
+      prices: { list: async () => ({ data: [{ id: "price_pro" }] }) },
+      subscriptions: { list: async () => ({ data: [] }) },
+    } as never);
+
+    const origin = "http://localhost:3000";
+    const response = await app.fetch(
+      new Request(`${origin}/api/auth/subscription/upgrade`, {
+        body: JSON.stringify({
+          disableRedirect: true,
+          metadata: { analytics_utm_source: "youtube" },
+          plan: billingCatalog.plans.pro.checkoutName,
+        }),
+        headers: {
+          "content-type": "application/json",
+          cookie: actor.cookie,
+          origin,
+        },
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(createSession).toHaveBeenCalledOnce();
+    expect(track).toHaveBeenCalledExactlyOnceWith(
+      "subscription_checkout_started",
+      {
+        attribution: { utmSource: "youtube" },
+        billingInterval: "monthly",
+        plan: "pro",
+      },
+      { context: { distinctId: actor.id, url: "/checkout" } },
+    );
+  });
 });
 
 function subscriptionObject({
@@ -83,6 +148,7 @@ function subscriptionObject({
       object: "list",
     },
     metadata: {
+      analytics_utm_source: "youtube",
       lookupKey,
       plan,
     },
@@ -99,17 +165,30 @@ function setBetterAuthWebhookStripeClient({
   throwOnConstruct = false,
   userId,
   purchaseId,
+  subscriptionStatus,
+  localSubscriptionId,
 }: {
   eventType:
     | "checkout.session.completed"
     | "customer.subscription.created"
+    | "invoice.paid"
     | "invoice.payment_failed";
   invoiceMetadata?: Record<string, string>;
   invoiceSubscriptionId?: string;
   throwOnConstruct?: boolean;
   userId: string;
   purchaseId?: string;
+  subscriptionStatus?: string;
+  localSubscriptionId?: string;
 }) {
+  const stripeSubscription = subscriptionObject({ status: subscriptionStatus });
+  const stripeRecord = {
+    ...stripeSubscription,
+    metadata: {
+      ...stripeSubscription.metadata,
+      subscriptionId: localSubscriptionId,
+    },
+  };
   const event = {
     created: Math.floor(Date.now() / 1000),
     data: {
@@ -133,14 +212,28 @@ function setBetterAuthWebhookStripeClient({
                     }
                   : undefined,
               }
-            : subscriptionObject(),
+            : eventType === "invoice.paid"
+              ? {
+                  amount_paid: 2000,
+                  billing_reason: "subscription_create",
+                  currency: "usd",
+                  id: "in_test_paid",
+                  object: "invoice",
+                  parent: {
+                    subscription_details: { subscription: "sub_test" },
+                  },
+                  status: "paid",
+                }
+              : stripeRecord,
     },
     id: `evt_test_${eventType.replaceAll(".", "_")}_${randomUUID()}`,
     object: "event",
     type: eventType,
   };
   const invoice =
-    eventType === "invoice.payment_failed" ? event.data.object : null;
+    eventType === "invoice.payment_failed" || eventType === "invoice.paid"
+      ? event.data.object
+      : null;
   setCreditTopUpStripeClientForTests({
     checkout: {
       sessions: {
@@ -189,7 +282,7 @@ function setBetterAuthWebhookStripeClient({
       retrieve: async () => invoice,
     },
     subscriptions: {
-      retrieve: async () => subscriptionObject(),
+      retrieve: async () => stripeRecord,
     },
     webhooks: {
       constructEventAsync: async () => {
@@ -233,6 +326,11 @@ async function postBetterAuthStripeWebhook(body = "{}") {
 }
 
 describe("Stripe webhook route", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
   it("is mounted through the Better Auth handler", async () => {
     const response = await app.fetch(
       new Request("http://localhost:3000/api/auth/stripe/webhook", {
@@ -336,20 +434,97 @@ describe("Stripe webhook route", () => {
     expect(balance.account.availableCredits).toBe(210);
   });
 
-  it("creates subscription records and grants credits through Better Auth lifecycle hooks", async () => {
+  it("grants no plan credits on an incomplete subscription", async () => {
     const actor = await createTestActor();
+    vi.spyOn(analyticsConfig, "getServerAnalyticsConfig").mockReturnValue({
+      enabled: true,
+      hostUrl: "https://umami.test",
+      websiteId: "test-site",
+    });
     await db
       .update(user)
       .set({ stripeCustomerId: "cus_test" })
       .where(eq(user.id, actor.id));
     setBetterAuthWebhookStripeClient({
       eventType: "customer.subscription.created",
+      subscriptionStatus: "incomplete",
       userId: actor.id,
     });
 
     const response = await postBetterAuthStripeWebhook();
-
     expect(response.status, await response.clone().text()).toBe(200);
+    expect((await getCreditBalance(actor.id)).account.availableCredits).toBe(
+      10,
+    );
+    expect(await db.select().from(billingAnalytics)).toHaveLength(0);
+    expect(
+      await db
+        .select()
+        .from(notification)
+        .where(eq(notification.type, "billing.subscription_started")),
+    ).toHaveLength(0);
+  });
+
+  it("queues initial payment before subscription creation and retries Umami independently", async () => {
+    const actor = await createTestActor();
+    const localSubscriptionId = randomUUID();
+    await db.insert(subscription).values({
+      id: localSubscriptionId,
+      plan: "pro",
+      referenceId: actor.id,
+      status: "incomplete",
+      stripeCustomerId: "cus_test",
+    });
+    vi.spyOn(analyticsConfig, "getServerAnalyticsConfig").mockReturnValue({
+      enabled: true,
+      hostUrl: "https://umami.test",
+      websiteId: "test-site",
+    });
+    setBetterAuthWebhookStripeClient({
+      eventType: "invoice.paid",
+      localSubscriptionId,
+      userId: actor.id,
+    });
+    const response = await postBetterAuthStripeWebhook();
+    expect(response.status, await response.clone().text()).toBe(200);
+    // Replay the same event, then send a distinct event for the same invoice.
+    expect((await postBetterAuthStripeWebhook()).status).toBe(200);
+    setBetterAuthWebhookStripeClient({
+      eventType: "invoice.paid",
+      localSubscriptionId,
+      userId: actor.id,
+    });
+    expect((await postBetterAuthStripeWebhook()).status).toBe(200);
+    const queued = await db.select().from(billingAnalytics);
+    expect(queued).toHaveLength(1);
+    expect(queued[0]?.event).toMatchObject({
+      event: "subscription_started",
+      properties: {
+        attribution: { utmSource: "youtube" },
+        billingInterval: "monthly",
+        currency: "USD",
+        plan: "pro",
+        revenue: 20,
+      },
+      context: { distinctId: actor.id },
+    });
+
+    const delivery = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", delivery);
+    await drainBillingAnalytics();
+    expect(delivery).toHaveBeenCalledTimes(1);
+    expect(
+      (await db.select().from(billingAnalytics))[0]?.deliveredAt,
+    ).toBeNull();
+    await db.update(billingAnalytics).set({ availableAt: new Date(0) });
+    await drainBillingAnalytics();
+    expect(delivery).toHaveBeenCalledTimes(2);
+    const [delivered] = await db.select().from(billingAnalytics);
+    expect(delivered?.deliveredAt).toBeInstanceOf(Date);
+    expect(delivered?.event).toBeNull();
 
     const records = await db
       .select()

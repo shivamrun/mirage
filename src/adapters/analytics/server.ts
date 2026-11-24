@@ -3,10 +3,13 @@ import "server-only";
 import { getServerAnalyticsConfig } from "@/adapters/analytics/config";
 import type {
   AnalyticsTrack,
-  ServerAuthoritativeEventMap,
   ServerBestEffortEventMap,
 } from "@/adapters/analytics/events";
-import { isValidDistinctId } from "@/adapters/analytics/events";
+import {
+  type BillingAnalyticsEvent,
+  type EventsWithoutProperties,
+  isValidDistinctId,
+} from "@/adapters/analytics/events";
 import { env } from "@/shared/env";
 
 type ServerAnalyticsContext = {
@@ -22,7 +25,9 @@ type ServerAnalyticsOptions = {
 const defaultBestEffortTimeoutMs = 1_500;
 const defaultAuthoritativeTimeoutMs = 2_500;
 const serverUserAgent = "Mirage/0.1 Analytics Server";
-const eventsWithoutProperties = new Set<string>(["signup_completed"]);
+const eventsWithoutProperties = {
+  login_completed: true,
+} satisfies Record<EventsWithoutProperties<ServerBestEffortEventMap>, true>;
 
 function pathnameOnly(value: string | undefined) {
   if (!value) {
@@ -41,15 +46,17 @@ async function sendServerEvent({
   event,
   options,
   properties,
+  timestamp,
 }: {
   event: string;
   options?: ServerAnalyticsOptions;
   properties?: Record<string, unknown>;
+  timestamp?: number;
 }) {
   const config = getServerAnalyticsConfig();
 
   if (!config.enabled || !config.hostUrl || !config.websiteId) {
-    return;
+    return false;
   }
 
   const controller = new AbortController();
@@ -69,6 +76,7 @@ async function sendServerEvent({
     if (properties) {
       payload.data = properties;
     }
+    if (timestamp !== undefined) payload.timestamp = timestamp;
 
     if (isValidDistinctId(options?.context?.distinctId)) {
       payload.id = options.context.distinctId;
@@ -89,11 +97,13 @@ async function sendServerEvent({
 
     if (!response.ok) {
       console.warn(
-        `Analytics event delivery failed with status ${response.status}.`,
+        `Analytics event ${event} failed with status ${response.status}.`,
       );
     }
+    return response.ok;
   } catch (error) {
-    console.warn("Analytics event delivery failed:", error);
+    console.warn(`Analytics event ${event} delivery failed:`, error);
+    return false;
   } finally {
     clearTimeout(timeout);
   }
@@ -104,7 +114,7 @@ function trackServerBestEffort(
   propertiesOrOptions?: Record<string, unknown> | ServerAnalyticsOptions,
   maybeOptions?: ServerAnalyticsOptions,
 ) {
-  const eventHasProperties = !eventsWithoutProperties.has(String(event));
+  const eventHasProperties = !Object.hasOwn(eventsWithoutProperties, event);
   const properties = eventHasProperties
     ? (propertiesOrOptions as Record<string, unknown> | undefined)
     : undefined;
@@ -112,31 +122,24 @@ function trackServerBestEffort(
     ? maybeOptions
     : (propertiesOrOptions as ServerAnalyticsOptions | undefined);
 
-  return sendServerEvent({ event, options, properties });
+  return sendServerEvent({ event, options, properties }).then(() => undefined);
 }
 
-function trackServerAuthoritative(
-  event: keyof ServerAuthoritativeEventMap,
-  propertiesOrOptions?: Record<string, unknown> | ServerAnalyticsOptions,
-  maybeOptions?: ServerAnalyticsOptions,
+export function deliverBillingAnalytics(
+  { event, properties, context }: BillingAnalyticsEvent,
+  occurredAt: Date,
 ) {
-  const properties = propertiesOrOptions as Record<string, unknown> | undefined;
-  const options = {
-    ...maybeOptions,
-    timeoutMs: maybeOptions?.timeoutMs ?? defaultAuthoritativeTimeoutMs,
-  };
-
-  return sendServerEvent({ event, options, properties });
+  return sendServerEvent({
+    event,
+    options: { context, timeoutMs: defaultAuthoritativeTimeoutMs },
+    properties,
+    timestamp: Math.floor(occurredAt.getTime() / 1000),
+  });
 }
 
 export const analytics = {
   track: trackServerBestEffort as AnalyticsTrack<
     ServerBestEffortEventMap,
-    Promise<void>,
-    ServerAnalyticsOptions
-  >,
-  trackAuthoritative: trackServerAuthoritative as AnalyticsTrack<
-    ServerAuthoritativeEventMap,
     Promise<void>,
     ServerAnalyticsOptions
   >,

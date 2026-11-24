@@ -101,7 +101,7 @@ changes, security reviews, or reliability hardening passes.
 - Select at least these events for the Better Auth endpoint:
   `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
   `customer.subscription.created`, `customer.subscription.updated`, and
-  `customer.subscription.deleted`, plus `invoice.payment_failed`.
+  `customer.subscription.deleted`, plus `invoice.paid` and `invoice.payment_failed`.
 - Verify the Stripe lookup keys used by the billing catalog exist in the
   production Stripe account: `mirage_pro_2_monthly`,
   `mirage_pro_2_yearly`, `mirage_hacker_monthly`, and
