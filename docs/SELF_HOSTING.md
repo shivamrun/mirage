@@ -70,6 +70,14 @@ Back up Postgres before an upgrade, pull the new source, then rerun the same
 `up -d --build` command. Compose recreates the one-shot migration container;
 successful migrations complete before the new app starts.
 
+When upgrading to the Umami Cloud proxy, remove the old tracker script URL
+setting from your deployment environment. To continue browser tracking, set
+`NEXT_PUBLIC_UMAMI_BROWSER_ENABLED=true` before rebuilding and set
+`NEXT_PUBLIC_BASE_URL` to the origin visitors use. Keep the existing Umami
+website ID. Leave the browser opt-in unset for server-only deployments.
+See [analytics configuration](adapters/analytics.md#configuration) for the
+direct server event setting.
+
 ## Backups and shutdown
 
 Back up the PostgreSQL database and Redis volume. Test restoration before

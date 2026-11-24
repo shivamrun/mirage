@@ -4,7 +4,6 @@ export type AnalyticsConfig = {
   domains?: string;
   enabled: boolean;
   hostUrl?: string;
-  scriptUrl?: string;
   websiteId?: string;
 };
 
@@ -24,16 +23,15 @@ function isAnalyticsEnabledForEnvironment() {
 }
 
 export function getAnalyticsConfig(): AnalyticsConfig {
-  const hasClientConfig = Boolean(
-    env.NEXT_PUBLIC_UMAMI_WEBSITE_ID && env.NEXT_PUBLIC_UMAMI_SCRIPT_URL,
-  );
-  const enabled = isAnalyticsEnabledForEnvironment() && hasClientConfig;
+  const enabled =
+    isAnalyticsEnabledForEnvironment() &&
+    env.NEXT_PUBLIC_UMAMI_BROWSER_ENABLED === true &&
+    Boolean(env.NEXT_PUBLIC_UMAMI_WEBSITE_ID);
 
   return {
     domains: env.NEXT_PUBLIC_UMAMI_DOMAINS,
     enabled,
     hostUrl: env.UMAMI_HOST_URL,
-    scriptUrl: env.NEXT_PUBLIC_UMAMI_SCRIPT_URL,
     websiteId: env.NEXT_PUBLIC_UMAMI_WEBSITE_ID,
   };
 }

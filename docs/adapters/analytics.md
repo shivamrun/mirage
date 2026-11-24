@@ -34,15 +34,23 @@ Analytics is optional. Missing config should make the adapter no-op.
 | Env var | Used by | Notes |
 | --- | --- | --- |
 | `NEXT_PUBLIC_UMAMI_ENABLED` | client and server | Optional boolean flag. Defaults to enabled only in production. Always disabled in `test`. |
+| `NEXT_PUBLIC_UMAMI_BROWSER_ENABLED` | client | Set to `true` to opt into browser analytics. Defaults to disabled. |
 | `NEXT_PUBLIC_UMAMI_WEBSITE_ID` | client and server | Umami website ID. Required for any analytics delivery. |
-| `NEXT_PUBLIC_UMAMI_SCRIPT_URL` | client | Tracker script URL. Required only for browser tracking. |
 | `NEXT_PUBLIC_UMAMI_DOMAINS` | client | Optional Umami domain filter. |
 | `UMAMI_HOST_URL` | server | Umami host used for direct server `POST /api/send`. Required only for server tracking. |
 
-Client analytics requires `NEXT_PUBLIC_UMAMI_WEBSITE_ID` and
-`NEXT_PUBLIC_UMAMI_SCRIPT_URL`.
+Client analytics requires `NEXT_PUBLIC_UMAMI_BROWSER_ENABLED=true` and
+`NEXT_PUBLIC_UMAMI_WEBSITE_ID`. The shared enable flag still applies.
+`NEXT_PUBLIC_BASE_URL` must match the public origin of the analytics-enabled
+deployment. The browser loads `/stats.js` and posts to `/api/send` on that
+origin. Next.js forwards both requests to Umami Cloud.
 
 Server analytics requires `NEXT_PUBLIC_UMAMI_WEBSITE_ID` and `UMAMI_HOST_URL`.
+Set `UMAMI_HOST_URL=https://gateway.umami.is` for direct server events on
+Umami Cloud.
+
+If you already collect browser analytics, set the browser opt-in before
+redeploying the proxy. For server-only analytics, leave the browser opt-in unset.
 
 `src/app/layout.tsx` renders `UmamiAnalyticsScript`, which loads the script with
 `data-exclude-search="true"` so query strings are not collected by default.

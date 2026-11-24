@@ -6,6 +6,7 @@ import { getSafeAuthRedirect } from "@/features/auth/redirect";
 const authRoutes = new Set(["/login", "/register"]);
 const protectedRoutePrefixes = ["/account", "/admin"];
 const inviteAcceptPath = "/invite/accept";
+const analyticsPaths = new Set(["/stats.js", "/api/send"]);
 
 function isProtectedRoute(pathname: string) {
   return protectedRoutePrefixes.some(
@@ -39,6 +40,19 @@ function redirectTo(
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const requestHeaders = new Headers(request.headers);
+
+  if (analyticsPaths.has(pathname.toLowerCase())) {
+    for (const header of [
+      "cookie",
+      "authorization",
+      "proxy-authorization",
+      "referer",
+    ]) {
+      requestHeaders.delete(header);
+    }
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  }
+
   requestHeaders.set(
     "x-mirage-current-path",
     `${request.nextUrl.pathname}${request.nextUrl.search}`,
@@ -81,5 +95,8 @@ export const config = {
     "/invite/accept",
     "/login",
     "/register",
+    // beforeFiles rewrites match these paths case-insensitively.
+    "/([sS][tT][aA][tT][sS]\\.[jJ][sS])",
+    "/([aA][pP][iI])/([sS][eE][nN][dD])",
   ],
 };
